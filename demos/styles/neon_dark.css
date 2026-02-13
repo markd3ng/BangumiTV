@@ -1,0 +1,123 @@
+:root {
+    --bg: #050505;
+    --card: #121212;
+    --accent: #00f3ff;
+    --pink: #ff00ff;
+    --text: #e0e0e0;
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    padding: 40px 20px;
+}
+
+.bgm-container {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+blockquote {
+    color: var(--pink);
+    border-image: linear-gradient(to bottom, var(--accent), var(--pink)) 1;
+    border-left: 4px solid;
+    padding-left: 20px;
+    font-size: 1.2em;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.bgm-tabs {
+    margin-bottom: 40px;
+}
+
+.bgm-tab {
+    color: #555;
+    border: 1px solid #333;
+    margin-right: 15px;
+    padding: 8px 20px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.bgm-tab.bgm-active {
+    color: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 15px var(--accent);
+}
+
+.bgm-collection {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 30px;
+}
+
+.bgm-item {
+    background: var(--card);
+    border: 1px solid #222;
+    display: flex;
+    transition: 0.3s;
+    position: relative;
+}
+
+.bgm-item:hover {
+    border-color: var(--pink);
+    box-shadow: 0 0 20px var(--pink);
+    z-index: 10;
+    transform: scale(1.02);
+}
+
+.bgm-item-thumb {
+    width: 120px;
+    filter: grayscale(50%);
+    transition: 0.3s;
+}
+
+.bgm-item:hover .bgm-item-thumb {
+    filter: grayscale(0%);
+}
+
+.bgm-item-info {
+    padding: 20px;
+    border-left: 1px solid #222;
+}
+
+.bgm-item-title.main {
+    color: var(--accent);
+    font-weight: bold;
+    text-shadow: 0 0 5px var(--accent);
+}
+
+.bgm-item-title {
+    font-size: 12px;
+    color: #888;
+}
+
+.bgm-item-statusBar-container {
+    margin-top: 20px;
+    height: 2px;
+    background: #333;
+}
+
+.bgm-item-statusBar {
+    background: var(--pink);
+    box-shadow: 0 0 10px var(--pink);
+}
+
+.bgm-item-percentage {
+    font-size: 10px;
+    color: var(--pink);
+    margin-top: 5px;
+    display: block;
+}
+
+.bgm-btn {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 10px 40px;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: inset 0 0 5px var(--accent);
+}

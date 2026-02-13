@@ -1,0 +1,105 @@
+:root {
+    --bg: #000814;
+    --hud-blue: #00d2ff;
+    --hud-glow: rgba(0, 210, 255, 0.4);
+}
+
+body {
+    background: var(--bg);
+    color: var(--hud-blue);
+    font-family: 'Space Mono', monospace;
+    padding: 50px;
+    background-image: radial-gradient(var(--hud-blue) 0.5px, transparent 0.5px);
+    background-size: 30px 30px;
+}
+
+.bgm-container {
+    max-width: 1100px;
+    margin: 0 auto;
+    position: relative;
+}
+
+blockquote {
+    border: 1px solid var(--hud-blue);
+    padding: 20px;
+    background: rgba(0, 210, 255, 0.05);
+    text-shadow: 0 0 10px var(--hud-blue);
+    clip-path: polygon(0 0, 95% 0, 100% 20%, 100% 100%, 5% 100%, 0 80%);
+}
+
+.bgm-tab {
+    border: 1px solid var(--hud-blue);
+    margin-right: 10px;
+    padding: 5px 20px;
+    background: transparent;
+    cursor: pointer;
+    transition: 0.3s;
+    position: relative;
+}
+
+.bgm-tab.bgm-active {
+    background: var(--hud-blue);
+    color: black;
+    box-shadow: 0 0 20px var(--hud-blue);
+}
+
+.bgm-collection {
+    display: grid;
+    gap: 20px;
+}
+
+.bgm-item {
+    border: 1px solid rgba(0, 210, 255, 0.3);
+    display: flex;
+    background: rgba(0, 210, 255, 0.02);
+    text-decoration: none;
+    color: inherit;
+    position: relative;
+    transition: 0.3s;
+}
+
+.bgm-item:hover {
+    border-color: var(--hud-blue);
+    background: rgba(0, 210, 255, 0.1);
+    box-shadow: inset 0 0 20px rgba(0, 210, 255, 0.2);
+}
+
+.bgm-item-thumb {
+    width: 130px;
+    opacity: 0.7;
+    mix-blend-mode: screen;
+}
+
+.bgm-item-info {
+    padding: 15px;
+    border-left: 1px solid rgba(0, 210, 255, 0.3);
+    flex-grow: 1;
+}
+
+.bgm-item-statusBar-container {
+    border: 1px solid var(--hud-blue);
+    height: 6px;
+    margin-top: 15px;
+    padding: 2px;
+}
+
+.bgm-item-statusBar {
+    background: var(--hud-blue);
+    box-shadow: 0 0 10px var(--hud-blue);
+}
+
+.bgm-btn {
+    background: transparent;
+    color: var(--hud-blue);
+    border: 2px solid var(--hud-blue);
+    padding: 10px 40px;
+    cursor: pointer;
+    font-size: 1.1rem;
+    text-transform: uppercase;
+    box-shadow: 0 0 10px rgba(0, 210, 255, 0.3);
+}
+
+.bgm-btn:hover {
+    background: var(--hud-blue);
+    color: black;
+}

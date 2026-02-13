@@ -1,8 +1,7 @@
-{
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/api/serverless.js"
-    }
-  ]
-}
+"rewrites"m78: [
+  {
+    "source": "/(.*)",
+    "destination": "/api/serverless.js"
+  }
+]
+}i7h48gvnkx u56

@@ -1,0 +1,104 @@
+:root {
+    --bg: #181818;
+    --border: #ffffff;
+    --tab-bg: #303030;
+    --acc: #00ff00;
+}
+
+body {
+    background: var(--bg);
+    color: #fff;
+    font-family: 'Courier', monospace;
+    image-rendering: pixelated;
+    padding: 40px;
+}
+
+* {
+    border-radius: 0 !important;
+}
+
+.bgm-container {
+    border: 4px solid var(--border);
+    padding: 20px;
+    outline: 4px solid var(--bg);
+    margin: 0 auto;
+    max-width: 800px;
+}
+
+blockquote {
+    border: 4px double var(--border);
+    padding: 10px;
+    margin-bottom: 20px;
+}
+
+.bgm-tab {
+    border: 4px solid var(--tab-bg);
+    margin-bottom: 10px;
+    background: var(--tab-bg);
+    padding: 5px 10px;
+    display: inline-block;
+    cursor: pointer;
+}
+
+.bgm-tab.bgm-active {
+    border-color: var(--acc);
+    color: var(--acc);
+    background: #000;
+}
+
+.bgm-item {
+    border: 4px solid var(--border);
+    margin-bottom: 15px;
+    display: flex;
+    background: #000;
+    box-shadow: 8px 8px 0 #444;
+}
+
+.bgm-item:active {
+    transform: translate(4px, 4px);
+    box-shadow: 4px 4px 0 #444;
+}
+
+.bgm-item-thumb {
+    width: 80px;
+    image-rendering: pixelated;
+    border-right: 4px solid var(--border);
+}
+
+.bgm-item-info {
+    padding: 10px;
+}
+
+.bgm-item-title.main {
+    font-size: 1.2em;
+    color: var(--acc);
+}
+
+.bgm-item-statusBar-container {
+    background: #333;
+    height: 16px;
+    border: 2px solid var(--border);
+    margin-top: 10px;
+    position: relative;
+}
+
+.bgm-item-statusBar {
+    background: repeating-linear-gradient(90deg, var(--acc), var(--acc) 10px, transparent 10px, transparent 15px);
+}
+
+.bgm-item-percentage {
+    position: absolute;
+    right: 5px;
+    top: -1px;
+    font-size: 10px;
+    color: #fff;
+    text-shadow: 1px 1px #000;
+}
+
+.bgm-btn {
+    border: 4px solid var(--border);
+    background: var(--bg);
+    color: #fff;
+    padding: 10px 20px;
+    cursor: pointer;
+}

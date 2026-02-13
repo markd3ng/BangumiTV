@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BangumiTV Demo Showcase</title>
+    <link id="theme-style" rel="stylesheet" href="styles/claymorphism.css">
+    <style>
+        /* Switcher Styles - Not part of the actual theme */
+        .demo-switcher {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 10000;
+            font-family: sans-serif;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .demo-switcher h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #aaa;
+        }
+
+        .demo-switcher select {
+            width: 100%;
+            padding: 8px;
+            border-radius: 5px;
+            border: none;
+            background: #333;
+            color: white;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="demo-switcher">
+        <h3>切换视觉风格</h3>
+        <select onchange="document.getElementById('theme-style').href = 'styles/' + this.value + '.css'">
+            <option value="minimal_white">1. 极简白 (Minimalist White)</option>
+            <option value="glassmorphism">2. 毛玻璃幻影 (Glassmorphism)</option>
+            <option value="neon_dark">3. 霓虹深渊 (Neon Dark)</option>
+            <option value="soft_anime">4. 治愈系动漫 (Soft Anime)</option>
+            <option value="cyberpunk">5. 赛博朋克 (Cyberpunk)</option>
+            <option value="retro_pixel">6. 复古像素 (Retro Pixel)</option>
+            <option value="magazine">7. 杂志排版 (Magazine Style)</option>
+            <option value="material_you">8. 灵动设计 (Material You)</option>
+            <option value="claymorphism" selected>9. 黏土风格 (Claymorphism)</option>
+            <option value="futuristic_hud">10. 未来全息 (Futuristic HUD)</option>
+        </select>
+    </div>
+
+    <div class="bgm-container">
+        <blockquote>
+            <p>生命不止，追番不息！</p>
+        </blockquote>
+
+        <div class="bgm-tabs">
+            <span class="bgm-tab">想看(23)</span>
+            <span class="bgm-tab bgm-active">在看(17)</span>
+            <span class="bgm-tab">看过(178)</span>
+            <span class="bgm-tab" style="margin-left:auto; background: #eccc68; color: #5a4b41;"
+                onclick="showSection('daily')">每日番组 (Matrix)</span>
+            <span class="bgm-tab" style="background: #70a1ff; color: white;"
+                onclick="showSection('collection')">我的收藏</span>
+        </div>
+
+        <!-- Collection Section -->
+        <div class="bgm-collection" id="collection-section">
+            <a class="bgm-item" href="#">
+                <div class="bgm-item-thumb"
+                    style="background-image:url('https://lain.bgm.tv/pic/cover/l/b9/52/526979_R83u1.jpg')"
+                    referrerpolicy="no-referrer"></div>
+                <div class="bgm-item-info">
+                    <span class="bgm-item-title main">地狱模式 ～喜欢速通游戏的玩家在废设定异世界无双～</span>
+                    <span class="bgm-item-title">ヘルモード ～やり込み好きのゲーマーは廃设定の异世界で无双する～</span>
+                    <div class="bgm-item-statusBar-container">
+                        <div class="bgm-item-statusBar" style="width:41.6%"></div>
+                        <span class="bgm-item-percentage">进度：5 / 12</span>
+                    </div>
+                </div>
+            </a>
+            <!-- Sample Item 2 -->
+            <a class="bgm-item" href="#">
+                <div class="bgm-item-thumb"
+                    style="background-image:url('https://lain.bgm.tv/pic/cover/l/08/df/372010_KBWk9.jpg')"
+                    referrerpolicy="no-referrer"></div>
+                <div class="bgm-item-info">
+                    <span class="bgm-item-title main">狼与香辛料 行商邂逅贤狼</span>
+                    <span class="bgm-item-title">狼と香辛料 MERCHANT MEETS THE WISE WOLF</span>
+                    <div class="bgm-item-statusBar-container">
+                        <div class="bgm-item-statusBar" style="width:100%"></div>
+                        <span class="bgm-item-percentage">进度：25 / 25</span>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Daily Bangumi Section -->
+        <div id="daily-section" style="display:none;">
+            <div class="bgm-tabs"
+                style="justify-content: center; background: rgba(255,255,255,0.5); padding: 10px; border-radius: 20px; box-shadow: inset 5px 5px 10px #cbcdd3; border: none;">
+                <span class="bgm-tab day-tab bgm-active" onclick="showDay(1, this)">周一</span>
+                <span class="bgm-tab day-tab" onclick="showDay(2, this)">周二</span>
+                <span class="bgm-tab day-tab" onclick="showDay(3, this)">周三</span>
+                <span class="bgm-tab day-tab" onclick="showDay(4, this)">周四</span>
+                <span class="bgm-tab day-tab" onclick="showDay(5, this)">周五</span>
+                <span class="bgm-tab day-tab" onclick="showDay(6, this)">周六</span>
+                <span class="bgm-tab day-tab" onclick="showDay(0, this)">周日</span>
+            </div>
+
+            <div class="bgm-matrix" id="day-content">
+                <a class="bgm-matrix-item" href="#">
+                    <div class="bgm-matrix-thumb"
+                        style="background-image:url('https://lain.bgm.tv/pic/cover/l/c8/8a/371546_Df9ri.jpg')"></div>
+                    <span class="bgm-matrix-title">每周一热门番剧 1</span>
+                    <span class="bgm-matrix-weekday">20:30 更新</span>
+                </a>
+                <a class="bgm-matrix-item" href="#">
+                    <div class="bgm-matrix-thumb"
+                        style="background-image:url('https://lain.bgm.tv/pic/cover/l/0d/cc/444049_pPnPh.jpg')"></div>
+                    <span class="bgm-matrix-title">每周一热门番剧 2</span>
+                    <span class="bgm-matrix-weekday">21:00 更新</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="bgm-navigator">
+            <a class="bgm-btn">加载更多</a>
+        </div>
+    </div>
+
+    <script>
+        function showSection(section) {
+            document.getElementById('collection-section').style.display = section === 'collection' ? 'grid' : 'none';
+            document.getElementById('daily-section').style.display = section === 'daily' ? 'block' : 'none';
+        }
+
+        function showDay(day, el) {
+            document.querySelectorAll('.day-tab').forEach(t => t.classList.remove('bgm-active'));
+            el.classList.add('bgm-active');
+
+            const content = document.getElementById('day-content');
+            const days = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+            const covers = [
+                'https://lain.bgm.tv/pic/cover/l/c8/8a/371546_Df9ri.jpg',
+                'https://lain.bgm.tv/pic/cover/l/0d/cc/444049_pPnPh.jpg',
+                'https://lain.bgm.tv/pic/cover/l/8a/53/444557_940Uq.jpg',
+                'https://lain.bgm.tv/pic/cover/l/54/b5/406251_MjAw4.jpg'
+            ];
+
+            content.innerHTML = '';
+            for (let i = 1; i <= 6; i++) {
+                const cover = covers[Math.floor(Math.random() * covers.length)];
+                content.innerHTML += `
+                    <a class="bgm-matrix-item" href="#">
+                        <div class="bgm-matrix-thumb" style="background-image:url('${cover}')"></div>
+                        <span class="bgm-matrix-title">${days[day]}的连载番剧 ${i}</span>
+                        <span class="bgm-matrix-weekday">更新于 ${days[day]}</span>
+                    </a>
+                `;
+            }
+        }
+    </script>
+</body>
+
+</html>

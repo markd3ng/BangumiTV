@@ -1,0 +1,176 @@
+:root {
+    --bg: #e6e9f0;
+    --clay-blue: #70a1ff;
+    --clay-pink: #ff4757;
+    --clay-green: #7bed9f;
+    --clay-yellow: #eccc68;
+}
+
+body {
+    background: var(--bg);
+    font-family: 'Outfit', sans-serif;
+    padding: 20px;
+    color: #2f3542;
+    margin: 0;
+}
+
+.bgm-container {
+    max-width: 95%;
+    margin: 0 auto;
+}
+
+blockquote {
+    background: white;
+    padding: 25px;
+    border-radius: 30px;
+    box-shadow: 10px 10px 20px #cbcdd3, -10px -10px 20px #ffffff, inset 5px 5px 10px #ffffff, inset -5px -5px 10px #cbcdd3;
+    margin-bottom: 40px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+.bgm-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+.bgm-tab {
+    background: white;
+    border-radius: 20px;
+    padding: 12px 25px;
+    box-shadow: 8px 8px 16px #cbcdd3, -8px -8px 16px #ffffff;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.bgm-tab.bgm-active {
+    background: var(--clay-blue);
+    color: white;
+    box-shadow: inset 6px 6px 12px rgba(0, 0, 0, 0.1), inset -6px -6px 12px rgba(255, 255, 255, 0.2);
+}
+
+.bgm-collection {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 30px;
+}
+
+.bgm-item {
+    background: white;
+    border-radius: 35px;
+    display: flex;
+    box-shadow: 15px 15px 30px #cbcdd3, -15px -15px 30px #ffffff;
+    text-decoration: none;
+    color: inherit;
+    padding: 15px;
+}
+
+.bgm-item:hover {
+    transform: translateY(-5px);
+}
+
+.bgm-item-thumb {
+    width: 120px;
+    border-radius: 25px;
+    box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.1);
+    margin-right: 20px;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-color: #f0f2f5;
+    /* Subtle background for mismatched ratios */
+}
+
+.bgm-item-info {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.bgm-item-statusBar-container {
+    background: #f1f2f6;
+    height: 14px;
+    border-radius: 10px;
+    margin-top: 15px;
+    overflow: hidden;
+    box-shadow: inset 3px 3px 6px #cbcdd3, inset -3px -3px 6px #ffffff;
+}
+
+.bgm-item-statusBar {
+    background: var(--clay-pink);
+    height: 100%;
+    border-radius: 10px;
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2);
+}
+
+/* Matrix Layout for Daily Bangumi */
+.bgm-matrix {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 30px;
+    margin-top: 40px;
+}
+
+.bgm-matrix-item {
+    background: white;
+    border-radius: 30px;
+    padding: 15px;
+    box-shadow: 10px 10px 20px #cbcdd3, -10px -10px 20px #ffffff;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    transition: 0.3s;
+}
+
+.bgm-matrix-item:hover {
+    transform: translateY(-10px);
+}
+
+.bgm-matrix-thumb {
+    width: 100%;
+    height: auto;
+    aspect-ratio: auto;
+    border-radius: 20px;
+    margin-bottom: 10px;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-color: #f8f9fa;
+    box-shadow: inset 5px 5px 10px rgba(0, 0, 0, 0.05);
+    min-height: 250px;
+    /* Base height to maintain grid rhythm */
+}
+
+.bgm-matrix-title {
+    font-size: 14px;
+    font-weight: bold;
+    padding: 0 5px;
+    margin-bottom: 5px;
+}
+
+.bgm-matrix-weekday {
+    font-size: 11px;
+    background: var(--clay-yellow);
+    color: #5a4b41;
+    padding: 4px 12px;
+    border-radius: 15px;
+    font-weight: bold;
+}
+
+.bgm-btn {
+    background: var(--clay-green);
+    color: white;
+    padding: 15px 50px;
+    border-radius: 25px;
+    box-shadow: 8px 8px 16px #cbcdd3, -8px -8px 16px #ffffff, inset 5px 5px 10px rgba(255, 255, 255, 0.4);
+    cursor: pointer;
+    border: none;
+    font-weight: 800;
+}

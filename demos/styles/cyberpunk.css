@@ -1,0 +1,100 @@
+:root {
+    --bg: #0d0221;
+    --cyan: #00ffcc;
+    --magenta: #ff00ff;
+    --yellow: #fdf500;
+    --text: #ffffff;
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    padding: 40px;
+    background-image: radial-gradient(circle, #1a0b2e 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+blockquote {
+    border: 2px solid var(--cyan);
+    padding: 15px;
+    position: relative;
+    background: rgba(0, 255, 204, 0.1);
+}
+
+blockquote::after {
+    content: "SYS_MSG";
+    position: absolute;
+    top: -10px;
+    left: 10px;
+    background: var(--bg);
+    padding: 0 5px;
+    color: var(--cyan);
+    font-size: 10px;
+}
+
+.bgm-tab {
+    border: 1px solid var(--magenta);
+    margin: 5px;
+    padding: 5px 15px;
+    clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%);
+    transition: 0.3s;
+    cursor: pointer;
+}
+
+.bgm-tab.bgm-active {
+    background: var(--magenta);
+    color: black;
+    font-weight: bold;
+}
+
+.bgm-item {
+    border-left: 5px solid var(--yellow);
+    background: rgba(255, 255, 255, 0.05);
+    margin-bottom: 15px;
+    display: flex;
+    transition: 0.3s;
+}
+
+.bgm-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-left-width: 15px;
+}
+
+.bgm-item-thumb {
+    width: 100px;
+    filter: hue-rotate(90deg) contrast(1.2);
+}
+
+.bgm-item-info {
+    padding: 15px;
+}
+
+.bgm-item-title.main {
+    color: var(--cyan);
+    text-transform: uppercase;
+}
+
+.bgm-item-statusBar-container {
+    height: 10px;
+    background: #222;
+    margin-top: 10px;
+    position: relative;
+}
+
+.bgm-item-statusBar {
+    background: linear-gradient(90deg, var(--cyan), var(--magenta));
+}
+
+.bgm-btn {
+    border: 2px solid var(--yellow);
+    color: var(--yellow);
+    padding: 10px 30px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.bgm-btn:hover {
+    background: var(--yellow);
+    color: black;
+}

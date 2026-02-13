@@ -1,0 +1,110 @@
+:root {
+    --bg: #fff;
+    --text: #000;
+    --accent: #d4af37;
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Playfair Display", serif;
+    padding: 60px 40px;
+    line-height: 1.4;
+}
+
+.bgm-container {
+    max-width: 1100px;
+    margin: 0 auto;
+    border-top: 10px solid #000;
+    padding-top: 40px;
+}
+
+blockquote {
+    font-size: 2em;
+    text-align: center;
+    margin-bottom: 60px;
+    font-weight: 900;
+    letter-spacing: -1px;
+    text-transform: uppercase;
+}
+
+.bgm-tabs {
+    justify-content: center;
+    border-bottom: 2px solid #000;
+    padding-bottom: 5px;
+    margin-bottom: 40px;
+}
+
+.bgm-tab {
+    font-weight: bold;
+    border: none;
+    padding: 10px 30px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.bgm-tab.bgm-active {
+    border-bottom: 8px solid var(--accent);
+}
+
+.bgm-collection {
+    grid-template-columns: 2fr 1fr 1fr;
+}
+
+/* Custom asymmetrical grid simulation */
+.bgm-item {
+    border: none;
+    flex-direction: column;
+    margin-bottom: 40px;
+}
+
+.bgm-item-thumb {
+    width: 100%;
+    height: 400px;
+    margin-bottom: 15px;
+    border: 1px solid #eee;
+}
+
+.bgm-item-info {
+    padding: 0;
+}
+
+.bgm-item-title.main {
+    font-size: 1.8em;
+    margin-bottom: 10px;
+    border-bottom: 3px solid #000;
+    display: inline-block;
+}
+
+.bgm-item-title {
+    font-size: 14px;
+    opacity: 0.7;
+    font-style: italic;
+}
+
+.bgm-item-statusBar-container {
+    height: 1px;
+    background: #ccc;
+    margin-top: 20px;
+}
+
+.bgm-item-statusBar {
+    background: var(--accent);
+    height: 3px;
+    top: -1px;
+    position: relative;
+}
+
+.bgm-btn {
+    background: #000;
+    color: #fff;
+    padding: 20px 60px;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+@media (max-width: 800px) {
+    .bgm-collection {
+        grid-template-columns: 1fr;
+    }
+}

@@ -1,0 +1,99 @@
+:root {
+    --bg: #fffbf0;
+    --primary: #ff9fb2;
+    --secondary: #b9e9ff;
+    --text: #5a4b41;
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "M PLUS Rounded 1c", sans-serif;
+    padding: 40px 20px;
+}
+
+.bgm-container {
+    max-width: 850px;
+    margin: 0 auto;
+    background: white;
+    padding: 30px;
+    border-radius: 40px;
+    box-shadow: 0 10px 0 #ede0c8;
+}
+
+blockquote {
+    background: var(--secondary);
+    color: #3a5c6d;
+    border-radius: 20px;
+    padding: 15px;
+    text-align: center;
+}
+
+.bgm-tab {
+    background: #f0f0f0;
+    border-radius: 15px;
+    margin-right: 10px;
+    padding: 10px 20px;
+    font-weight: bold;
+}
+
+.bgm-tab.bgm-active {
+    background: var(--primary);
+    color: white;
+    transform: rotate(-2deg);
+}
+
+.bgm-item {
+    border: 3px solid #f0f0f0;
+    border-radius: 25px;
+    margin-bottom: 20px;
+    display: flex;
+    transition: 0.2s;
+    overflow: hidden;
+}
+
+.bgm-item:hover {
+    border-color: var(--primary);
+    transform: translateY(-3px) rotate(1deg);
+}
+
+.bgm-item-thumb {
+    width: 90px;
+    border-radius: 0 15px 15px 0;
+}
+
+.bgm-item-info {
+    padding: 15px;
+}
+
+.bgm-item-title.main {
+    color: #d0667a;
+    font-size: 1.1em;
+}
+
+.bgm-item-statusBar-container {
+    background: #eee;
+    height: 12px;
+    border-radius: 6px;
+    margin-top: 10px;
+    overflow: hidden;
+}
+
+.bgm-item-statusBar {
+    background: var(--primary);
+    height: 100%;
+}
+
+.bgm-btn {
+    background: var(--secondary);
+    border: none;
+    border-radius: 20px;
+    padding: 15px 30px;
+    color: #3a5c6d;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.bgm-btn:hover {
+    background: #9cdfff;
+}

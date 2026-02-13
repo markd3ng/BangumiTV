@@ -1,145 +1,189 @@
+document.addEventListener('DOMContentLoaded', () => {
+  const apiBase = '/api';
+  const container = document.querySelector('.bgm-container');
+  const categories = ['watching', 'watched', 'want'];
+  let currentType = 'watching';
+  let currentOffset = 0;
+  const limit = 12;
 
-const bangumiUrl = bgmConfig.apiUrl
-const quote = bgmConfig.quote
+  // --- State & UI Helpers ---
 
-const limit = 12
-const load = `<img style="margin: 0 auto;" src="https://cdn.jsdelivr.net/gh/hans362/Bilibili-Bangumi-JS/assets/bilibili.gif">`
+  const showLoading = (isDaily = false) => {
+    const targetId = isDaily ? 'day-content' : 'collection-section';
+    const target = document.getElementById(targetId);
+    if (!target) return;
 
-function getTab() {
-  const types = {
-    'want': '想看',
-    'watching': '在看',
-    'watched': '看过'
-  }
-  const url = `${bangumiUrl}/bangumi_total`
-  getJSON(url, function (data) {
-    for (const key in data) {
-      if (Object.hasOwnProperty.call(data, key)) {
-        const value = data[key]
-        document.querySelector('.bgm-tabs')
-          .insertAdjacentHTML('beforeend', `<span class="bgm-tab" id="bgm-${key}" data-type=${key} onclick="tabClick(event)">${types[key]}(${value})</span>`)
+    target.innerHTML = '';
+    const count = isDaily ? 6 : 4;
+    for (let i = 0; i < count; i++) {
+      const skeleton = document.createElement('div');
+      skeleton.className = isDaily ? 'bgm-matrix-item bgm-skeleton' : 'bgm-item bgm-skeleton';
+      skeleton.style.minHeight = isDaily ? '350px' : '180px';
+      target.appendChild(skeleton);
+    }
+  };
+
+  const clearActiveTabs = (selector) => {
+    document.querySelectorAll(selector).forEach(t => t.classList.remove('bgm-active'));
+  };
+
+  // --- Data Fetching ---
+
+  const fetchCollection = async (type, offset = 0, append = false) => {
+    if (!append) showLoading();
+    try {
+      const response = await fetch(`${apiBase}/bangumi?type=${type}&offset=${offset}&limit=${limit}`);
+      const result = await response.json();
+      renderCollection(result.data, append);
+
+      // Show/Hide Load More
+      const total = result.total || 0;
+      const nav = document.querySelector('.bgm-navigator');
+      if (offset + limit < total) {
+        nav.style.display = 'block';
+      } else {
+        nav.style.display = 'none';
       }
-    }
-    document.getElementsByClassName('bgm-tab')[1].click()
-  })
-}
-
-function getPage(pageNum, type) {
-  const url = `${bangumiUrl}/bangumi?type=${type}&offset=${(pageNum - 1) * limit}&limit=${limit}`
-  getJSON(url, function (data) {
-    if (pageNum == 1) {
-      emptyEl(document.querySelector('.bgm-collection'))
-    } else {
-      removeEl(document.querySelector('.bgm-navigator'))
-    }
-    Array.prototype.forEach.call(data.data, function (value, index) {
-
-      let totalEp = value.eps || 0
-      let ep = type === 'watched' ? totalEp : (value.ep_status || 0)
-
-      let percentage = totalEp > 0 ? (ep / totalEp * 100) : 0
-      let cover = (value.images && value.images.large)
-        ? value.images.large
-        : 'https://placehold.co/150x200?text=No+Image'
-      let subjectUrl = `https://bgm.tv/subject/${value.subject_id}`
-      const html = `
-      <a class="bgm-item" href="${subjectUrl}" target="_blank">
-          <div class="bgm-item-thumb" style="background-image:url(${cover})" referrerpolicy="no-referrer"></div>
-          <div class="bgm-item-info">
-              <span class="bgm-item-title main">${value.name_cn || value.name}</span>
-              <span class="bgm-item-title">${value.summary || value.name}</span>
-              <div class="bgm-item-statusBar-container">
-                <div class="bgm-item-statusBar" style="width:${percentage}%"></div>
-                <span class="bgm-item-percentage">进度：${ep} / ${totalEp}</span>
-              </div>
-          </div>
-      </a>
-      `
-      document.querySelector('.bgm-collection')
-        .insertAdjacentHTML('beforeend', html)
-    })
-    if (pageNum < Math.ceil(data.total / limit)) {
-      const html = `
-      <div class="bgm-navigator">
-          <a class="bgm-btn">加载更多</a>
-          <script>
-          
-          </script>
-      </div>
-      `
-      document.querySelector('.bgm-container')
-        .insertAdjacentHTML('beforeend', html)
-      document.querySelector('.bgm-btn').addEventListener('click', function (event) {
-        loadClick(event, pageNum + 1, type)
-      }, { 'once': true })
-    }
-  })
-}
-
-function tabClick(event) {
-
-  emptyEl(document.querySelector('.bgm-collection'))
-  removeEl(document.querySelector('.bgm-navigator'))
-
-  document.querySelector('.bgm-collection').insertAdjacentHTML('beforeend', load)
-  const el = event.target
-  el.classList.add('bgm-active')
-  document.querySelectorAll('.bgm-tab').forEach(function (item) {
-    if (item.id !== el.id) {
-      item.classList.remove('bgm-active')
-    }
-  })
-  const type = el.dataset.type
-  getPage(1, type)
-}
-
-function loadClick(event, pageNum, type) {
-  getPage(pageNum, type);
-  const el = event.target
-  el.textContent = '加载中'
-  el.style.backgroundColor = 'grey'
-}
-
-function emptyEl(el) {
-  while (el.firstChild)
-    el.removeChild(el.firstChild)
-}
-
-function removeEl(el) {
-  if (el && el.parentNode) {
-    el.parentNode.removeChild(el)
-  }
-}
-
-function getJSON(url, callback) {
-  var xhr = new XMLHttpRequest()
-  xhr.open('GET', url, true)
-
-  xhr.onload = function () {
-    if (this.status >= 200 && this.status < 400) {
-      // Success!
-      callback(JSON.parse(this.response))
+    } catch (error) {
+      console.error('Failed to fetch collection:', error);
     }
   };
 
-  xhr.onerror = function () {
-    // There was a connection error of some sort
+  const fetchCalendar = async () => {
+    showLoading(true);
+    try {
+      const response = await fetch(`${apiBase}/calendar`);
+      const calendarData = await response.json();
+      window.calendarData = calendarData; // Cache in window for day switching
+
+      // Default to today
+      const today = new Date().getDay(); // 0 is Sunday
+      const dayTab = document.querySelector(`.day-tab[data-day="${today}"]`);
+      if (dayTab) dayTab.click();
+    } catch (error) {
+      console.error('Failed to fetch calendar:', error);
+    }
   };
 
-  xhr.send()
-}
+  // --- Rendering ---
 
-function init() {
-  if (quote) {
-    document.querySelector('.bgm-container').insertAdjacentHTML('beforeend', `<blockquote><p>${quote}</p></blockquote>`)
-  }
-  document.querySelector('.bgm-container').insertAdjacentHTML('beforeend', `<div class="bgm-tabs"></div>`)
-  document.querySelector('.bgm-container').insertAdjacentHTML('beforeend', `
-    <div class="bgm-collection" id="bgm-collection">
-      ${load}
-    </div>`
-  )
-  getTab()
-}
+  const renderCollection = (items, append) => {
+    const target = document.getElementById('collection-section');
+    if (!append) target.innerHTML = '';
 
-init()
+    items.forEach(item => {
+      const percentage = item.eps > 0 ? Math.round((item.ep_status / item.eps) * 100) : 0;
+      const cover = (item.images && item.images.large) ? item.images.large : 'https://placehold.co/150x200?text=No+Image';
+
+      const card = `
+                <div class="bgm-item">
+                    <div class="bgm-item-thumb" 
+                         style="background-image:url('${cover}')" 
+                         onclick="window.showLightbox('${cover}')"
+                         title="点击查看大图"></div>
+                    <div class="bgm-item-info">
+                        <a class="bgm-item-title-link" href="https://bgm.tv/subject/${item.id}" target="_blank">
+                            <span class="bgm-item-title main">${item.name_cn || item.name}</span>
+                        </a>
+                        <span class="bgm-item-title">${item.name}</span>
+                        <div class="bgm-item-statusBar-container">
+                            <div class="bgm-item-statusBar" style="width:${percentage}%"></div>
+                            <span class="bgm-item-progress-text">${item.ep_status} / ${item.eps || '??'}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+      target.insertAdjacentHTML('beforeend', card);
+    });
+  };
+
+  // --- Lightbox Implementation ---
+  const lightbox = document.createElement('div');
+  lightbox.className = 'bgm-lightbox';
+  lightbox.innerHTML = '<img src="" alt="Zoomed Cover">';
+  document.body.appendChild(lightbox);
+
+  window.showLightbox = (url) => {
+    const img = lightbox.querySelector('img');
+    img.src = url;
+    lightbox.classList.add('active');
+  };
+
+  lightbox.addEventListener('click', () => {
+    lightbox.classList.remove('active');
+  });
+
+  const renderDay = (dayIndex) => {
+    const target = document.getElementById('day-content');
+    target.innerHTML = '';
+
+    // Find day data (bgm.tv calendar uses 1=Mon...7=Sun)
+    const dayData = window.calendarData.find(d => d.weekday.id === (dayIndex === 0 ? 7 : dayIndex));
+    if (!dayData || !dayData.items) return;
+
+    const weekdayLabel = dayData.weekday.cn.replace('星期', '周');
+
+    dayData.items.forEach(item => {
+      const cover = (item.images && item.images.large) ? item.images.large : 'https://placehold.co/150x200?text=No+Image';
+      const card = `
+                <div class="bgm-matrix-item">
+                    <div class="bgm-matrix-thumb" 
+                         style="background-image:url('${cover}')" 
+                         onclick="window.showLightbox('${cover}')"
+                         title="点击查看大图"></div>
+                    <a class="bgm-item-title-link" href="https://bgm.tv/subject/${item.id}" target="_blank">
+                        <span class="bgm-matrix-title">${item.name_cn || item.name}</span>
+                    </a>
+                </div>
+            `;
+      target.insertAdjacentHTML('beforeend', card);
+    });
+  };
+
+  // --- Event Listeners ---
+
+  // Collection Category Switching
+  document.querySelectorAll('.cat-tab').forEach((tab, index) => {
+    tab.addEventListener('click', () => {
+      clearActiveTabs('.cat-tab');
+      tab.classList.add('bgm-active');
+      currentType = categories[index];
+      currentOffset = 0;
+      fetchCollection(currentType);
+
+      // Switch view
+      document.getElementById('collection-section').style.display = 'grid';
+      document.getElementById('daily-section').style.display = 'none';
+    });
+  });
+
+  // Daily Bangumi Toggle
+  document.getElementById('btn-daily').addEventListener('click', () => {
+    clearActiveTabs('.bgm-tab');
+    document.getElementById('btn-daily').classList.add('bgm-active');
+    document.getElementById('collection-section').style.display = 'none';
+    document.getElementById('daily-section').style.display = 'block';
+    if (!window.calendarData) {
+      fetchCalendar();
+    }
+  });
+
+  // Day Switching
+  document.querySelectorAll('.day-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      clearActiveTabs('.day-tab');
+      tab.classList.add('bgm-active');
+      const day = parseInt(tab.dataset.day);
+      renderDay(day);
+    });
+  });
+
+  // Load More
+  document.querySelector('.bgm-btn').addEventListener('click', () => {
+    currentOffset += limit;
+    fetchCollection(currentType, currentOffset, true);
+  });
+
+  // Initial Load
+  fetchCollection(currentType);
+});

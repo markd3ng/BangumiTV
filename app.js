@@ -1,96 +1,32 @@
-import { fileURLToPath } from 'url'
-import { dirname, join } from 'path'
-import { readFileSync } from 'fs'
-import Cors from '@fastify/cors'
-import Static from '@fastify/static'
+const fastify = require('fastify')({ logger: true });
+const path = require('path');
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
+// Register CORS
+fastify.register(require('@fastify/cors'), {
+  origin: '*',
+});
 
-const collectionMap = {
-  want: [],
-  watched: [],
-  watching: [],
-}
+// Register Static Files
+fastify.register(require('@fastify/static'), {
+  root: path.join(__dirname, 'public'),
+  prefix: '/',
+});
 
-const calendar = []
+// Register New API Routes
+fastify.register(require('./src/api/routes'), { prefix: '/api' });
 
-export default async function (fastify, opt) {
-  fastify.register(Cors, {
-    origin: true,
-  })
+// Legacy compatibility (optional, can be removed if frontend is updated simultaneously)
+fastify.register(require('./src/api/routes'), { prefix: '/' });
 
-  fastify.register(Static, {
-    root: join(__dirname, 'public'),
-  })
+// Run the server!
+const start = async () => {
+  try {
+    await fastify.listen({ port: 3000, host: '0.0.0.0' });
+    console.log(`- [INFO] Server logic refactored. Listening on port 3000.`);
+  } catch (err) {
+    fastify.log.error(err);
+    process.exit(1);
+  }
+};
 
-  fastify.get('/', (request, reply) => {
-    reply.sendFile('index.html')
-  })
-
-  fastify.get('/bangumi', (request, reply) => {
-    const { type, offset, limit } = request.query
-
-    if (!collectionMap[type]) {
-      reply.send({ msg: `No collection ${type}` }).statusCode(404)
-    }
-
-    const collection = collectionMap[type]
-    reply.send({
-      data: collection.data.slice(
-        parseInt(offset),
-        parseInt(offset) + parseInt(limit)
-      ),
-      total: collection.total,
-    })
-  })
-
-  fastify.get('/v2/bangumi', (request, reply) => {
-    const { type, page, size } = request.query
-    if (!collectionMap[type]) {
-      reply.send({ msg: `No collection ${type}` }).statusCode(404)
-    }
-
-    const collection = collectionMap[type]
-    reply.send({
-      data: collection.data.slice(
-        (parseInt(page) - 1) * size,
-        parseInt(page) * parseInt(size)
-      ),
-      total: collection.total,
-    })
-  })
-
-  fastify.get('/bangumi_total', (request, reply) => {
-    const res = {}
-    for (const key in collectionMap) {
-      if (Object.hasOwnProperty.call(collectionMap, key)) {
-        const collection = collectionMap[key]
-        res[key] = collection.total
-      }
-    }
-    reply.send(res)
-  })
-
-  fastify.get('/calendar', (request, reply) => {
-    reply.send(calendar)
-  })
-
-  fastify.addHook('onReady', async () => {
-    for (const key in collectionMap) {
-      if (Object.hasOwnProperty.call(collectionMap, key)) {
-        collectionMap[key] = await JSON.parse(
-          readFileSync(`${__dirname}/data/${key}.json`, 'utf8')
-        )
-      }
-    }
-
-    calendar.push(
-      ...(await JSON.parse(
-        readFileSync(`${__dirname}/data/calendar.json`, 'utf-8')
-      ))
-    )
-
-    console.log(`- [INFO] collection loaded.`)
-  })
-}
+start();

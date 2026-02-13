@@ -1,0 +1,134 @@
+:root {
+    --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --glass-bg: rgba(255, 255, 255, 0.15);
+    --glass-border: rgba(255, 255, 255, 0.2);
+    --text: #ffffff;
+    --accent: #ffd700;
+}
+
+body {
+    background: var(--bg-gradient);
+    background-attachment: fixed;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: var(--text);
+    margin: 0;
+    padding: 50px 20px;
+    min-height: 100vh;
+}
+
+.bgm-container {
+    max-width: 950px;
+    margin: 0 auto;
+}
+
+blockquote {
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    padding: 20px;
+    border-radius: 15px;
+    border-left: 5px solid var(--accent);
+    margin-bottom: 30px;
+}
+
+.bgm-tabs {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+.bgm-tab {
+    background: var(--glass-bg);
+    backdrop-filter: blur(5px);
+    padding: 10px 20px;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.bgm-tab.bgm-active {
+    background: white;
+    color: #764ba2;
+    font-weight: bold;
+}
+
+.bgm-collection {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 25px;
+}
+
+.bgm-item {
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    display: flex;
+    text-decoration: none;
+    color: inherit;
+    transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    overflow: hidden;
+}
+
+.bgm-item:hover {
+    transform: scale(1.05);
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.bgm-item-thumb {
+    width: 110px;
+    background-size: cover;
+    border-right: 1px solid var(--glass-border);
+}
+
+.bgm-item-info {
+    padding: 20px;
+}
+
+.bgm-item-title.main {
+    font-size: 16px;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.bgm-item-title {
+    font-size: 13px;
+    opacity: 0.8;
+}
+
+.bgm-item-statusBar-container {
+    margin-top: 15px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    height: 6px;
+    position: relative;
+}
+
+.bgm-item-statusBar {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 10px;
+}
+
+.bgm-item-percentage {
+    position: absolute;
+    top: 12px;
+    left: 0;
+    font-size: 10px;
+}
+
+.bgm-navigator {
+    text-align: center;
+    margin-top: 50px;
+}
+
+.bgm-btn {
+    background: white;
+    color: #764ba2;
+    padding: 15px 40px;
+    border-radius: 30px;
+    font-weight: bold;
+    text-decoration: none;
+    cursor: pointer;
+    display: inline-block;
+}

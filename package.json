@@ -3,10 +3,11 @@
   "version": "1.0.2",
   "description": "render your bangumi.tv progress on a static web page",
   "main": "index.js",
-  "type": "module",
   "scripts": {
-    "start": "fastify start -l info ./app.js",
-    "dev": "fastify start -w -l info -P app.js",
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "sync": "node src/scripts/sync.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
     "buildSubject": "node collection.js",
     "build": "node build.js"
   },

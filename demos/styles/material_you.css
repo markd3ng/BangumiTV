@@ -1,0 +1,113 @@
+:root {
+    --bg: #fcfcfc;
+    --primary: #f8dbd0;
+    --primary-text: #2c150d;
+    --secondary: #d1e5f4;
+    --card: #fef7f5;
+}
+
+body {
+    background: var(--bg);
+    color: #1c1b1f;
+    font-family: 'Roboto', 'Google Sans', sans-serif;
+    padding: 40px 20px;
+}
+
+.bgm-container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+blockquote {
+    background: var(--primary);
+    color: var(--primary-text);
+    padding: 24px;
+    border-radius: 28px;
+    margin-bottom: 32px;
+    font-weight: 500;
+    font-size: 18px;
+}
+
+.bgm-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+}
+
+.bgm-tab {
+    background: var(--secondary);
+    color: #001d33;
+    padding: 14px 24px;
+    border-radius: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: 0.2s;
+    white-space: nowrap;
+}
+
+.bgm-tab.bgm-active {
+    background: #00639b;
+    color: #ffffff;
+}
+
+.bgm-collection {
+    display: grid;
+    gap: 16px;
+}
+
+.bgm-item {
+    background: var(--card);
+    border-radius: 24px;
+    display: flex;
+    transition: 0.2s;
+    text-decoration: none;
+    color: inherit;
+    overflow: hidden;
+}
+
+.bgm-item:hover {
+    background: #f4eaeb;
+    transform: scale(1.01);
+}
+
+.bgm-item-thumb {
+    width: 120px;
+    border-radius: 0 16px 16px 0;
+}
+
+.bgm-item-info {
+    padding: 20px;
+}
+
+.bgm-item-title.main {
+    font-size: 1.1rem;
+    color: #201a19;
+    margin-bottom: 8px;
+}
+
+.bgm-item-statusBar-container {
+    background: #ede0de;
+    height: 8px;
+    border-radius: 4px;
+    margin-top: 16px;
+}
+
+.bgm-item-statusBar {
+    background: #9c4146;
+    height: 100%;
+    border-radius: 4px;
+}
+
+.bgm-btn {
+    background: #00639b;
+    color: white;
+    padding: 16px 32px;
+    border-radius: 100px;
+    font-weight: bold;
+    border: none;
+    cursor: pointer;
+    display: inline-block;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
