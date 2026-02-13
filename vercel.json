@@ -1,7 +1,8 @@
-"rewrites"m78: [
-  {
-    "source": "/(.*)",
-    "destination": "/api/serverless.js"
-  }
-]
-}i7h48gvnkx u56
+{
+  "rewrites": [
+    {
+      "source": "/(bangumi|calendar|api)(.*)",
+      "destination": "/api/serverless.js"
+    }
+  ]
+}
