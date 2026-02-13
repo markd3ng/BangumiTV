@@ -15,12 +15,16 @@
 ### 后端安装
 #### 方案一：Vercel
 1.  Fork 本项目
-2.  在本项目 `Settings -> Secrets -> Actions` 中点击 `New repository secret`，`Name` 填 `BANGUMI_USER`，`Value` 填 ` 你的 bgm.tv 的用户名 `，之后点击 `Add secret` 按钮
+2.  在本项目 `Settings -> Secrets -> Actions` 中点击 `New repository secret`，`Name` 填 `BANGUMI_USER`，`Value` 填你的 **bgm.tv 的数字 ID 或个人主页地址**（见下文注意事项），之后点击 `Add secret` 按钮
 3.  前往 Vercel 官网注册或登录。
 在 Vercel Dashboard 中点击 New Project，授权 GitHub，选择账户下 Fork 出来的本项目，点击 Deploy 完成部署。
 4.  记录下 Vercel 分配的 Production 域名 ( 如 bangumi-tv.vercel.app )
 
-**⚠️Github Action 会每两小时读取用户收藏状况生成数据，如需要可在。github/workflows/buildSubject.yml 中修改 cron**
+
+**⚠️ 注意事项**
+- **BANGUMI_USER**: 请填写你的数字 ID（如 `821993`）或自定义的个人主页用户名。如果填写昵称（Nickname）会导致 404 错误。请在 [设置-隐私](https://bgm.tv/settings/privacy) 中确认。
+- **构建机制**: GitHub Action 会每两小时自动运行一次。本项目采用了 **多源拉取机制**：优先从 CDN ([czy0729/Bangumi-Subject](https://github.com/czy0729/Bangumi-Subject)) 获取条目信息，若 CDN 缺失则会自动回退到 **Bangumi 官方 API**，确保数据 100% 完整。
+- **自定义配置**: 如需修改运行频率，请编辑 `.github/workflows/buildSubject.yml` 中的 cron 表达式。
 
 #### 方案二：自建服务器
 1.  Clone 本项目
@@ -57,7 +61,7 @@
 ```
 
 ## 感谢❤️
--   [Bangumi-Subject](https://github.com/GeeKaven/BangumiTV-Subject) 离线Bgm数据
+-   [Bangumi-Subject](https://github.com/czy0729/Bangumi-Subject) 离线Bgm数据 (由 czy0729 提供)
 -   [bangumi/api](https://github.com/bangumi/api) 提供 API
 -   [hans362/Bilibili-Bangumi-JS](https://github.com/hans362/Bilibili-Bangumi-JS) 提供前端展示逻辑
 -   [AlanDecode/PandaBangumi-Typecho-Plugin](https://github.com/AlanDecode/PandaBangumi-Typecho-Plugin) 提供前端展示样式
