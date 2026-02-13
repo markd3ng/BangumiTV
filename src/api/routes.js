@@ -1,7 +1,7 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
 
-async function routes(fastify, options) {
+export default async function routes(fastify, options) {
     const dataDir = path.resolve(process.cwd(), 'data');
 
     // Helper to load collection data
@@ -58,5 +58,3 @@ async function routes(fastify, options) {
         return [];
     });
 }
-
-module.exports = routes;

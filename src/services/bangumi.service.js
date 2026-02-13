@@ -1,9 +1,9 @@
-const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
-require('dotenv').config();
+import axios from 'axios';
+import fs from 'fs';
+import path from 'path';
+import 'dotenv/config';
 
-class BangumiService {
+export default class BangumiService {
     constructor(config = {}) {
         this.baseUrl = 'https://api.bgm.tv';
         this.cdnUrl = 'https://cdn.jsdelivr.net/gh/czy0729/Bangumi-Subject@master/data';
@@ -160,5 +160,3 @@ class BangumiService {
         }
     }
 }
-
-module.exports = BangumiService;

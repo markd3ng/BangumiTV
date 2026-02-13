@@ -1,7 +1,7 @@
-const fs = require('fs');
-const path = require('path');
-require('dotenv').config();
-const BangumiService = require('../services/bangumi.service');
+import fs from 'fs';
+import path from 'path';
+import 'dotenv/config';
+import BangumiService from '../services/bangumi.service.js';
 
 async function sync() {
     const username = process.env.BANGUMI_USER;
@@ -69,7 +69,6 @@ async function sync() {
         const calendarData = await service.getCalendar();
 
         // Sort and normalize calendar data
-        const weekdayMap = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
         const normalizedCalendar = calendarData.map(day => ({
             weekday: day.weekday,
             items: (day.items || []).map(item => ({

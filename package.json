@@ -2,13 +2,14 @@
   "name": "bangumi-tv",
   "version": "1.0.2",
   "description": "render your bangumi.tv progress on a static web page",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
     "sync": "node src/scripts/sync.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "buildSubject": "node collection.js",
+    "buildSubject": "node src/scripts/sync.js",
     "build": "node build.js"
   },
   "repository": {

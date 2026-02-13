@@ -1,28 +1,37 @@
-const fastify = require('fastify')({ logger: true });
-const path = require('path');
+import Fastify from 'fastify';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fastifyCors from '@fastify/cors';
+import fastifyStatic from '@fastify/static';
+import routes from './src/api/routes.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const fastify = Fastify({ logger: true });
 
 // Register CORS
-fastify.register(require('@fastify/cors'), {
+fastify.register(fastifyCors, {
   origin: '*',
 });
 
 // Register Static Files
-fastify.register(require('@fastify/static'), {
+fastify.register(fastifyStatic, {
   root: path.join(__dirname, 'public'),
   prefix: '/',
 });
 
 // Register New API Routes
-fastify.register(require('./src/api/routes'), { prefix: '/api' });
+fastify.register(routes, { prefix: '/api' });
 
-// Legacy compatibility (optional, can be removed if frontend is updated simultaneously)
-fastify.register(require('./src/api/routes'), { prefix: '/' });
+// Legacy compatibility
+fastify.register(routes, { prefix: '/' });
 
 // Run the server!
 const start = async () => {
   try {
-    await fastify.listen({ port: 3000, host: '0.0.0.0' });
-    console.log(`- [INFO] Server logic refactored. Listening on port 3000.`);
+    await fastify.listen({ port: parseInt(process.env.PORT) || 3000, host: '0.0.0.0' });
+    console.log(`- [INFO] Server logic refactored to ESM. Listening...`);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
@@ -30,3 +39,5 @@ const start = async () => {
 };
 
 start();
+
+export default fastify;
