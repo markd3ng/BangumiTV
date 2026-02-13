@@ -53,6 +53,21 @@
 3.  同步数据：`npm run sync`
 4.  本地运行：`npm run dev`
 
+## 🖼️ 图片镜像反代 (Image Proxy)
+
+为了解决 `lain.bgm.tv` 的访问速度问题或跨域限制，你可以配置图片反代前缀。
+
+### 配置方式
+在 Vercel 环境变量或 `.env` 文件中设置 `IMG_PROXY_PREFIX`。
+
+### 支持的模式
+1.  **直接替换模式**：
+    将环境变量设为反代站点的地址（如 `https://i0.hdslb.com/bfs/bas`）。
+    脚本会自动将 `https://lain.bgm.tv` 替换为你设置的前缀。
+2.  **占位符模式**：
+    如果你的反代服务需要完整的原始 URL（如 `https://worker.com/?url={origin-uri}`）。
+    脚本会将 `{origin-uri}` 替换为经过编码的原始图片地址。
+
 ## 感谢❤️
 
 -   [Bangumi-Subject](https://github.com/czy0729/Bangumi-Subject) 离线Bgm数据 (由 czy0729 提供)
