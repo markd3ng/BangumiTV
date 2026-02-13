@@ -34,11 +34,13 @@ function getPage(pageNum, type) {
     }
     Array.prototype.forEach.call(data.data, function (value, index) {
 
-      let totalEp = value.eps
-      let ep = type === 'watched' ? totalEp : value.ep_status
+      let totalEp = value.eps || 0
+      let ep = type === 'watched' ? totalEp : (value.ep_status || 0)
 
-      let percentage = ep / totalEp * 100
-      let cover = value.images.large
+      let percentage = totalEp > 0 ? (ep / totalEp * 100) : 0
+      let cover = (value.images && value.images.large)
+        ? value.images.large
+        : 'https://placehold.co/150x200?text=No+Image'
       let subjectUrl = `https://bgm.tv/subject/${value.subject_id}`
       const html = `
       <a class="bgm-item" href="${subjectUrl}" target="_blank">
@@ -129,7 +131,7 @@ function getJSON(url, callback) {
 
 function init() {
   if (quote) {
-    document.querySelector('.bgm-container').insertAdjacentHTML('beforeend',`<blockquote><p>${quote}</p></blockquote>`)
+    document.querySelector('.bgm-container').insertAdjacentHTML('beforeend', `<blockquote><p>${quote}</p></blockquote>`)
   }
   document.querySelector('.bgm-container').insertAdjacentHTML('beforeend', `<div class="bgm-tabs"></div>`)
   document.querySelector('.bgm-container').insertAdjacentHTML('beforeend', `

@@ -123,6 +123,27 @@ async function buildSubject() {
             }
           }
 
+          // Data Normalization: Handle discrepancies between CDN and Official API
+          if (!subject.images && subject.image) {
+            const imageUrl = subject.image.startsWith('//')
+              ? `https:${subject.image}`
+              : subject.image
+            subject.images = {
+              large: imageUrl,
+              common: imageUrl,
+              medium: imageUrl,
+              small: imageUrl,
+              grid: imageUrl,
+            }
+          } else if (subject.images) {
+            // Ensure URLs start with https:
+            for (const key in subject.images) {
+              if (subject.images[key].startsWith('//')) {
+                subject.images[key] = `https:${subject.images[key]}`
+              }
+            }
+          }
+
           item['date'] = subject['date']
           item['images'] = subject['images']
           item['name'] = subject['name']
