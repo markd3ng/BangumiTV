@@ -38,6 +38,11 @@ const start = async () => {
   }
 };
 
-start();
+const isMain = import.meta.url === `file://${fileURLToPath(import.meta.url)}`; // Simplistic check or just don't auto-call
+
+// Only start if not imported (using a more robust check for ESM main)
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+  start();
+}
 
 export default fastify;

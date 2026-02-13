@@ -1,13 +1,4 @@
-import * as dotenv from "dotenv";
-dotenv.config();
-import Fastify from "fastify";
-import appInstance from "../app.js";
-
-const app = Fastify({
-  logger: true,
-});
-
-app.register(appInstance);
+import app from "../app.js";
 
 export default async (req, res) => {
   await app.ready();
