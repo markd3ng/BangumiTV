@@ -16,7 +16,7 @@ const collectionType = {
 
 const headers = {
   'User-Agent':
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.132 Safari/537.36',
+    'BangumiTV-Client/1.0 (https://github.com/markd3ng/BangumiTV)',
 }
 
 async function fetchCollection(limit, offset) {
@@ -33,7 +33,11 @@ async function fetchCollection(limit, offset) {
     })
     return data
   } catch (error) {
-    console.log(`- [ERROR] Fetch ${url}. error: ${error}`)
+    if (error.response && error.response.status === 404) {
+      console.log(`- [ERROR] Fetch ${url}. error: 404 Not Found. Please check if BANGUMI_USER "${bgmUser}" is correct (Numeric ID vs Username) or if your account is private.`)
+    } else {
+      console.log(`- [ERROR] Fetch ${url}. error: ${error}`)
+    }
   }
   return false
 }
@@ -93,12 +97,32 @@ async function buildSubject() {
           console.log(
             `- [INFO] Fetch ${key} - ${subjectId}. ${i}/${data.length}`
           )
-          const { data: subject } = await axios.get(
-            `https://cdn.jsdelivr.net/gh/geekaven/BangumiTV-Subject@latest/data/${Math.floor(
-              subjectId / 100
-            )}/${subjectId}.json`,
-            { headers: headers }
-          )
+          const cdnUrl = `https://cdn.jsdelivr.net/gh/czy0729/Bangumi-Subject@master/data/${parseInt(
+            parseInt(subjectId) / 100
+          )}/${subjectId}.json`
+
+          let subject
+          try {
+            const { data: res } = await axios.get(cdnUrl, { headers: headers })
+            subject = res
+          } catch (error) {
+            console.log(
+              `- [WARN] ${subjectId} not found in CDN (${error.response ? error.response.status : error.message
+              }). Falling back to Bangumi API...`
+            )
+            // Wait 200ms to avoid rate limit
+            await new Promise((resolve) => setTimeout(resolve, 200))
+            try {
+              const { data: res } = await axios.get(
+                `${bgmUrl}/v0/subjects/${subjectId}`,
+                { headers: headers }
+              )
+              subject = res
+            } catch (fallbackError) {
+              throw fallbackError
+            }
+          }
+
           item['date'] = subject['date']
           item['images'] = subject['images']
           item['name'] = subject['name']
