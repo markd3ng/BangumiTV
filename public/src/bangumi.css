@@ -125,29 +125,11 @@ blockquote {
   position: relative;
   cursor: zoom-in;
   overflow: hidden;
+  transition: transform 0.3s ease;
 }
 
-/* Zoom Overlay */
-.bgm-item-thumb::after {
-  content: '🔍';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2rem;
-  opacity: 0;
-  transition: 0.3s ease;
-  backdrop-filter: blur(2px);
-  color: white;
-}
-
-.bgm-item-thumb:hover::after {
-  opacity: 1;
+.bgm-item-thumb:hover {
+  transform: scale(1.02);
 }
 
 .bgm-item-info {
