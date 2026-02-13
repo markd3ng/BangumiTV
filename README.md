@@ -15,7 +15,7 @@
 ### 后端安装
 #### 方案一：Vercel
 1.  Fork 本项目
-2.  在本项目 `Settings -> Secrets -> Actions` 中点击 `New repository secret`，`Name` 填 `BANGUMI_USER`，`Value` 填 ` 你的 bgm.tv 的用户名 `，之后点击 `Add secret` 按钮
+2.  在本项目 `Settings ->  Secrets and variables -> Actions` 中点击 `New repository secret`，`Name` 填 `BANGUMI_USER`，`Value` 填 ` 你的 bgm.tv 的 ID（一串数字） `，之后点击 `Add secret` 按钮
 3.  前往 Vercel 官网注册或登录。
 在 Vercel Dashboard 中点击 New Project，授权 GitHub，选择账户下 Fork 出来的本项目，点击 Deploy 完成部署。
 4.  记录下 Vercel 分配的 Production 域名 ( 如 bangumi-tv.vercel.app )
