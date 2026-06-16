@@ -460,8 +460,25 @@ User-Agent: `markd3ng/BangumiTV (https://github.com/markd3ng/BangumiTV)`
 | 操作 | 文件 |
 |------|------|
 | 新增 | `workers/index.ts`, `src/**`, `manage/index.html`, `wrangler.toml`, `.github/workflows/deploy.yml` |
-| 修改 | `public/index.html`, `public/src/bangumi.js`, `public/src/bangumi.css`, `build.js`, `package.json` |
+| 修改 | `public/index.html`, `public/src/bangumi.js`, `public/src/bangumi.css`, `build.js`, `package.json`, `README.md` |
 | 删除 | `app.js`, `collection.js`, `api/serverless.js`, `data/*.json`, `vercel.json` |
+
+## 文档更新
+
+README.md 需完全重写，覆盖以下内容：
+
+- **项目介绍**：说明是基于 Cloudflare Workers + Pages 的 Bangumi 追番展示工具
+- **前置条件**：Cloudflare 账号、bgm.tv 账号及 OAuth App 注册、GitHub 账号
+- **快速部署**：
+  1. Fork 本仓库
+  2. 在 GitHub Secrets 中配置 `CF_API_TOKEN`、`CF_ACCOUNT_ID`、`BANGUMI_TOKEN` 等
+  3. 在 GitHub Variables 中配置 `BANGUMI_USERS`、`BANGUMI_PRIMARY_USER`
+  4. Push 到 dev 分支，GitHub Actions 自动部署
+- **前端接入**：更新后的 widget 引入方式（`<link>` + `<script>` + `bgmConfig`）
+- **管理页面**：如何使用 `/manage` 进行多账户同步
+- **本地开发**：`wrangler dev` 的使用方法
+- **环境变量说明**：所有变量的含义和配置方式
+- **删除 Vercel 相关的旧部署文档**
 
 ## 前端 Widget 变更
 
@@ -497,4 +514,9 @@ User-Agent: `markd3ng/BangumiTV (https://github.com/markd3ng/BangumiTV)`
 - 更新 widget：新 API 路径、响应格式、NSFW 弹窗
 - 按需调整 build.js
 - 删除旧文件：app.js, collection.js, api/, data/, vercel.json
-- 部署到 Cloudflare Pages + Workers
+
+### 第五阶段：文档 & 部署
+- 重写 README.md（项目介绍、快速部署、前端接入、本地开发、ENV 说明）
+- 配置 GitHub Actions 工作流（`.github/workflows/deploy.yml`）
+- 验证 CI/CD 全流程：push → 自动创建资源 → 注入 secrets → deploy
+- 验证 Worker + Pages 线上可访问
