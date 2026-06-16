@@ -75,6 +75,9 @@ BangumiTV/
 │       └── nsfw-modal.js
 ├── manage/
 │   └── index.html             # 管理页面（由 Worker 提供，不部署到 Pages）
+├── .github/
+│   └── workflows/
+│       └── deploy.yml          # CI/CD 部署工作流
 └── build.js
 ```
 
@@ -318,6 +321,127 @@ BANGUMI_CLIENT_ID              # OAuth app client_id（管理页面用）
 BANGUMI_CLIENT_SECRET          # OAuth app client_secret（管理页面用）
 ```
 
+## wrangler.toml 配置
+
+所有 Cloudflare 资源（KV、R2）使用固定名称，由 CI/CD 自动创建。Binding 声明在 wrangler.toml 中，Worker 代码通过 `env.<BINDING_NAME>` 访问。
+
+```toml
+name = "bangumi-tv"
+main = "workers/index.ts"
+compatibility_date = "2026-06-17"
+
+# 定时同步，每 4 小时
+[triggers]
+crons = ["0 */4 * * *"]
+
+# 公开环境变量
+[vars]
+SYNC_MODE = "merge"
+NSFW_SHOW = "true"
+SYNC_INTERVAL = "4h"
+
+# KV 命名空间（CI 自动创建）
+[[kv_namespaces]]
+binding = "BANGUMI_KV"
+id = "bangumi-tv-kv"
+
+# R2 存储桶（CI 自动创建）
+[[r2_buckets]]
+binding = "BANGUMI_R2"
+bucket_name = "bangumi-tv-images"
+
+# Worker 路由
+[[routes]]
+pattern = "<worker-domain>/*"
+zone_name = "<zone>"
+```
+
+## CI/CD 部署（GitHub Actions）
+
+所有部署通过 GitHub Actions 完成，不使用 wrangler CLI 手动操作。Cloudflare 的资源在 CI 阶段自动检测和创建。
+
+### GitHub Secrets & Variables 配置
+
+在 GitHub Repo → Settings → Secrets and variables → Actions 中配置：
+
+| 类型 | 名称 | 说明 |
+|------|------|------|
+| Secret | `CF_API_TOKEN` | Cloudflare API Token（需 Workers/R2/KV 读写权限） |
+| Secret | `CF_ACCOUNT_ID` | Cloudflare 账户 ID |
+| Secret | `BANGUMI_TOKEN` | bgm.tv OAuth access token |
+| Secret | `BANGUMI_REFRESH_TOKEN` | bgm.tv OAuth refresh token |
+| Secret | `BANGUMI_CLIENT_ID` | bgm.tv OAuth app client_id |
+| Secret | `BANGUMI_CLIENT_SECRET` | bgm.tv OAuth app client_secret |
+| Variable | `BANGUMI_USERS` | bgm 用户名列表（逗号分隔） |
+| Variable | `BANGUMI_PRIMARY_USER` | primary 模式主账户 |
+
+### CI 工作流步骤
+
+```
+name: Deploy
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:           # 支持手动触发
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      1. Checkout 代码
+
+      2. Setup Node + pnpm
+
+      3. 安装依赖 (pnpm install)
+
+      4. 🔧 检查并创建 Cloudflare 资源
+         - 检查 KV namespace "bangumi-tv-kv" 是否存在
+           → 不存在则 wrangler kv:namespace create "bangumi-tv-kv"
+           → 拿到 namespace id，写入 wrangler.toml 对应的 id 字段
+         - 检查 R2 bucket "bangumi-tv-images" 是否存在
+           → 不存在则 wrangler r2 bucket create "bangumi-tv-images"
+         - 探测 KV id 和 R2 bucket 是否就绪
+
+      5. 构建前端 (node build.js)
+
+      6. 注入 Secrets
+         - 通过 wrangler secret put 写入所有 BANGUMI_* secrets
+         - 或通过 wrangler deploy --var 传递
+
+      7. 部署 Worker
+         wrangler deploy --var SYNC_MODE:merge --var ...
+
+      8. 部署 Pages（静态前端）
+         wrangler pages deploy public/ --project-name=bangumi-tv
+```
+
+### 资源命名规范
+
+| 资源 | 固定名称 | Binding 名 | Worker 中访问方式 |
+|------|---------|-----------|------------------|
+| KV Namespace | `bangumi-tv-kv` | `BANGUMI_KV` | `env.BANGUMI_KV.get(...)` |
+| R2 Bucket | `bangumi-tv-images` | `BANGUMI_R2` | `env.BANGUMI_R2.get(...)` |
+
+首次运行 CI 时自动创建这些资源，后续运行检测到已存在则跳过创建。
+
+### CI/CD 流程总结
+
+```
+开发者 push 到 dev 分支
+    │
+    ▼
+GitHub Actions 触发
+    │
+    ├─ 检查 CF 资源 → 不存在就创建（固定名字）
+    ├─ 构建前端
+    ├─ 注入 ENV（从 GitHub Secrets/Variables 读取）
+    ├─ wrangler deploy（Worker）
+    └─ wrangler pages deploy（Pages）
+```
+
+全程无需登录 Cloudflare Dashboard 手动配置。
+
 ## bgm.tv API 使用清单
 
 | 端点 | 用途 | 认证 |
@@ -335,7 +459,7 @@ User-Agent: `markd3ng/BangumiTV (https://github.com/markd3ng/BangumiTV)`
 
 | 操作 | 文件 |
 |------|------|
-| 新增 | `workers/index.ts`, `src/**`, `manage/index.html`, `wrangler.toml` |
+| 新增 | `workers/index.ts`, `src/**`, `manage/index.html`, `wrangler.toml`, `.github/workflows/deploy.yml` |
 | 修改 | `public/index.html`, `public/src/bangumi.js`, `public/src/bangumi.css`, `build.js`, `package.json` |
 | 删除 | `app.js`, `collection.js`, `api/serverless.js`, `data/*.json`, `vercel.json` |
 
