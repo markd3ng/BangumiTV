@@ -1,10 +1,10 @@
-# BangumiTV Cloudflare Migration Design
+# BangumiTV Cloudflare 迁移设计方案
 
-## Motivation
+## 背景
 
-Rewrite BangumiTV to run on Cloudflare Workers + Pages, replacing the current Vercel serverless + static JSON architecture. All data comes from live bgm.tv API calls; images are cached in R2 with content-hash dedup. The frontend widget is preserved but the backend is completely rebuilt.
+将 BangumiTV 从 Vercel Serverless + 静态 JSON 架构迁移到 Cloudflare Workers + Pages。数据改为直接从 bgm.tv API 获取，条目图片缓存在 R2 中并通过内容哈希去重。前端 widget 的展示逻辑和样式保留，后端完全重写。
 
-## Architecture Overview
+## 架构总览
 
 ```
                        Cloudflare
@@ -12,8 +12,8 @@ Rewrite BangumiTV to run on Cloudflare Workers + Pages, replacing the current Ve
 │                                                          │
 │   Pages                          Workers                 │
 │  ┌──────────┐                 ┌──────────────────┐      │
-│  │ index.html│── deploy ──→  │  Pages Functions  │      │
-│  │ bangumi.js│   (静态)      │  (SSR fallback)   │      │
+│  │ index.html│── 部署 ──→    │  Pages Functions  │      │
+│  │ bangumi.js│   (静态)      │  (SSR 兜底)      │      │
 │  │ bangumi.css│               └──────────────────┘      │
 │  └──────────┘                                           │
 │       │                                                  │
@@ -25,65 +25,64 @@ Rewrite BangumiTV to run on Cloudflare Workers + Pages, replacing the current Ve
 │  ┌─────────────────────────────────────────────────┐    │
 │  │                   Worker                        │    │
 │  │  ┌───────────┐  ┌───────────┐  ┌────────────┐  │    │
-│  │  │ API route │  │ Image proxy│  │ Cron handler│  │    │
-│  │  │ (read KV) │  │ (R2 cache)│  │ (sync bgm) │  │    │
+│  │  │ API 路由  │  │ 图片代理  │  │ 定时同步   │  │    │
+│  │  │ (读 KV)  │  │ (R2 缓存) │  │ (拉 bgm)   │  │    │
 │  │  └─────┬─────┘  └─────┬─────┘  └─────┬──────┘  │    │
 │  └────────┼──────────────┼──────────────┼──────────┘    │
 │           │              │              │                │
 │           ▼              ▼              ▼                │
 │     ┌─────────┐   ┌──────────┐   ┌───────────────┐     │
 │     │   KV    │   │    R2    │   │  bgm.tv API   │     │
-│     │collections│  │  images  │   │  (external)   │     │
-│     │calendar │   │          │   │               │     │
+│     │收藏/日历│   │  图片    │   │  (外部)       │     │
 │     └─────────┘   └──────────┘   └───────────────┘     │
 └──────────────────────────────────────────────────────────┘
 ```
 
-Single Worker handles API routes, image proxy, and cron triggers. Pages deploys the static frontend widget.
+一个 Worker 处理所有：API 路由、图片代理、定时同步。Pages 只部署纯静态前端。
 
-## Directory Structure
+## 目录结构
 
 ```
 BangumiTV/
 ├── wrangler.toml
 ├── package.json
 ├── workers/
-│   └── index.ts               # Worker entry (Hono router)
+│   └── index.ts               # Worker 入口（Hono 路由）
 ├── src/
 │   ├── api/
 │   │   ├── collections.ts     # GET /api/collections
 │   │   ├── calendar.ts        # GET /api/calendar
 │   │   └── config.ts          # GET /api/config
 │   ├── image/
-│   │   ├── proxy.ts           # Image proxy route handler
-│   │   └── store.ts           # R2 adapter (ImageStore interface)
+│   │   ├── proxy.ts           # 图片代理路由
+│   │   └── store.ts           # R2 适配器（ImageStore 接口）
 │   ├── sync/
-│   │   ├── cron.ts            # Cron trigger handler
-│   │   ├── bgm-client.ts      # bgm.tv API client
-│   │   └── merger.ts          # Multi-account merge logic
+│   │   ├── cron.ts            # 定时任务处理
+│   │   ├── bgm-client.ts      # bgm.tv API 客户端
+│   │   └── merger.ts          # 多账户合并逻辑
 │   ├── manage/
-│   │   ├── oauth.ts           # OAuth flow helpers
-│   │   ├── compare.ts         # Account comparison logic
-│   │   └── sync-write.ts      # Write-back sync to bgm.tv
+│   │   ├── oauth.ts           # OAuth 流程
+│   │   ├── compare.ts         # 账户对比逻辑
+│   │   └── sync-write.ts      # 写回 bgm.tv
 │   └── storage/
-│       ├── adapter.ts         # StorageAdapter interface
-│       └── kv.ts              # Cloudflare KV implementation
-├── public/
+│       ├── adapter.ts         # StorageAdapter 接口
+│       └── kv.ts              # Cloudflare KV 实现
+├── public/                    # 前端 widget（部署到 Pages）
 │   ├── index.html
 │   └── src/
 │       ├── bangumi.js
 │       ├── bangumi.css
 │       └── nsfw-modal.js
 ├── manage/
-│   └── index.html             # Manage page (served by Worker, not Pages)
+│   └── index.html             # 管理页面（由 Worker 提供，不部署到 Pages）
 └── build.js
 ```
 
-## API Design
+## API 设计
 
-All endpoints are served by the Worker. The frontend never sees bgm.tv usernames, user IDs, or tokens.
+所有端点由 Worker 提供。前端永远不知道 bgm.tv 的用户名、用户 ID 或 token。
 
-### Frontend endpoints (public, no auth)
+### 前端公开端点（无需认证）
 
 ```
 GET /api/collections?type=watching&page=1&limit=24
@@ -96,50 +95,50 @@ GET /api/config?key=nsfw
 → { nsfw: true }
 ```
 
-### Manage endpoints (OAuth session required)
+### 管理后台端点（需 OAuth 授权）
 
 ```
-GET  /manage                    → HTML page (served by Worker)
-GET  /manage/callback           → OAuth callback, exchanges code for token
-GET  /api/manage/compare        → Compare two users' collections (uses OAuth session tokens)
-POST /api/manage/sync           → Execute sync
+GET  /manage                    → 管理页面 HTML（Worker 直接渲染）
+GET  /manage/callback           → OAuth 回调，用 code 换 token
+GET  /api/manage/compare        → 对比两个用户收藏（使用 OAuth session token）
+POST /api/manage/sync           → 执行同步
 ```
 
 ```
 GET  /api/manage/compare?userA=<name>&userB=<name>
      → { userA: { collections: {...}, total: 120 }, userB: { ... }, common: 60 }
-     Both users must complete OAuth before this returns data.
+     两个用户都完成 OAuth 后才能返回数据。
 
 POST /api/manage/sync
      Body: { mode: "full" | "partial", from: "userA", to: "userB", subject_ids: [1,2,3] }
      → { results: [{ subject_id, status: "ok"|"error" }] }
 ```
 
-### Image proxy
+### 图片代理
 
 ```
-GET /image/:contentHash?w=<width>&fmt=webp|avif|jpeg
-→ 302 to R2 or direct response with Cache-Control: public, max-age=31536000
+GET /image/:contentHash?w=<宽度>&fmt=webp|avif|jpeg
+→ 返回处理后图片，带 Cache-Control: public, max-age=31536000
 ```
 
-`contentHash` = SHA256 of the original image bytes. Identical images across different bgm.tv entries share one cache entry.
+`contentHash` = 图片原始字节的 SHA256。不同条目如果 bgm.tv 用了同一张图，共用一个缓存。
 
-### Internal endpoints
-
-```
-POST /__cron/sync   (triggered by Cron Triggers, requires secret header)
-```
-
-## KV Storage
-
-Key structure in Cloudflare KV:
+### 内部端点
 
 ```
-collections:merged    → { want: [...], watched: [...], watching: [...], on_hold: [...], dropped: [...], updated_at: "ISO" }
+POST /__cron/sync   （由 Cloudflare Cron Triggers 触发，需 secret header 校验）
+```
+
+## KV 存储
+
+Cloudflare KV 的 key 结构：
+
+```
+collections:merged    → { want: [...], watched: [...], watching: [...], on_hold: [...], dropped: [...], updated_at: "ISO时间" }
 calendar              → [{ weekday: {...}, items: [...] }]
 ```
 
-Collections value per-entry shape:
+收藏条目数据格式：
 ```json
 {
   "subject_id": 123,
@@ -157,40 +156,42 @@ Collections value per-entry shape:
 }
 ```
 
-Images are stored as `{ hash, w, h }` — no bgm.tv CDN URLs exposed to frontend.
+图片存为 `{ hash, w, h }`，不暴露任何 bgm.tv CDN 地址到前端。
 
-## Image Proxy & R2
+## 图片代理 & R2
 
-### Flow
+### 处理流程
 
 ```
 GET /image/abc123?w=300&fmt=webp
-  1. Check R2: images/abc123/w300.webp
-  2. Hit → return with long cache headers
-  3. Miss:
-     a. Fetch R2: images/abc123/original
-     b. If missing → download from bgm.tv CDN (using /v0/subjects/{id}/image?type=large)
-     c. Store as images/abc123/original
-     d. Resize + convert format in Worker (Cloudflare Image Resizing via `cf.image` binding or wasm sharp)
-     e. Store variant images/abc123/w300.webp
-     f. Return
+  1. 查 R2: images/abc123/w300.webp
+  2. 命中 → 直接返回，带上长缓存头
+  3. 未命中:
+     a. 查 R2: images/abc123/original
+     b. 没有 → 从 bgm.tv CDN 下载（通过 /v0/subjects/{id}/image?type=large）
+     c. 存为 images/abc123/original
+     d. Worker 内裁切 + 转格式（Cloudflare Image Resizing 或 wasm sharp）
+     e. 存变体 images/abc123/w300.webp
+     f. 返回
 ```
 
-**Supported variant widths**: 200, 300, 400, 600 (w1920 original preserved for future use). No height constraint — aspect ratio preserved.
+### 支持的变体宽度
 
-### R2 directory layout
+200, 300, 400, 600（original 保留原始尺寸备用）。保持宽高比，不限制高度。
+
+### R2 目录结构
 
 ```
 images/
   <contentHash>/
-    original          ← raw download from bgm.tv CDN
+    original          ← 从 bgm.tv CDN 下载的原图
     w200.webp
     w300.webp
     w400.webp
     w600.webp
 ```
 
-### ImageStore interface
+### ImageStore 接口
 
 ```ts
 interface ImageStore {
@@ -201,11 +202,11 @@ interface ImageStore {
 }
 ```
 
-Cloudflare R2 implementation lives in `src/image/store.ts`. Swapping platforms requires only implementing this interface.
+Cloudflare 用 R2 实现。换平台只需实现这个接口。
 
-## StorageAdapter Interface
+## StorageAdapter 接口
 
-Abstraction for KV (and future Redis/EdgeOne KV):
+KV 存储的抽象层（方便未来切换 Redis / EdgeOne KV）：
 
 ```ts
 interface StorageAdapter {
@@ -215,162 +216,161 @@ interface StorageAdapter {
 }
 ```
 
-Current implementation: Cloudflare KV. New platforms: implement this interface.
+当前实现：Cloudflare KV。换平台只需实现新的 adapter。
 
-## Cron Job
+## 定时同步（Cron Job）
 
-### Schedule
+### 频率
 
-Every 4 hours (configurable via `SYNC_INTERVAL` ENV):
+每 4 小时一次（通过 `SYNC_INTERVAL` 环境变量可配）。
 
-### Execution flow
+### 执行流程
 
 ```
-Cron → Worker /__cron/sync (validates secret header)
-  1. For each user in BANGUMI_USERS:
+Cron 触发 → Worker /__cron/sync（校验 secret header）
+  1. 遍历 BANGUMI_USERS 中的每个用户
      GET /v0/users/{user}/collections?subject_type=2
-     Paginate (50 per page, 200ms delay between pages)
-  2. For all unique subject_ids:
-     GET /v0/subjects/{subject_id}
-     Compute image content hash from images.large URL
-     Trigger image cache warm (fire-and-forget, no blocking)
-  3. Merge by SYNC_MODE:
-     merge:    union of all users, same subject = latest updated_at wins
-     primary:  BANGUMI_PRIMARY_USER data wins (write-back occurs in manage page, not cron)
-  4. Write to KV: collections:merged, calendar
-  5. Update metadata timestamp
+     分页获取，每页 50 条，请求间隔 200ms（控制 rate limit）
+  2. 对所有去重后的 subject_id
+     GET /v0/subjects/{subject_id} 获取条目详情 + 图片
+     对 images.large URL 下载并计算 content hash
+     触发图片缓存预热（fire-and-forget，不阻塞同步）
+  3. 按 SYNC_MODE 合并
+     merge：所有用户取并集，同一条目以最新 updated_at 为准
+     primary：以 BANGUMI_PRIMARY_USER 的数据为准（写回同步在管理页面手动触发）
+  4. 写入 KV：collections:merged, calendar
+  5. 更新元数据时间戳
 ```
 
 ### Stale-while-revalidate
 
-When frontend requests `/api/collections`:
-- If KV data is fresh (< 5 min old) → return directly
-- If KV data is stale → return existing data immediately, fire background refresh
+前端发起 `/api/collections` 请求时：
+- KV 数据未过期（距上次更新 < 5 分钟）→ 直接返回
+- KV 数据已过期 → 先返回旧数据，后台异步刷新
 
-## Multi-Account Sync (Manage Page)
+## 多账户同步（管理页面）
 
-Accessible at `https://<worker-domain>/manage`. Not linked from the widget.
+URL：`https://<worker域名>/manage`。不在前端 widget 中暴露入口，需要知道地址才能访问。
 
-### Step 1: Enter usernames
+### 步骤 1：输入用户名
 
-Input form with two text fields for bgm.tv usernames.
+输入两个 bgm.tv 用户名。
 
-### Step 2: OAuth authorization
+### 步骤 2：OAuth 授权
 
-Sequential OAuth flow per account:
-- Redirect to `https://bgm.tv/oauth/authorize?client_id=...&response_type=code&redirect_uri=https://<worker>/manage/callback&state=<userA|userB>`
-- Callback at `GET /manage/callback?code=xxx&state=xxx`: Worker exchanges code for access_token via `POST https://bgm.tv/oauth/access_token`
-- Token held in short-lived cookie (session only, discarded after sync)
-- After both accounts authorized, show collection summaries
+两个账号依次完成 OAuth：
+- 跳转到 `https://bgm.tv/oauth/authorize?client_id=...&response_type=code&redirect_uri=https://<worker>/manage/callback&state=<userA|userB>`
+- 回调 `GET /manage/callback?code=xxx&state=xxx`：Worker 用 code 换 access_token（`POST https://bgm.tv/oauth/access_token`）
+- Token 存在短期 cookie 中（仅当次 session 有效，同步完成后丢弃）
+- 两个账号授权完成后，展示各自的收藏概况
 
-### Step 3: Choose sync mode
+### 步骤 3：选择同步模式
 
-**Full sync:**
-- Select direction: A → B or B → A
-- Source account's entire collection (all types) is written to target account
-- Progress shown per-entry
+**完整同步：**
+- 选择方向：A → B 或 B → A
+- 将源账户的全部收藏状态完整同步到目标账户
+- 逐条显示执行进度
 
-**Partial sync:**
-- Select direction: A → B or B → A
-- Show list of common entries (same subject_id in both accounts) with current progress side-by-side
-- Checkboxes: select all / individual entries
-- Only sync selected entries from source → target
+**部分同步：**
+- 选择方向：A → B 或 B → A
+- 列出两个账户的共有条目（相同 subject_id），并排显示当前进度差异
+- 支持全选 / 单选勾选
+- 只同步被选中的条目从源 → 目标
 
-### Step 4: Execute
+### 步骤 4：执行
 
-- `PATCH /v0/users/-/collections/{subject_id}` for each selected entry
-- Body: `{ ep_status, vol_status, type, rate, tags, comment }`
-- Real-time progress display
-- Result summary when complete
+- 对每个选中条目调用 `PATCH /v0/users/-/collections/{subject_id}`
+- 请求体：`{ ep_status, vol_status, type, rate, tags, comment }`
+- 实时显示执行进度
+- 完成后展示结果汇总
 
-## NSFW/R18 Handling
+## NSFW / R18 处理
 
-### Backend
+### 后端
 
-- `NSFW_SHOW` ENV controls whether R18 entries appear in API responses
-- When `NSFW_SHOW=false`: filter out entries with `nsfw: true` from collection responses
-- `GET /api/config?key=nsfw` returns current setting
+- `NSFW_SHOW` 环境变量控制 API 响应中是否包含 R18 条目
+- `NSFW_SHOW=false` 时：从收藏列表中过滤掉 `nsfw: true` 的条目
+- `GET /api/config?key=nsfw` 返回当前设置
 
-### Frontend
+### 前端
 
-- On load, check `GET /api/config?key=nsfw`
-- If nsfw === true and no `bgm-age-confirmed` in localStorage → show age-18 modal
-- User confirms → set localStorage, render content
-- User declines → redirect away
-- NSFW entries in the rendered grid: blur overlay by default, click to reveal (configurable to disable blur)
+- 页面加载时检查 `GET /api/config?key=nsfw`
+- 如果 nsfw === true 且 localStorage 中无 `bgm-age-confirmed` → 弹出 age-18 确认弹窗
+- 用户确认 → 写入 localStorage，渲染内容
+- 用户拒绝 → 跳转离开
+- NSFW 条目在列表中默认模糊遮罩，点击可查看（可配置关闭模糊）
 
-## ENV Variables
+## 环境变量
 
 ```toml
-# wrangler.toml - public vars
+# wrangler.toml - 公开变量
 [vars]
 SYNC_MODE = "merge"            # merge | primary
 NSFW_SHOW = "true"
 SYNC_INTERVAL = "4h"
 
-# Secrets (not in git)
-BANGUMI_TOKEN                  # bgm.tv OAuth access token
+# Secrets（不提交 git）
+BANGUMI_TOKEN                  # bgm.tv OAuth access token（cron 同步用）
 BANGUMI_REFRESH_TOKEN          # bgm.tv OAuth refresh token
-BANGUMI_USERS                  # comma-separated bgm usernames
-BANGUMI_PRIMARY_USER           # primary username for sync mode
-BANGUMI_CLIENT_ID              # OAuth app client_id (for manage page)
-BANGUMI_CLIENT_SECRET          # OAuth app client_secret (for manage page)
+BANGUMI_USERS                  # 逗号分隔的 bgm 用户名列表
+BANGUMI_PRIMARY_USER           # primary 模式下的主账户
+BANGUMI_CLIENT_ID              # OAuth app client_id（管理页面用）
+BANGUMI_CLIENT_SECRET          # OAuth app client_secret（管理页面用）
 ```
 
-## bgm.tv API Usage
+## bgm.tv API 使用清单
 
-| Endpoint | Purpose | Auth |
-|----------|---------|------|
-| `GET /v0/users/{user}/collections` | Fetch user collections (paginated) | Bearer (optional for public) |
-| `GET /v0/subjects/{subject_id}` | Fetch subject details + images | Bearer (optional for public) |
-| `GET /v0/subjects/{subject_id}/image?type=large` | Get subject image redirect URL | Optional |
-| `PATCH /v0/users/-/collections/{subject_id}` | Write-back sync | Bearer required |
-| `GET /calendar` | Daily broadcast schedule | None |
-| `POST /oauth/access_token` | Exchange code for token | client_id/secret |
+| 端点 | 用途 | 认证 |
+|------|------|------|
+| `GET /v0/users/{user}/collections` | 获取用户收藏（分页） | Bearer（公开收藏可选） |
+| `GET /v0/subjects/{subject_id}` | 获取条目详情 + 图片 | Bearer（公开条目可选） |
+| `GET /v0/subjects/{subject_id}/image?type=large` | 获取条目图片跳转地址 | 可选 |
+| `PATCH /v0/users/-/collections/{subject_id}` | 写回同步 | Bearer 必须 |
+| `GET /calendar` | 每日放送 | 无 |
+| `POST /oauth/access_token` | 用 code 换 token | client_id/secret |
 
 User-Agent: `markd3ng/BangumiTV (https://github.com/markd3ng/BangumiTV)`
 
-## File Change Summary
+## 文件变更清单
 
-| Action | File |
-|--------|------|
-| Add | `workers/index.ts`, `src/**`, `manage/index.html`, `wrangler.toml` |
-| Modify | `public/index.html`, `public/src/bangumi.js`, `public/src/bangumi.css`, `build.js`, `package.json` |
-| Delete | `app.js`, `collection.js`, `api/serverless.js`, `data/*.json`, `vercel.json` |
+| 操作 | 文件 |
+|------|------|
+| 新增 | `workers/index.ts`, `src/**`, `manage/index.html`, `wrangler.toml` |
+| 修改 | `public/index.html`, `public/src/bangumi.js`, `public/src/bangumi.css`, `build.js`, `package.json` |
+| 删除 | `app.js`, `collection.js`, `api/serverless.js`, `data/*.json`, `vercel.json` |
 
-## Frontend Widget Changes
+## 前端 Widget 变更
 
-- `apiUrl` → points to Worker domain
-- API path changes: `/bangumi` → `/api/collections`, remove `/bangumi_total`, `/v2/bangumi`
-- NSFW modal integrated
-- NSFW entry blur overlay
-- Response shape updated to match new API format
-- CSS: preserve all existing styles, add `.bgm-nsfw-blur` and `.bgm-age-modal` styles
-- Manage page: standalone HTML at `/manage`, served by Worker, not deployed to Pages
+- `apiUrl` 指向 Worker 域名
+- API 路径变更：`/bangumi` `/v2/bangumi` `/bangumi_total` → `/api/collections`
+- 新增 NSFW 弹窗组件
+- 新增 NSFW 条目模糊遮罩
+- 响应数据格式适配新 API
+- CSS：保留所有现有样式，新增 `.bgm-nsfw-blur` 和 `.bgm-age-modal` 样式
 
-## Implementation Phases
+## 实现阶段
 
-### Phase 1: Core Worker + KV
-- Set up wrangler.toml, KV namespace, Worker entry point (Hono)
-- Implement bgm-client.ts (bgm.tv API wrapper)
-- Implement cron sync: fetch collections → merge → write KV
-- Implement public API endpoints: `/api/collections`, `/api/calendar`, `/api/config`
-- Test with `wrangler dev`
+### 第一阶段：核心 Worker + KV
+- 搭建 wrangler.toml、KV namespace、Worker 入口（Hono）
+- 实现 bgm-client.ts（bgm.tv API 封装）
+- 实现 cron 同步：拉收藏 → 合并 → 写 KV
+- 实现公开 API：`/api/collections`, `/api/calendar`, `/api/config`
+- 用 `wrangler dev` 本地验证
 
-### Phase 2: Image Proxy + R2
-- Set up R2 bucket
-- Implement ImageStore with R2 adapter
-- Implement image proxy route: `/image/:hash`
-- Integrate image caching into cron sync (fire-and-forget warm)
+### 第二阶段：图片代理 + R2
+- 创建 R2 bucket
+- 实现 ImageStore（R2 adapter）
+- 实现图片代理路由 `/image/:hash`
+- 集成到 cron 同步（异步预热缓存）
 
-### Phase 3: Manage Page
-- Implement OAuth flow (bgm.tv authorize → callback → token exchange)
-- Implement compare endpoint
-- Implement sync-write (PATCH collections)
-- Build manage page HTML + JS (served by Worker)
+### 第三阶段：管理页面
+- 实现 OAuth 流程（bgm.tv 授权 → 回调 → 换 token）
+- 实现账户对比接口
+- 实现同步写回（PATCH collections）
+- 构建管理页面 HTML + JS（Worker 提供）
 
-### Phase 4: Frontend & Cleanup
-- Update widget: new API paths, response shape, NSFW modal
-- Update build.js if needed
-- Delete old files: app.js, collection.js, api/, data/, vercel.json
-- Deploy to Cloudflare Pages + Workers
+### 第四阶段：前端 & 清理
+- 更新 widget：新 API 路径、响应格式、NSFW 弹窗
+- 按需调整 build.js
+- 删除旧文件：app.js, collection.js, api/, data/, vercel.json
+- 部署到 Cloudflare Pages + Workers
