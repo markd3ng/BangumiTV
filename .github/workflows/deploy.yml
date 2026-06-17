@@ -38,7 +38,7 @@ jobs:
         id: kv-id
         run: |
           set -euo pipefail
-          KV_ID=$(npx wrangler kv namespace list --json | jq -r '.[] | select(.title == "bangumi-tv-kv") | .id' | head -n1 | tr -d '[:space:]')
+          KV_ID=$(npx wrangler kv namespace list | jq -r '.[] | select(.title == "bangumi-tv-kv") | .id' | head -n1 | tr -d '[:space:]')
           if [ -z "${KV_ID}" ]; then
             echo "Failed to resolve KV namespace id" >&2
             exit 1
