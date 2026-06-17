@@ -58,21 +58,8 @@ jobs:
           p.write_text(text)
           PY
 
-      - name: Deploy Worker
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: deploy
-          secrets: |
-            BANGUMI_TOKEN
-            BANGUMI_REFRESH_TOKEN
-            BANGUMI_USERS
-            BANGUMI_PRIMARY_USER
-            BANGUMI_CLIENT_ID
-            BANGUMI_CLIENT_SECRET
-            CRON_SECRET
-            MANAGE_SECRET
+      # 逐个上传非空的 Worker secret（空值跳过，避免 wrangler rejected）。
+      - name: Upload Worker secrets
         env:
           BANGUMI_TOKEN: ${{ secrets.BANGUMI_TOKEN }}
           BANGUMI_REFRESH_TOKEN: ${{ secrets.BANGUMI_REFRESH_TOKEN }}
@@ -82,6 +69,23 @@ jobs:
           BANGUMI_CLIENT_SECRET: ${{ secrets.BANGUMI_CLIENT_SECRET }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           MANAGE_SECRET: ${{ secrets.MANAGE_SECRET }}
+        run: |
+          for name in BANGUMI_TOKEN BANGUMI_REFRESH_TOKEN BANGUMI_USERS BANGUMI_PRIMARY_USER \
+                      BANGUMI_CLIENT_ID BANGUMI_CLIENT_SECRET CRON_SECRET MANAGE_SECRET; do
+            val="${!name}"
+            if [ -n "${val}" ]; then
+              echo "${val}" | npx wrangler secret put "$name"
+            else
+              echo "Skipping $name (empty — will use KV / not configured)"
+            fi
+          done
+
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: deploy
 
       - name: Deploy Pages
         uses: cloudflare/wrangler-action@v3
