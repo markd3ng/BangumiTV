@@ -29,13 +29,12 @@ export async function handleImage(
   }
 
   // 2. 查原图
-  let original = await store.getOriginal(hash)
+  const original = await store.getOriginal(hash)
   if (!original) {
     return new Response('Not found', { status: 404 })
   }
 
-  // 3. 生成变体（简化版：先用原图返回，后续可接 CF Image Resizing）
-  await store.putVariant(hash, variant, original)
-  const contentType = 'image/jpeg' // fallback when original content type unknown
-  return new Response(original, { headers: { ...CACHE_HEADERS, 'Content-Type': contentType } })
+  // 3. 生成变体，返回原图（后续可接 CF Image Resizing）
+  await store.putVariant(hash, variant, original.data)
+  return new Response(original.data, { headers: { ...CACHE_HEADERS, 'Content-Type': original.contentType } })
 }

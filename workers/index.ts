@@ -104,7 +104,7 @@ async function submitCallback(which) {
   const code = new URL(url).searchParams.get('code')
   if (!code) return alert('无效的回调 URL')
   const user = which === 'A' ? state.userA : state.userB
-  const res = await fetch('/api/manage/exchange?code=' + encodeURIComponent(code) + '&user=' + encodeURIComponent(user))
+  const res = await fetch('/api/manage/exchange?code=' + encodeURIComponent(code))
   const data = await res.json()
   if (!data.access_token) return alert('授权失败')
   if (which === 'A') {

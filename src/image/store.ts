@@ -1,5 +1,5 @@
 export interface ImageStore {
-  getOriginal(hash: string): Promise<ArrayBuffer | null>
+  getOriginal(hash: string): Promise<{ data: ArrayBuffer; contentType: string } | null>
   putOriginal(hash: string, data: ArrayBuffer, contentType: string): Promise<void>
   getVariant(hash: string, variant: string): Promise<ArrayBuffer | null>
   putVariant(hash: string, variant: string, data: ArrayBuffer): Promise<void>
@@ -12,9 +12,13 @@ export class R2ImageStore implements ImageStore {
     return `images/${hash}/${file}`
   }
 
-  async getOriginal(hash: string): Promise<ArrayBuffer | null> {
+  async getOriginal(hash: string): Promise<{ data: ArrayBuffer; contentType: string } | null> {
     const obj = await this.r2.get(this.key(hash, 'original'))
-    return obj ? obj.arrayBuffer() : null
+    if (!obj) return null
+    return {
+      data: await obj.arrayBuffer(),
+      contentType: obj.httpMetadata?.contentType || 'image/jpeg',
+    }
   }
 
   async putOriginal(hash: string, data: ArrayBuffer, contentType: string): Promise<void> {

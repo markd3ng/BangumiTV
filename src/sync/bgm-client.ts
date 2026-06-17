@@ -45,14 +45,14 @@ export class BgmClient {
 
   async getCollections(username: string, offset = 0, limit = 50): Promise<{ data: BgmCollection[]; total: number }> {
     const url = `${BGM_BASE}/v0/users/${username}/collections?subject_type=2&limit=${limit}&offset=${offset}`
-    const res = await fetch(url, { headers: this.headers() })
+    const res = await fetch(url, { headers: this.headers(), signal: AbortSignal.timeout(30000) })
     if (!res.ok) throw new Error(`bgm.tv collections error: ${res.status}`)
     return res.json()
   }
 
   async getSubject(subjectId: number): Promise<BgmSlimSubject | null> {
     const url = `${BGM_BASE}/v0/subjects/${subjectId}`
-    const res = await fetch(url, { headers: this.headers() })
+    const res = await fetch(url, { headers: this.headers(), signal: AbortSignal.timeout(30000) })
     if (res.status === 404) return null
     if (!res.ok) throw new Error(`bgm.tv subject error: ${res.status}`)
     return res.json()
@@ -60,13 +60,13 @@ export class BgmClient {
 
   async getCalendar(): Promise<BgmCalendarItem[]> {
     const url = `${BGM_BASE}/calendar`
-    const res = await fetch(url, { headers: this.headers() })
+    const res = await fetch(url, { headers: this.headers(), signal: AbortSignal.timeout(30000) })
     if (!res.ok) throw new Error(`bgm.tv calendar error: ${res.status}`)
     return res.json()
   }
 
   async downloadImage(url: string): Promise<{ data: ArrayBuffer; contentType: string } | null> {
-    const res = await fetch(url, { headers: { 'User-Agent': UA } })
+    const res = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(30000) })
     if (!res.ok) return null
     return {
       data: await res.arrayBuffer(),
@@ -85,6 +85,7 @@ export class BgmClient {
         code,
         redirect_uri: redirectUri,
       }),
+      signal: AbortSignal.timeout(30000),
     })
     if (!res.ok) throw new Error(`oauth error: ${res.status}`)
     return res.json() as Promise<{ access_token: string; refresh_token: string; user_id: number }>
@@ -96,6 +97,7 @@ export class BgmClient {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'User-Agent': UA },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(30000),
     })
     if (!res.ok) throw new Error(`patch collection error: ${res.status}`)
     return res.json()
