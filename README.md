@@ -14,6 +14,23 @@
 - [bgm.tv](https://bgm.tv) 账号及 [OAuth App](https://bgm.tv/dev/app)（用于管理页面的多账户同步）
 - GitHub 账号
 
+### Cloudflare API Token 权限配置
+
+前往 [Cloudflare Dashboard → 个人资料 → API 令牌](https://dash.cloudflare.com/profile/api-tokens)，创建 API 令牌：
+
+选择 **「编辑 Cloudflare Workers」** 模板，或手动创建自定义令牌，需勾选以下权限：
+
+| 范围 | 权限 | 说明 |
+|------|------|------|
+| 账户 — Workers Scripts | 编辑 | 部署 Worker 代码 |
+| 账户 — Workers KV Storage | 编辑 | 创建和管理 KV 命名空间 |
+| 账户 — Workers R2 Storage | 编辑 | 创建和管理 R2 存储桶 |
+| 账户 — Account Settings | 读取 | 读取账户设置（必含） |
+| 用户 — User Details | 读取 | 读取用户信息（必含） |
+| 区域 — Workers Routes | 编辑 | 管理 Worker 路由 |
+
+> **提示：** 如果直接使用「编辑 Cloudflare Workers」模板，默认已包含上述所需权限。在「账户资源」中选择你的 Cloudflare 账户，「区域资源」选择「所有区域」即可。
+
 ## 快速部署
 
 ### 1. Fork 本仓库
