@@ -1,0 +1,74 @@
+name: Deploy to Cloudflare
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - run: pnpm install
+
+      - name: Provision Cloudflare resources
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: |
+            npx wrangler kv namespace create "bangumi-tv-kv" 2>/dev/null || echo "KV namespace already exists"
+            npx wrangler r2 bucket create "bangumi-tv-images" 2>/dev/null || echo "R2 bucket already exists"
+
+      - name: Get KV namespace ID
+        id: kv-id
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: kv namespace list --json | jq -r '.[] | select(.title == "bangumi-tv-kv") | .id'
+
+      - name: Inject KV id into wrangler.toml
+        run: |
+          KV_ID="${{ steps.kv-id.outputs.stdout }}"
+          sed -i "s/id = \"bangumi-tv-kv\"/id = \"${KV_ID}\"/" wrangler.toml
+
+      - name: Build frontend
+        run: node build.js
+
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: deploy
+          secrets: |
+            BANGUMI_TOKEN
+            BANGUMI_REFRESH_TOKEN
+            BANGUMI_CLIENT_ID
+            BANGUMI_CLIENT_SECRET
+            CRON_SECRET
+        env:
+          BANGUMI_TOKEN: ${{ secrets.BANGUMI_TOKEN }}
+          BANGUMI_REFRESH_TOKEN: ${{ secrets.BANGUMI_REFRESH_TOKEN }}
+          BANGUMI_CLIENT_ID: ${{ secrets.BANGUMI_CLIENT_ID }}
+          BANGUMI_CLIENT_SECRET: ${{ secrets.BANGUMI_CLIENT_SECRET }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+
+      - name: Deploy Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: pages deploy public/ --project-name=bangumi-tv
