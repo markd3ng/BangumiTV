@@ -31,29 +31,64 @@
 
 > **提示：** 如果直接使用「编辑 Cloudflare Workers」模板，默认已包含上述所需权限。在「账户资源」中选择你的 Cloudflare 账户，「区域资源」选择「所有区域」即可。
 
-### bgm.tv OAuth App 注册
+## 快速部署
 
-管理页面的多账户同步需要 bgm.tv OAuth App 的 `client_id` 和 `client_secret`。
+> **关于 OAuth 回调地址的鸡生蛋问题**：注册 bgm.tv OAuth App 和换取 cron token 都需要 `redirect_uri`（= Worker 域名），但 Worker 域名要部署后才有。因此部署分两个阶段：**阶段一只需 Cloudflare 凭证**即可让 Worker 上线并拿到域名，**阶段二**再注册 OAuth App、换取 token、回填剩余 secrets 后重新部署。
 
-1. 登录 [bgm.tv](https://bgm.tv)，前往 [https://bgm.tv/dev/app](https://bgm.tv/dev/app)
-2. 点击「创建应用」，填写：
-   - **应用名称**：自定义，如 `BangumiTV`
-   - **回调地址 (redirect_uri)**：填 `https://<你的 Worker 域名>/manage/callback`
-   - **应用描述**：可选，如 `多账户追番同步工具`
-3. 创建成功后记录 **App ID**（= `BANGUMI_CLIENT_ID`）和 **App Secret**（= `BANGUMI_CLIENT_SECRET`）
-4. 将这两个值填入下面的 GitHub Secrets 中
+### 阶段一：部署 Worker（仅需 Cloudflare 凭证）
 
-> **注意：** 回调地址必须与创建应用时填写的一致，否则 OAuth 授权会失败。如果是本地开发调试，可以先填 `http://localhost:8787/manage/callback`。
+1. Fork 本仓库
 
-### 获取 cron 同步用的 access token / refresh token
+2. 配置 GitHub Secrets & Variables（此阶段只填以下几项即可，其余留到阶段二）：
 
-定时同步（cron）需要一个有收藏读取权限的 `BANGUMI_TOKEN` 和 `BANGUMI_REFRESH_TOKEN`。bgm.tv 的 access token 有效期约 7 天，过期后 Worker 会用 refresh token 自动续期。首次获取这一对 token 的方法：
+   前往 Repo → Settings → Secrets and variables → Actions。
 
-1. 浏览器打开（替换 `<CLIENT_ID>` 和 `<回调地址>`，与上方 OAuth App 一致）：
+   **Secrets:**
+   | 名称 | 说明 |
+   |------|------|
+   | `CF_API_TOKEN` | Cloudflare API Token（见上方「Cloudflare API Token 权限配置」） |
+   | `CF_ACCOUNT_ID` | Cloudflare 账户 ID（Dashboard 右侧栏可见） |
+   | `CRON_SECRET` | 自定义随机字符串（手动触发 `POST /__cron/sync` 认证用） |
+
+   **Variables:**
+   | 名称 | 说明 |
+   |------|------|
+   | `BANGUMI_USERS` | 要展示的 bgm 用户名（逗号分隔，如 `user1,user2`） |
+   | `BANGUMI_PRIMARY_USER` | `primary` 模式下的主账户名（单账户可留空） |
+
+3. Push 到 `dev` 分支：
+
+   ```bash
+   git push origin dev
+   ```
+
+   GitHub Actions 将自动：检查并创建 Cloudflare KV / R2 资源 → 构建前端 → 注入环境变量 → 部署 Worker 和 Pages。
+
+4. 部署完成后，到 Cloudflare Dashboard → Workers & Pages 找到 `bangumi-tv` 项目，记下它的访问域名（形如 `https://bangumi-tv.<你的子域名>.workers.dev`，下文记作 `WORKER_DOMAIN`）。此时公开 widget 已可访问，但 cron 同步尚未生效（token 未配置）。
+
+### 阶段二：注册 OAuth App、换取 cron token、回填并重新部署
+
+#### 1. 注册 bgm.tv OAuth App
+
+登录 [bgm.tv](https://bgm.tv)，前往 [https://bgm.tv/dev/app](https://bgm.tv/dev/app) 创建应用：
+
+- **应用名称**：自定义，如 `BangumiTV`
+- **回调地址 (redirect_uri)**：填 `https://<WORKER_DOMAIN>/manage/callback`
+- **应用描述**：可选
+
+创建后记录 **App ID**（= `BANGUMI_CLIENT_ID`）和 **App Secret**（= `BANGUMI_CLIENT_SECRET`）。
+
+> 回调地址必须与创建时一致。本地调试可额外用 `http://localhost:8787/manage/callback`（bgm.tv 支持多个回调地址时；若只允许一个，请以线上域名为准）。
+
+#### 2. 换取 cron 用的 access token / refresh token
+
+bgm.tv access token 有效期约 7 天，过期后 Worker 会用 refresh token 自动续期。首次获取这一对 token：
+
+1. 浏览器打开（替换 `<CLIENT_ID>` 和 `<回调地址>`，与 OAuth App 一致）：
    ```
    https://bgm.tv/oauth/authorize?client_id=<CLIENT_ID>&response_type=code&redirect_uri=<回调地址>
    ```
-2. 授权后跳转到回调地址，URL 中带 `?code=<CODE>`，复制 `<CODE>`。
+2. 授权后跳转到回调地址，URL 中带 `?code=<CODE>`，复制 `<CODE>`（即便页面报错也无妨，code 在地址栏里）。
 3. 用 code 换取 token：
    ```bash
    curl -X POST https://bgm.tv/oauth/access_token \
@@ -68,46 +103,23 @@
    ```
 4. 返回 JSON 中的 `access_token` 即 `BANGUMI_TOKEN`，`refresh_token` 即 `BANGUMI_REFRESH_TOKEN`。
 
-## 快速部署
+#### 3. 回填剩余 Secrets 并重新部署
 
-### 1. Fork 本仓库
+在 GitHub Repo → Settings → Secrets and variables → Actions → **Secrets** 中补加：
 
-### 2. 配置 GitHub Secrets & Variables
-
-前往 Repo → Settings → Secrets and variables → Actions，添加：
-
-**Secrets:**
 | 名称 | 说明 |
 |------|------|
-| `CF_API_TOKEN` | Cloudflare API Token（需 Workers/R2/KV 权限） |
-| `CF_ACCOUNT_ID` | Cloudflare 账户 ID |
-| `BANGUMI_TOKEN` | bgm.tv access token（见上方「获取 cron 同步用的 access token / refresh token」） |
-| `BANGUMI_REFRESH_TOKEN` | bgm.tv refresh token（同上） |
-| `BANGUMI_CLIENT_ID` | bgm.tv OAuth App client_id（见上方「bgm.tv OAuth App 注册」） |
-| `BANGUMI_CLIENT_SECRET` | bgm.tv OAuth App client_secret（见上方「bgm.tv OAuth App 注册」） |
-| `CRON_SECRET` | 自定义随机字符串（用于手动触发 `POST /__cron/sync` 认证；定时 cron 由 Cloudflare 调度自动运行，无需此密钥） |
+| `BANGUMI_CLIENT_ID` | 上一步 OAuth App 的 App ID |
+| `BANGUMI_CLIENT_SECRET` | 上一步 OAuth App 的 App Secret |
+| `BANGUMI_TOKEN` | 上一步换得的 access_token |
+| `BANGUMI_REFRESH_TOKEN` | 上一步换得的 refresh_token |
 
-**Variables:**
-| 名称 | 说明 |
-|------|------|
-| `BANGUMI_USERS` | bgm 用户名（逗号分隔，如 `user1,user2`） |
-| `BANGUMI_PRIMARY_USER` | primary 模式下的主账户名 |
+然后在 GitHub Actions 页面手动重新运行一次 Deploy 工作流（或向 `dev` 推一个空提交）。重新部署后 cron 同步开始生效，KV 被填充，widget 即可显示追番数据。
 
-### 3. Push 到 dev 分支
-
-```bash
-git push origin dev
-```
-
-GitHub Actions 将自动：
-- 检查并创建 Cloudflare KV 和 R2 资源
-- 构建前端
-- 注入环境变量
-- 部署 Worker 和 Pages
-
-### 4. 等待部署完成
-
-访问 `https://bangumi-tv.<你的子域名>.workers.dev`
+> 若想立即触发一次同步而不等 4 小时定时任务，可：
+> ```bash
+> curl -X POST -H "X-Cron-Secret: <CRON_SECRET>" https://<WORKER_DOMAIN>/__cron/sync
+> ```
 
 ## 前端接入
 
