@@ -1,0 +1,18 @@
+name = "bangumi-tv"
+main = "workers/index.ts"
+compatibility_date = "2026-06-17"
+
+[triggers]
+crons = ["0 */4 * * *"]
+
+[vars]
+SYNC_MODE = "merge"
+NSFW_SHOW = "true"
+
+[[kv_namespaces]]
+binding = "BANGUMI_KV"
+id = "bangumi-tv-kv"
+
+[[r2_buckets]]
+binding = "BANGUMI_R2"
+bucket_name = "bangumi-tv-images"
