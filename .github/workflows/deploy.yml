@@ -32,7 +32,7 @@ jobs:
         run: |
           npx wrangler kv namespace create "bangumi-tv-kv" || echo "KV namespace already exists"
           npx wrangler r2 bucket create "bangumi-tv-images" || echo "R2 bucket already exists"
-          npx wrangler pages project create bangumi-tv || echo "Pages project already exists"
+          npx wrangler pages project create bangumi-tv --production-branch dev || echo "Pages project already exists"
 
       # 在 shell 中解析 KV namespace id，trim 掉尾随换行；若未拿到则失败。
       - name: Resolve KV namespace ID
