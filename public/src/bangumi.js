@@ -1,143 +1,107 @@
+(function () {
+  const config = window.bgmConfig || { apiUrl: '', quote: '' }
+  const API = (config.apiUrl || '').replace(/\/$/, '')
+  const container = document.querySelector('.bgm-container')
+  if (!container || !API) return
 
-const bangumiUrl = bgmConfig.apiUrl
-const quote = bgmConfig.quote
+  const TYPE_NAMES = { want: '想看', watched: '看过', watching: '在看', on_hold: '搁置', dropped: '抛弃' }
 
-const limit = 12
-const load = `<img style="margin: 0 auto;" src="https://cdn.jsdelivr.net/gh/hans362/Bilibili-Bangumi-JS/assets/bilibili.gif">`
-
-function getTab() {
-  const types = {
-    'want': '想看',
-    'watching': '在看',
-    'watched': '看过'
+  async function checkNSFW() {
+    try {
+      const res = await fetch(API + '/api/config?key=nsfw')
+      const data = await res.json()
+      if (data.nsfw && !localStorage.getItem('bgm-age-confirmed')) {
+        document.getElementById('bgm-age-modal').style.display = 'block'
+      } else if (!data.nsfw) {
+        localStorage.removeItem('bgm-age-confirmed')
+      }
+    } catch (e) {}
   }
-  const url = `${bangumiUrl}/bangumi_total`
-  getJSON(url, function (data) {
-    for (const key in data) {
-      if (Object.hasOwnProperty.call(data, key)) {
-        const value = data[key]
-        document.querySelector('.bgm-tabs')
-          .insertAdjacentHTML('beforeend', `<span class="bgm-tab" id="bgm-${key}" data-type=${key} onclick="tabClick(event)">${types[key]}(${value})</span>`)
+
+  window.bgmConfirmAge = function () {
+    localStorage.setItem('bgm-age-confirmed', '1')
+    document.getElementById('bgm-age-modal').style.display = 'none'
+  }
+
+  function renderCard(entry) {
+    const imgUrl = entry.images?.hash
+      ? `${API}/image/${entry.images.hash}?w=300&fmt=webp`
+      : 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" fill="#333"><rect width="300" height="400"/></svg>')
+
+    const progress = entry.total_episodes > 0
+      ? Math.round((entry.ep_status / entry.total_episodes) * 100)
+      : 0
+
+    return '<a href="https://bgm.tv/subject/' + entry.subject_id + '" target="_blank" class="bgm-card' + (entry.nsfw ? ' bgm-nsfw' : '') + '">' +
+      '<div class="bgm-card-cover">' +
+        '<img src="' + imgUrl + '" alt="' + (entry.name_cn || entry.name) + '" loading="lazy">' +
+        (entry.nsfw ? '<div class="bgm-nsfw-overlay" onclick="event.preventDefault();this.parentElement.parentElement.classList.toggle(\'bgm-nsfw-reveal\')">R18</div>' : '') +
+      '</div>' +
+      '<div class="bgm-card-info">' +
+        '<h3>' + (entry.name_cn || entry.name) + '</h3>' +
+        (progress > 0 ? '<div class="bgm-progress"><span style="width:' + progress + '%"></span></div>' : '') +
+        '<span class="bgm-ep">' + entry.ep_status + '/' + (entry.total_episodes || '??') + '</span>' +
+      '</div>' +
+    '</a>'
+  }
+
+  async function render() {
+    var nav = document.createElement('div')
+    nav.className = 'bgm-nav'
+    var keys = Object.keys(TYPE_NAMES)
+    var navHtml = ''
+    for (var i = 0; i < keys.length; i++) {
+      navHtml += '<button data-type="' + keys[i] + '">' + TYPE_NAMES[keys[i]] + '</button>'
+    }
+    nav.innerHTML = navHtml
+    container.appendChild(nav)
+
+    var grid = document.createElement('div')
+    grid.className = 'bgm-grid'
+    container.appendChild(grid)
+
+    var pagination = document.createElement('div')
+    pagination.className = 'bgm-pagination'
+    container.appendChild(pagination)
+
+    var currentType = 'watching'
+    var currentPage = 1
+
+    async function load(type, page) {
+      try {
+        var res = await fetch(API + '/api/collections?type=' + type + '&page=' + page + '&limit=24')
+        var data = await res.json()
+        var cardsHtml = ''
+        for (var i = 0; i < data.data.length; i++) {
+          cardsHtml += renderCard(data.data[i])
+        }
+        grid.innerHTML = cardsHtml
+
+        var totalPages = Math.ceil(data.total / 24)
+        pagination.innerHTML = ''
+        for (var i = 1; i <= totalPages; i++) {
+          var btn = document.createElement('button')
+          btn.textContent = i
+          if (i === page) btn.classList.add('active')
+          ;(function(p) { btn.onclick = function() { currentPage = p; load(currentType, p) } })(i)
+          pagination.appendChild(btn)
+        }
+      } catch (e) {
+        grid.innerHTML = '<p style="color:#a0a0b0;">加载失败</p>'
       }
     }
-    document.getElementsByClassName('bgm-tab')[1].click()
-  })
-}
 
-function getPage(pageNum, type) {
-  const url = `${bangumiUrl}/bangumi?type=${type}&offset=${(pageNum - 1) * limit}&limit=${limit}`
-  getJSON(url, function (data) {
-    if (pageNum == 1) {
-      emptyEl(document.querySelector('.bgm-collection'))
-    } else {
-      removeEl(document.querySelector('.bgm-navigator'))
-    }
-    Array.prototype.forEach.call(data.data, function (value, index) {
-
-      let totalEp = value.eps
-      let ep = type === 'watched' ? totalEp : value.ep_status
-
-      let percentage = ep / totalEp * 100
-      let cover = value.images.large
-      let subjectUrl = `https://bgm.tv/subject/${value.subject_id}`
-      const html = `
-      <a class="bgm-item" href="${subjectUrl}" target="_blank">
-          <div class="bgm-item-thumb" style="background-image:url(${cover})" referrerpolicy="no-referrer"></div>
-          <div class="bgm-item-info">
-              <span class="bgm-item-title main">${value.name_cn || value.name}</span>
-              <span class="bgm-item-title">${value.summary || value.name}</span>
-              <div class="bgm-item-statusBar-container">
-                <div class="bgm-item-statusBar" style="width:${percentage}%"></div>
-                <span class="bgm-item-percentage">进度：${ep} / ${totalEp}</span>
-              </div>
-          </div>
-      </a>
-      `
-      document.querySelector('.bgm-collection')
-        .insertAdjacentHTML('beforeend', html)
+    nav.addEventListener('click', function(e) {
+      if (e.target.tagName === 'BUTTON') {
+        currentType = e.target.dataset.type
+        currentPage = 1
+        load(currentType, 1)
+      }
     })
-    if (pageNum < Math.ceil(data.total / limit)) {
-      const html = `
-      <div class="bgm-navigator">
-          <a class="bgm-btn">加载更多</a>
-          <script>
-          
-          </script>
-      </div>
-      `
-      document.querySelector('.bgm-container')
-        .insertAdjacentHTML('beforeend', html)
-      document.querySelector('.bgm-btn').addEventListener('click', function (event) {
-        loadClick(event, pageNum + 1, type)
-      }, { 'once': true })
-    }
-  })
-}
 
-function tabClick(event) {
-
-  emptyEl(document.querySelector('.bgm-collection'))
-  removeEl(document.querySelector('.bgm-navigator'))
-
-  document.querySelector('.bgm-collection').insertAdjacentHTML('beforeend', load)
-  const el = event.target
-  el.classList.add('bgm-active')
-  document.querySelectorAll('.bgm-tab').forEach(function (item) {
-    if (item.id !== el.id) {
-      item.classList.remove('bgm-active')
-    }
-  })
-  const type = el.dataset.type
-  getPage(1, type)
-}
-
-function loadClick(event, pageNum, type) {
-  getPage(pageNum, type);
-  const el = event.target
-  el.textContent = '加载中'
-  el.style.backgroundColor = 'grey'
-}
-
-function emptyEl(el) {
-  while (el.firstChild)
-    el.removeChild(el.firstChild)
-}
-
-function removeEl(el) {
-  if (el && el.parentNode) {
-    el.parentNode.removeChild(el)
+    await checkNSFW()
+    load(currentType, 1)
   }
-}
 
-function getJSON(url, callback) {
-  var xhr = new XMLHttpRequest()
-  xhr.open('GET', url, true)
-
-  xhr.onload = function () {
-    if (this.status >= 200 && this.status < 400) {
-      // Success!
-      callback(JSON.parse(this.response))
-    }
-  };
-
-  xhr.onerror = function () {
-    // There was a connection error of some sort
-  };
-
-  xhr.send()
-}
-
-function init() {
-  if (quote) {
-    document.querySelector('.bgm-container').insertAdjacentHTML('beforeend',`<blockquote><p>${quote}</p></blockquote>`)
-  }
-  document.querySelector('.bgm-container').insertAdjacentHTML('beforeend', `<div class="bgm-tabs"></div>`)
-  document.querySelector('.bgm-container').insertAdjacentHTML('beforeend', `
-    <div class="bgm-collection" id="bgm-collection">
-      ${load}
-    </div>`
-  )
-  getTab()
-}
-
-init()
+  render()
+})()

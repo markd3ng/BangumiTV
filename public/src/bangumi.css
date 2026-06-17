@@ -225,3 +225,32 @@ body.theme-dark .loader:hover {
     transform: scale(1)
   }
 }
+
+/* NSFW 模糊遮罩 */
+.bgm-card.bgm-nsfw .bgm-card-cover {
+  position: relative;
+  overflow: hidden;
+}
+.bgm-card.bgm-nsfw .bgm-card-cover img {
+  filter: blur(20px);
+  transition: filter 0.3s;
+}
+.bgm-card.bgm-nsfw.bgm-nsfw-reveal .bgm-card-cover img {
+  filter: blur(0);
+}
+.bgm-nsfw-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.5);
+  color: #e94560;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  z-index: 2;
+}
+.bgm-nsfw-reveal .bgm-nsfw-overlay {
+  display: none;
+}
