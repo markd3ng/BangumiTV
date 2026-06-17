@@ -31,6 +31,20 @@
 
 > **提示：** 如果直接使用「编辑 Cloudflare Workers」模板，默认已包含上述所需权限。在「账户资源」中选择你的 Cloudflare 账户，「区域资源」选择「所有区域」即可。
 
+### bgm.tv OAuth App 注册
+
+管理页面的多账户同步需要 bgm.tv OAuth App 的 `client_id` 和 `client_secret`。
+
+1. 登录 [bgm.tv](https://bgm.tv)，前往 [https://bgm.tv/dev/app](https://bgm.tv/dev/app)
+2. 点击「创建应用」，填写：
+   - **应用名称**：自定义，如 `BangumiTV`
+   - **回调地址 (redirect_uri)**：填 `https://<你的 Worker 域名>/manage/callback`
+   - **应用描述**：可选，如 `多账户追番同步工具`
+3. 创建成功后记录 **App ID**（= `BANGUMI_CLIENT_ID`）和 **App Secret**（= `BANGUMI_CLIENT_SECRET`）
+4. 将这两个值填入下面的 GitHub Secrets 中
+
+> **注意：** 回调地址必须与创建应用时填写的一致，否则 OAuth 授权会失败。如果是本地开发调试，可以先填 `http://localhost:8787/manage/callback`。
+
 ## 快速部署
 
 ### 1. Fork 本仓库
@@ -46,8 +60,8 @@
 | `CF_ACCOUNT_ID` | Cloudflare 账户 ID |
 | `BANGUMI_TOKEN` | bgm.tv OAuth access token |
 | `BANGUMI_REFRESH_TOKEN` | bgm.tv OAuth refresh token |
-| `BANGUMI_CLIENT_ID` | bgm.tv OAuth App client_id |
-| `BANGUMI_CLIENT_SECRET` | bgm.tv OAuth App client_secret |
+| `BANGUMI_CLIENT_ID` | bgm.tv OAuth App client_id（见上方「bgm.tv OAuth App 注册」） |
+| `BANGUMI_CLIENT_SECRET` | bgm.tv OAuth App client_secret（见上方「bgm.tv OAuth App 注册」） |
 | `CRON_SECRET` | 自定义随机字符串（用于 cron 同步认证） |
 
 **Variables:**
