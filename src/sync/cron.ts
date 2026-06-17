@@ -1,22 +1,7 @@
 import { BgmClient } from './bgm-client'
 import { merge, primaryMerge, type MergedCollections } from './merger'
 import type { StorageAdapter } from '../storage/adapter'
-
-async function fetchAllCollections(client: BgmClient, username: string): Promise<Awaited<ReturnType<typeof client.getCollections>>['data']> {
-  const all: Awaited<ReturnType<typeof client.getCollections>>['data'] = []
-  const first = await client.getCollections(username, 0, 1)
-  const total = first.total
-  if (total === 0) return []
-
-  const limit = 50
-  const totalPages = Math.ceil(total / limit)
-  for (let page = 0; page < totalPages; page++) {
-    const { data } = await client.getCollections(username, page * limit, limit)
-    all.push(...data)
-    if (page < totalPages - 1) await new Promise(r => setTimeout(r, 200))
-  }
-  return all
-}
+import { fetchAllCollections } from './utils'
 
 async function fetchSubjects(client: BgmClient, subjectIds: number[]) {
   const map = new Map<number, Awaited<ReturnType<typeof client.getSubject>>>()

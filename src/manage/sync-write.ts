@@ -1,4 +1,5 @@
 import { BgmClient, type BgmCollection } from '../sync/bgm-client'
+import { fetchAllCollections } from '../sync/utils'
 
 export interface SyncRequest {
   mode: 'full' | 'partial'
@@ -14,22 +15,6 @@ export interface SyncResult {
   error?: string
 }
 
-async function fetchAllWithToken(token: string, username: string): Promise<BgmCollection[]> {
-  const client = new BgmClient(token)
-  const all: BgmCollection[] = []
-  const first = await client.getCollections(username, 0, 1)
-  if (first.total === 0) return []
-
-  const limit = 50
-  const pages = Math.ceil(first.total / limit)
-  for (let p = 0; p < pages; p++) {
-    const { data } = await client.getCollections(username, p * limit, limit)
-    all.push(...data)
-    if (p < pages - 1) await new Promise(r => setTimeout(r, 200))
-  }
-  return all
-}
-
 export async function executeSync(
   fromToken: string,
   fromUser: string,
@@ -37,10 +22,10 @@ export async function executeSync(
   toUser: string,
   request: SyncRequest,
 ): Promise<SyncResult[]> {
-  const fromCol = await fetchAllWithToken(fromToken, fromUser)
+  const fromCol = await fetchAllCollections(new BgmClient(fromToken), fromUser)
   const fromMap = new Map(fromCol.map(c => [c.subject_id, c]))
 
-  const toCol = await fetchAllWithToken(toToken, toUser)
+  const toCol = await fetchAllCollections(new BgmClient(toToken), toUser)
   const toMap = new Map(toCol.map(c => [c.subject_id, c]))
 
   let targets: BgmCollection[]
