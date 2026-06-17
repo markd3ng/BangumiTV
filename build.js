@@ -5,7 +5,7 @@ const pkg = JSON.parse(readFileSync('./package.json', 'utf8'))
 
 const banner = [`/*! BangumiTV v${pkg.version}`,
   'GeeKaven (https://tawawa.moe)',
-  'https://bangumi-tv.vercel.app',
+  'https://github.com/markd3ng/BangumiTV',
 `${pkg.license} License */`
 ].join(' | ');
 

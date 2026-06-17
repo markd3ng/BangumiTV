@@ -46,41 +46,41 @@
   }
 
   async function render() {
-    var nav = document.createElement('div')
+    const nav = document.createElement('div')
     nav.className = 'bgm-nav'
-    var keys = Object.keys(TYPE_NAMES)
-    var navHtml = ''
-    for (var i = 0; i < keys.length; i++) {
+    const keys = Object.keys(TYPE_NAMES)
+    let navHtml = ''
+    for (let i = 0; i < keys.length; i++) {
       navHtml += '<button data-type="' + keys[i] + '">' + TYPE_NAMES[keys[i]] + '</button>'
     }
     nav.innerHTML = navHtml
     container.appendChild(nav)
 
-    var grid = document.createElement('div')
+    const grid = document.createElement('div')
     grid.className = 'bgm-grid'
     container.appendChild(grid)
 
-    var pagination = document.createElement('div')
+    const pagination = document.createElement('div')
     pagination.className = 'bgm-pagination'
     container.appendChild(pagination)
 
-    var currentType = 'watching'
-    var currentPage = 1
+    let currentType = 'watching'
+    let currentPage = 1
 
     async function load(type, page) {
       try {
-        var res = await fetch(API + '/api/collections?type=' + type + '&page=' + page + '&limit=24')
-        var data = await res.json()
-        var cardsHtml = ''
-        for (var i = 0; i < data.data.length; i++) {
+        const res = await fetch(API + '/api/collections?type=' + type + '&page=' + page + '&limit=24')
+        const data = await res.json()
+        let cardsHtml = ''
+        for (let i = 0; i < data.data.length; i++) {
           cardsHtml += renderCard(data.data[i])
         }
         grid.innerHTML = cardsHtml
 
-        var totalPages = Math.ceil(data.total / 24)
+        const totalPages = Math.ceil(data.total / 24)
         pagination.innerHTML = ''
-        for (var i = 1; i <= totalPages; i++) {
-          var btn = document.createElement('button')
+        for (let i = 1; i <= totalPages; i++) {
+          const btn = document.createElement('button')
           btn.textContent = i
           if (i === page) btn.classList.add('active')
           ;(function(p) { btn.onclick = function() { currentPage = p; load(currentType, p) } })(i)
