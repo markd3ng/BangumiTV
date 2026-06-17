@@ -2,63 +2,108 @@
 
 > 在静态页面中渲染你的 Bangumi 追番进度
 
-[![](https://img.shields.io/npm/v/bangumi-tv)](https://www.npmjs.com/package/bangumi-tv) [![](https://img.shields.io/badge/Author-GeeKaven-blueviolet)](https://github.com/GeeKaven) [![](https://img.shields.io/npm/l/bangumi-tv)](https://github.com/geekaven/BangumiTV/blob/main/LICENSE) [![](https://data.jsdelivr.com/v1/package/npm/bangumi-tv/badge)](https://www.jsdelivr.com/package/npm/bangumi-tv)
-
-一个基于 Vercel Severless Function 的 [Bangumi.tv](https://bgm.tv) 追番进度展示页面
-
-## 起源
+基于 Cloudflare Workers + Pages，数据直接来源于 bgm.tv API，条目图片通过 R2 缓存分发。
 
 ## Demo
--   https://bangumi-tv.vercel.app
 
-## 安装
-### 后端安装
-#### 方案一：Vercel
-1.  Fork 本项目
-2.  在本项目 `Settings -> Secrets -> Actions` 中点击 `New repository secret`，`Name` 填 `BANGUMI_USER`，`Value` 填 ` 你的 bgm.tv 的用户名 `，之后点击 `Add secret` 按钮
-3.  前往 Vercel 官网注册或登录。
-在 Vercel Dashboard 中点击 New Project，授权 GitHub，选择账户下 Fork 出来的本项目，点击 Deploy 完成部署。
-4.  记录下 Vercel 分配的 Production 域名 ( 如 bangumi-tv.vercel.app )
+`https://bangumi-tv.<你的域名>.workers.dev`
 
-**⚠️Github Action 会每两小时读取用户收藏状况生成数据，如需要可在。github/workflows/buildSubject.yml 中修改 cron**
+## 前置条件
 
-#### 方案二：自建服务器
-1.  Clone 本项目
-2.  安装 Node 环境
-3.  运行 `npm install` 或 `pnpm install` 安装依赖
-4.  设置环境变量
-   ```shell
-   echo "BANGUMI_USER={你的 bgm.tv 用户名}" >> .env
-   ```
-5.  生成追番数据 `npm run buildSubject` 或者 `pnpm buildSubject`
-6.  启动服务 `npm run start` 或者 `pnpm start`
-7.  服务运行在 `localhost:3000` 上，服务器域名，SSL 等自行设置
+- [Cloudflare](https://cloudflare.com) 账号
+- [bgm.tv](https://bgm.tv) 账号及 [OAuth App](https://bgm.tv/dev/app)（用于管理页面的多账户同步）
+- GitHub 账号
 
-### 前端安装
-在需要添加追番列表的页面中直接引入 CSS 。
+## 快速部署
+
+### 1. Fork 本仓库
+
+### 2. 配置 GitHub Secrets & Variables
+
+前往 Repo → Settings → Secrets and variables → Actions，添加：
+
+**Secrets:**
+| 名称 | 说明 |
+|------|------|
+| `CF_API_TOKEN` | Cloudflare API Token（需 Workers/R2/KV 权限） |
+| `CF_ACCOUNT_ID` | Cloudflare 账户 ID |
+| `BANGUMI_TOKEN` | bgm.tv OAuth access token |
+| `BANGUMI_REFRESH_TOKEN` | bgm.tv OAuth refresh token |
+| `BANGUMI_CLIENT_ID` | bgm.tv OAuth App client_id |
+| `BANGUMI_CLIENT_SECRET` | bgm.tv OAuth App client_secret |
+| `CRON_SECRET` | 自定义随机字符串（用于 cron 同步认证） |
+
+**Variables:**
+| 名称 | 说明 |
+|------|------|
+| `BANGUMI_USERS` | bgm 用户名（逗号分隔，如 `user1,user2`） |
+| `BANGUMI_PRIMARY_USER` | primary 模式下的主账户名 |
+
+### 3. Push 到 dev 分支
+
+```bash
+git push origin dev
+```
+
+GitHub Actions 将自动：
+- 检查并创建 Cloudflare KV 和 R2 资源
+- 构建前端
+- 注入环境变量
+- 部署 Worker 和 Pages
+
+### 4. 等待部署完成
+
+访问 `https://bangumi-tv.<你的子域名>.workers.dev`
+
+## 前端接入
+
+在任意页面中引入 Widget：
+
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bangumi-tv@latest/dist/bangumi.css">
+<link rel="stylesheet" href="https://bangumi-tv.<你的域名>.workers.dev/src/bangumi.css">
 <script>
   const bgmConfig = {
-      apiUrl: "https://bangumi-tv.vercel.app",   // 替换成自己的后端域名
-      quote: "生命不止，追番不息！"
-    }
+    apiUrl: "https://bangumi-tv.<你的域名>.workers.dev",
+    quote: "生命不止，追番不息！"
+  }
 </script>
-```
-在 `</body>` 之前引入 JS
-```html
-<script src="https://cdn.jsdelivr.net/npm/bangumi-tv@latest/dist/bangumi.js"></script>
+<script src="https://bangumi-tv.<你的域名>.workers.dev/src/bangumi.js"></script>
+<div class="bgm-container"></div>
 ```
 
-引入完成后在需要添加番剧进度的地方添加容器
-```html
-<div class="bgm-container">
-</div>
+## 管理页面
+
+访问 `https://<worker>/manage` 进行多账户同步：
+
+1. 输入两个 bgm.tv 用户名
+2. 依次完成 OAuth 授权
+3. 选择完整同步或部分同步
+4. 执行同步
+
+## 本地开发
+
+```bash
+pnpm install
+npx wrangler dev
 ```
 
-## 感谢❤️
--   [Bangumi-Subject](https://github.com/GeeKaven/BangumiTV-Subject) 离线Bgm数据
--   [bangumi/api](https://github.com/bangumi/api) 提供 API
--   [hans362/Bilibili-Bangumi-JS](https://github.com/hans362/Bilibili-Bangumi-JS) 提供前端展示逻辑
--   [AlanDecode/PandaBangumi-Typecho-Plugin](https://github.com/AlanDecode/PandaBangumi-Typecho-Plugin) 提供前端展示样式
--   [HCLonely/hexo-bilibili-bangumi](https://github.com/HCLonely/hexo-bilibili-bangumi) 提供分页逻辑
+Worker 启动在 `http://localhost:8787`。
+
+## 环境变量说明
+
+| 变量 | 类型 | 说明 |
+|------|------|------|
+| `SYNC_MODE` | var | `merge` 或 `primary` |
+| `NSFW_SHOW` | var | 是否展示 R18 条目（`true`/`false`） |
+| `BANGUMI_TOKEN` | secret | bgm.tv access token |
+| `BANGUMI_REFRESH_TOKEN` | secret | bgm.tv refresh token |
+| `BANGUMI_USERS` | secret | bgm 用户名列表 |
+| `BANGUMI_PRIMARY_USER` | secret | 主账户名 |
+| `BANGUMI_CLIENT_ID` | secret | OAuth App client_id |
+| `BANGUMI_CLIENT_SECRET` | secret | OAuth App client_secret |
+| `CRON_SECRET` | secret | cron 同步认证密钥 |
+
+## 感谢
+
+- [bangumi/api](https://github.com/bangumi/api) 提供 API
+- [GeeKaven/BangumiTV](https://github.com/GeeKaven/BangumiTV) 原始项目
