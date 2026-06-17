@@ -133,7 +133,7 @@ async function submitCallback(which) {
 
 async function loadComparison() {
   showStep(3)
-  const res = await fetch('/api/manage/compare?tokenA=' + encodeURIComponent(state.tokenA) + '&tokenB=' + encodeURIComponent(state.tokenB) + '&userA=' + state.userA + '&userB=' + state.userB)
+  const res = await fetch('/api/manage/compare', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tokenA:state.tokenA,tokenB:state.tokenB,userA:state.userA,userB:state.userB}) })
   const data = await res.json()
   document.getElementById('step3-summary').innerHTML = `
     <div class="summary-card"><div class="count">${data.userA?.total || 0}</div><div class="label">${state.userA}</div></div>

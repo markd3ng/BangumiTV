@@ -119,7 +119,7 @@ async function submitCallback(which) {
 }
 async function loadComparison() {
   showStep(3)
-  const res = await fetch('/api/manage/compare?tokenA=' + encodeURIComponent(state.tokenA) + '&tokenB=' + encodeURIComponent(state.tokenB) + '&userA=' + state.userA + '&userB=' + state.userB)
+  const res = await fetch('/api/manage/compare', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tokenA:state.tokenA,tokenB:state.tokenB,userA:state.userA,userB:state.userB}) })
   const data = await res.json()
   document.getElementById('step3-summary').innerHTML = '<div class="summary-card"><div class="count">'+(data.userA?.total||0)+'</div><div class="label">'+state.userA+'</div></div><div class="summary-card"><div class="count">'+(data.userB?.total||0)+'</div><div class="label">'+state.userB+'</div></div>'
   state.differences = data.differences || []
@@ -247,12 +247,12 @@ app.get('/api/manage/exchange', async (c) => {
   }
 })
 
-app.get('/api/manage/compare', async (c) => {
-  const url = new URL(c.req.url)
-  const tokenA = url.searchParams.get('tokenA') || ''
-  const tokenB = url.searchParams.get('tokenB') || ''
-  const userA = url.searchParams.get('userA') || ''
-  const userB = url.searchParams.get('userB') || ''
+app.post('/api/manage/compare', async (c) => {
+  const body = await c.req.json()
+  const tokenA = body.tokenA || ''
+  const tokenB = body.tokenB || ''
+  const userA = body.userA || ''
+  const userB = body.userB || ''
   try {
     const result = await compareAccounts(tokenA, userA, tokenB, userB)
     return Response.json(result)
