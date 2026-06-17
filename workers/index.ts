@@ -6,6 +6,7 @@ import { handleConfig } from '../src/api/config'
 import { runSync } from '../src/sync/cron'
 import { compareAccounts } from '../src/manage/compare'
 import { executeSync } from '../src/manage/sync-write'
+import { handleImage } from '../src/image/proxy'
 
 // 管理页面 — HTML 模板字符串内联
 const manageHtml = `<!DOCTYPE html>
@@ -273,6 +274,11 @@ app.post('/api/manage/sync', async (c) => {
   } catch (err) {
     return Response.json({ error: String(err) }, { status: 500 })
   }
+})
+
+// 图片代理
+app.get('/image/*', async (c) => {
+  return handleImage({ BANGUMI_R2: c.env.BANGUMI_R2, BANGUMI_TOKEN: c.env.BANGUMI_TOKEN }, c.req.raw)
 })
 
 export default app
