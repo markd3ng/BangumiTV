@@ -16,6 +16,7 @@ export interface MergedEntry {
   nsfw: boolean
   date: string
   tags: string[]
+  updated_at: string
 }
 
 export interface MergedCollections {
@@ -53,6 +54,7 @@ function toMergedEntry(c: BgmCollection): MergedEntry {
     nsfw: subj?.nsfw ?? false,
     date: subj?.date ?? '',
     tags: c.tags ?? [],
+    updated_at: c.updated_at,
   }
 }
 
@@ -63,7 +65,7 @@ export function merge(usersCollections: BgmCollection[][]): MergedCollections {
     for (const c of collections) {
       const entry = toMergedEntry(c)
       const existing = map.get(c.subject_id)
-      if (!existing || new Date(c.updated_at) > new Date(existing.date)) {
+      if (!existing || new Date(c.updated_at) > new Date(existing.updated_at)) {
         map.set(c.subject_id, entry)
       }
     }
