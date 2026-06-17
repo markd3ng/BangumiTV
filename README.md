@@ -45,6 +45,29 @@
 
 > **注意：** 回调地址必须与创建应用时填写的一致，否则 OAuth 授权会失败。如果是本地开发调试，可以先填 `http://localhost:8787/manage/callback`。
 
+### 获取 cron 同步用的 access token / refresh token
+
+定时同步（cron）需要一个有收藏读取权限的 `BANGUMI_TOKEN` 和 `BANGUMI_REFRESH_TOKEN`。bgm.tv 的 access token 有效期约 7 天，过期后 Worker 会用 refresh token 自动续期。首次获取这一对 token 的方法：
+
+1. 浏览器打开（替换 `<CLIENT_ID>` 和 `<回调地址>`，与上方 OAuth App 一致）：
+   ```
+   https://bgm.tv/oauth/authorize?client_id=<CLIENT_ID>&response_type=code&redirect_uri=<回调地址>
+   ```
+2. 授权后跳转到回调地址，URL 中带 `?code=<CODE>`，复制 `<CODE>`。
+3. 用 code 换取 token：
+   ```bash
+   curl -X POST https://bgm.tv/oauth/access_token \
+     -H "Content-Type: application/json" \
+     -d '{
+       "grant_type":"authorization_code",
+       "client_id":"<CLIENT_ID>",
+       "client_secret":"<CLIENT_SECRET>",
+       "code":"<CODE>",
+       "redirect_uri":"<回调地址>"
+     }'
+   ```
+4. 返回 JSON 中的 `access_token` 即 `BANGUMI_TOKEN`，`refresh_token` 即 `BANGUMI_REFRESH_TOKEN`。
+
 ## 快速部署
 
 ### 1. Fork 本仓库
@@ -58,11 +81,11 @@
 |------|------|
 | `CF_API_TOKEN` | Cloudflare API Token（需 Workers/R2/KV 权限） |
 | `CF_ACCOUNT_ID` | Cloudflare 账户 ID |
-| `BANGUMI_TOKEN` | bgm.tv OAuth access token |
-| `BANGUMI_REFRESH_TOKEN` | bgm.tv OAuth refresh token |
+| `BANGUMI_TOKEN` | bgm.tv access token（见上方「获取 cron 同步用的 access token / refresh token」） |
+| `BANGUMI_REFRESH_TOKEN` | bgm.tv refresh token（同上） |
 | `BANGUMI_CLIENT_ID` | bgm.tv OAuth App client_id（见上方「bgm.tv OAuth App 注册」） |
 | `BANGUMI_CLIENT_SECRET` | bgm.tv OAuth App client_secret（见上方「bgm.tv OAuth App 注册」） |
-| `CRON_SECRET` | 自定义随机字符串（用于 cron 同步认证） |
+| `CRON_SECRET` | 自定义随机字符串（用于手动触发 `POST /__cron/sync` 认证；定时 cron 由 Cloudflare 调度自动运行，无需此密钥） |
 
 **Variables:**
 | 名称 | 说明 |
@@ -120,19 +143,37 @@ npx wrangler dev
 
 Worker 启动在 `http://localhost:8787`。
 
+本地运行需要提供 secrets（KV/R2 绑定由 `wrangler.toml` 自动接入，但环境变量需本地提供）。在项目根目录创建 `.dev.vars` 文件：
+
+```
+BANGUMI_TOKEN=你的_access_token
+BANGUMI_REFRESH_TOKEN=你的_refresh_token
+BANGUMI_USERS=user1,user2
+BANGUMI_PRIMARY_USER=user1
+BANGUMI_CLIENT_ID=你的_client_id
+BANGUMI_CLIENT_SECRET=你的_client_secret
+CRON_SECRET=任意字符串
+SYNC_MODE=merge
+NSFW_SHOW=true
+```
+
+> `.dev.vars` 已被 `.gitignore` 忽略，不会提交。本地若需手动触发一次同步，可 `curl -X POST -H "X-Cron-Secret: 任意字符串" http://localhost:8787/__cron/sync`。
+
 ## 环境变量说明
 
 | 变量 | 类型 | 说明 |
 |------|------|------|
-| `SYNC_MODE` | var | `merge` 或 `primary` |
-| `NSFW_SHOW` | var | 是否展示 R18 条目（`true`/`false`） |
-| `BANGUMI_TOKEN` | secret | bgm.tv access token |
-| `BANGUMI_REFRESH_TOKEN` | secret | bgm.tv refresh token |
-| `BANGUMI_USERS` | secret | bgm 用户名列表 |
-| `BANGUMI_PRIMARY_USER` | secret | 主账户名 |
+| `SYNC_MODE` | var | `merge`（多账号取并集，相同条目以最新为准）或 `primary`（以主账号为准） |
+| `NSFW_SHOW` | var | 是否展示 R18 条目（`true`/`false`）。为 `true` 时前端首次访问会弹 age-18 确认窗，R18 卡片默认模糊、点击可查看；为 `false` 时 API 直接不返回 R18 条目 |
+| `BANGUMI_TOKEN` | secret | bgm.tv access token（见「获取 cron 同步用的 token」） |
+| `BANGUMI_REFRESH_TOKEN` | secret | bgm.tv refresh token，token 过期时自动续期 |
+| `BANGUMI_USERS` | var | bgm 用户名列表（逗号分隔，如 `user1,user2`） |
+| `BANGUMI_PRIMARY_USER` | var | `primary` 模式下的主账户名 |
 | `BANGUMI_CLIENT_ID` | secret | OAuth App client_id |
 | `BANGUMI_CLIENT_SECRET` | secret | OAuth App client_secret |
-| `CRON_SECRET` | secret | cron 同步认证密钥 |
+| `CRON_SECRET` | secret | 手动触发 `POST /__cron/sync` 的认证密钥（定时 cron 无需） |
+
+> GitHub 中：标 **var** 的配在 Settings → Secrets and variables → Actions → **Variables**；标 **secret** 的配在 **Secrets**。
 
 ## 感谢
 

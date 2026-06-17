@@ -78,8 +78,8 @@ jobs:
         env:
           BANGUMI_TOKEN: ${{ secrets.BANGUMI_TOKEN }}
           BANGUMI_REFRESH_TOKEN: ${{ secrets.BANGUMI_REFRESH_TOKEN }}
-          BANGUMI_USERS: ${{ secrets.BANGUMI_USERS }}
-          BANGUMI_PRIMARY_USER: ${{ secrets.BANGUMI_PRIMARY_USER }}
+          BANGUMI_USERS: ${{ vars.BANGUMI_USERS }}
+          BANGUMI_PRIMARY_USER: ${{ vars.BANGUMI_PRIMARY_USER }}
           BANGUMI_CLIENT_ID: ${{ secrets.BANGUMI_CLIENT_ID }}
           BANGUMI_CLIENT_SECRET: ${{ secrets.BANGUMI_CLIENT_SECRET }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
