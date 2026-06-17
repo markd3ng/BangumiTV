@@ -16,3 +16,9 @@ id = "bangumi-tv-kv"
 [[r2_buckets]]
 binding = "BANGUMI_R2"
 bucket_name = "bangumi-tv-images"
+
+# 允许将 HTML 作为文本模块导入（manage 页面模板）。
+[[rules]]
+type = "Text"
+globs = ["**/*.html"]
+fallthrough = true

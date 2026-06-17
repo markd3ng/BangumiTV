@@ -15,12 +15,12 @@
   "keywords": ["bangumi", "anime"],
   "author": "markd3ng",
   "license": "MIT",
+  "dependencies": {
+    "hono": "^4.x"
+  },
   "devDependencies": {
-    "hono": "^4.x",
     "wrangler": "^4.x",
-    "esbuild": "^0.28.1",
-    "dotenv": "^17.4.2",
-    "axios": "^1.18.0"
+    "esbuild": "^0.28.1"
   },
   "files": ["dist", "LICENSE", "README.md"]
 }

@@ -1,25 +1,5 @@
 import { BgmClient } from '../sync/bgm-client'
 
-export interface OAuthState {
-  userA: string
-  userB: string
-  tokenA?: string
-  tokenB?: string
-  step: 'input' | 'authA' | 'authB' | 'ready'
-}
-
-export function generateState(userA: string, userB: string): string {
-  return btoa(JSON.stringify({ userA, userB, step: 'authA' }))
-}
-
-export function parseState(state: string): OAuthState | null {
-  try {
-    return JSON.parse(atob(state))
-  } catch {
-    return null
-  }
-}
-
 export function getOAuthRedirectUrl(clientId: string, redirectUri: string, state: string): string {
   const params = new URLSearchParams({
     client_id: clientId,

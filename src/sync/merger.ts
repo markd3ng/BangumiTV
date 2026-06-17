@@ -36,6 +36,12 @@ const TYPE_MAP: Record<number, 'want' | 'watched' | 'watching' | 'on_hold' | 'dr
   5: 'dropped',
 }
 
+function toTimestamp(s: string | undefined): number {
+  if (!s) return 0
+  const t = new Date(s).getTime()
+  return Number.isNaN(t) ? 0 : t
+}
+
 function toMergedEntry(c: BgmCollection): MergedEntry {
   const subj = c.subject
   return {
@@ -65,7 +71,9 @@ export function merge(usersCollections: BgmCollection[][]): MergedCollections {
     for (const c of collections) {
       const entry = toMergedEntry(c)
       const existing = map.get(c.subject_id)
-      if (!existing || new Date(c.updated_at) > new Date(existing.updated_at)) {
+      // 仅当新记录时间戳有效且严格大于已有记录时才替换；无效/缺失时间戳视为 0，
+      // 避免因 Invalid Date 导致比较恒为 false 而无法更新，或误覆盖有效记录。
+      if (!existing || toTimestamp(c.updated_at) > toTimestamp(existing.updated_at)) {
         map.set(c.subject_id, entry)
       }
     }

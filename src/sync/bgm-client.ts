@@ -1,6 +1,13 @@
 const BGM_BASE = 'https://api.bgm.tv'
 const UA = 'markd3ng/BangumiTV (https://github.com/markd3ng/BangumiTV)'
 
+export class BgmHttpError extends Error {
+  constructor(public status: number, message: string) {
+    super(message)
+    this.name = 'BgmHttpError'
+  }
+}
+
 export interface BgmCollection {
   subject_id: number
   subject_type: number
@@ -46,7 +53,7 @@ export class BgmClient {
   async getCollections(username: string, offset = 0, limit = 50): Promise<{ data: BgmCollection[]; total: number }> {
     const url = `${BGM_BASE}/v0/users/${username}/collections?subject_type=2&limit=${limit}&offset=${offset}`
     const res = await fetch(url, { headers: this.headers(), signal: AbortSignal.timeout(30000) })
-    if (!res.ok) throw new Error(`bgm.tv collections error: ${res.status}`)
+    if (!res.ok) throw new BgmHttpError(res.status, `bgm.tv collections error: ${res.status}`)
     return res.json()
   }
 
@@ -54,14 +61,14 @@ export class BgmClient {
     const url = `${BGM_BASE}/v0/subjects/${subjectId}`
     const res = await fetch(url, { headers: this.headers(), signal: AbortSignal.timeout(30000) })
     if (res.status === 404) return null
-    if (!res.ok) throw new Error(`bgm.tv subject error: ${res.status}`)
+    if (!res.ok) throw new BgmHttpError(res.status, `bgm.tv subject error: ${res.status}`)
     return res.json()
   }
 
   async getCalendar(): Promise<BgmCalendarItem[]> {
     const url = `${BGM_BASE}/calendar`
     const res = await fetch(url, { headers: this.headers(), signal: AbortSignal.timeout(30000) })
-    if (!res.ok) throw new Error(`bgm.tv calendar error: ${res.status}`)
+    if (!res.ok) throw new BgmHttpError(res.status, `bgm.tv calendar error: ${res.status}`)
     return res.json()
   }
 
@@ -87,7 +94,23 @@ export class BgmClient {
       }),
       signal: AbortSignal.timeout(30000),
     })
-    if (!res.ok) throw new Error(`oauth error: ${res.status}`)
+    if (!res.ok) throw new BgmHttpError(res.status, `oauth error: ${res.status}`)
+    return res.json() as Promise<{ access_token: string; refresh_token: string; user_id: number }>
+  }
+
+  async refreshAccessToken(clientId: string, clientSecret: string, refreshToken: string): Promise<{ access_token: string; refresh_token: string; user_id: number }> {
+    const res = await fetch(`https://bgm.tv/oauth/access_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'User-Agent': UA },
+      body: JSON.stringify({
+        grant_type: 'refresh_token',
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+      }),
+      signal: AbortSignal.timeout(30000),
+    })
+    if (!res.ok) throw new BgmHttpError(res.status, `oauth refresh error: ${res.status}`)
     return res.json() as Promise<{ access_token: string; refresh_token: string; user_id: number }>
   }
 

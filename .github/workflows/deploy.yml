@@ -22,27 +22,41 @@ jobs:
 
       - run: pnpm install
 
-      - name: Provision Cloudflare resources
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: |
-            npx wrangler kv namespace create "bangumi-tv-kv" 2>/dev/null || echo "KV namespace already exists"
-            npx wrangler r2 bucket create "bangumi-tv-images" 2>/dev/null || echo "R2 bucket already exists"
+      - name: Configure Wrangler env
+        run: |
+          echo "CLOUDFLARE_API_TOKEN=${{ secrets.CF_API_TOKEN }}" >> "$GITHUB_ENV"
+          echo "CLOUDFLARE_ACCOUNT_ID=${{ secrets.CF_ACCOUNT_ID }}" >> "$GITHUB_ENV"
 
-      - name: Get KV namespace ID
+      # 幂等创建资源：已存在时忽略。
+      - name: Provision Cloudflare resources
+        run: |
+          npx wrangler kv namespace create "bangumi-tv-kv" || echo "KV namespace already exists"
+          npx wrangler r2 bucket create "bangumi-tv-images" || echo "R2 bucket already exists"
+
+      # 在 shell 中解析 KV namespace id，trim 掉尾随换行；若未拿到则失败。
+      - name: Resolve KV namespace ID
         id: kv-id
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: kv namespace list --json | jq -r '.[] | select(.title == "bangumi-tv-kv") | .id'
+        run: |
+          set -euo pipefail
+          KV_ID=$(npx wrangler kv namespace list --json | jq -r '.[] | select(.title == "bangumi-tv-kv") | .id' | head -n1 | tr -d '[:space:]')
+          if [ -z "${KV_ID}" ]; then
+            echo "Failed to resolve KV namespace id" >&2
+            exit 1
+          fi
+          echo "id=${KV_ID}" >> "$GITHUB_OUTPUT"
 
       - name: Inject KV id into wrangler.toml
+        env:
+          KV_ID: ${{ steps.kv-id.outputs.id }}
         run: |
-          KV_ID="${{ steps.kv-id.outputs.stdout }}"
-          sed -i "s/id = \"bangumi-tv-kv\"/id = \"${KV_ID}\"/" wrangler.toml
+          python3 - <<'PY'
+          import os, re, pathlib
+          kv_id = os.environ["KV_ID"]
+          p = pathlib.Path("wrangler.toml")
+          text = p.read_text()
+          text = re.sub(r'id = "bangumi-tv-kv"', f'id = "{kv_id}"', text)
+          p.write_text(text)
+          PY
 
       - name: Build frontend
         run: node build.js

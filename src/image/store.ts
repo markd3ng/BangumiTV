@@ -1,8 +1,13 @@
+export interface StoredImage {
+  data: ArrayBuffer
+  contentType: string
+}
+
 export interface ImageStore {
-  getOriginal(hash: string): Promise<{ data: ArrayBuffer; contentType: string } | null>
+  getOriginal(hash: string): Promise<StoredImage | null>
   putOriginal(hash: string, data: ArrayBuffer, contentType: string): Promise<void>
-  getVariant(hash: string, variant: string): Promise<ArrayBuffer | null>
-  putVariant(hash: string, variant: string, data: ArrayBuffer): Promise<void>
+  getVariant(hash: string, variant: string): Promise<StoredImage | null>
+  putVariant(hash: string, variant: string, data: ArrayBuffer, contentType: string): Promise<void>
 }
 
 export class R2ImageStore implements ImageStore {
@@ -12,7 +17,7 @@ export class R2ImageStore implements ImageStore {
     return `images/${hash}/${file}`
   }
 
-  async getOriginal(hash: string): Promise<{ data: ArrayBuffer; contentType: string } | null> {
+  async getOriginal(hash: string): Promise<StoredImage | null> {
     const obj = await this.r2.get(this.key(hash, 'original'))
     if (!obj) return null
     return {
@@ -27,14 +32,18 @@ export class R2ImageStore implements ImageStore {
     })
   }
 
-  async getVariant(hash: string, variant: string): Promise<ArrayBuffer | null> {
+  async getVariant(hash: string, variant: string): Promise<StoredImage | null> {
     const obj = await this.r2.get(this.key(hash, variant))
-    return obj ? obj.arrayBuffer() : null
+    if (!obj) return null
+    return {
+      data: await obj.arrayBuffer(),
+      contentType: obj.httpMetadata?.contentType || 'image/jpeg',
+    }
   }
 
-  async putVariant(hash: string, variant: string, data: ArrayBuffer): Promise<void> {
+  async putVariant(hash: string, variant: string, data: ArrayBuffer, contentType: string): Promise<void> {
     await this.r2.put(this.key(hash, variant), data, {
-      httpMetadata: { contentType: 'image/webp' },
+      httpMetadata: { contentType },
     })
   }
 }
