@@ -32,6 +32,7 @@ jobs:
         run: |
           npx wrangler kv namespace create "bangumi-tv-kv" || echo "KV namespace already exists"
           npx wrangler r2 bucket create "bangumi-tv-images" || echo "R2 bucket already exists"
+          npx wrangler pages project create bangumi-tv || echo "Pages project already exists"
 
       # 在 shell 中解析 KV namespace id，trim 掉尾随换行；若未拿到则失败。
       - name: Resolve KV namespace ID
@@ -92,4 +93,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages deploy public/ --project-name=bangumi-tv
+          command: pages deploy public/ --project-name=bangumi-tv --commit-dirty=true

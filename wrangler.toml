@@ -1,6 +1,7 @@
 name = "bangumi-tv"
 main = "workers/index.ts"
 compatibility_date = "2026-06-17"
+pages_build_output_dir = "public"
 
 [triggers]
 crons = ["0 */4 * * *"]
