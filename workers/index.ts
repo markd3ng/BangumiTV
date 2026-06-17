@@ -24,6 +24,7 @@ interface Env {
   BANGUMI_CLIENT_ID?: string
   BANGUMI_CLIENT_SECRET?: string
   CRON_SECRET: string
+  MANAGE_SECRET?: string
 }
 
 const app = new Hono<{ Bindings: Env }>()
@@ -61,7 +62,14 @@ app.get('/manage', () => {
 })
 
 app.get('/manage/callback', () => {
-  const html = '<html><body><script>window.opener.postMessage({code:new URLSearchParams(window.location.search).get("code")},"*");window.close();</script></body></html>'
+  // 把 code 与 state 回传给打开它的 /manage 父窗口，再自动关闭。
+  const html = '<html><body><script>' +
+    'var p=new URLSearchParams(location.search);' +
+    'try{window.opener.postMessage({type:"bgm-oauth",code:p.get("code"),state:p.get("state")},"*");}catch(e){}' +
+    'window.close();' +
+    '</script>' +
+    '<noscript>请复制本页地址栏完整 URL，粘贴回管理页面。</noscript>' +
+    '</body></html>'
   return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
 })
 
@@ -73,7 +81,19 @@ app.get('/api/manage/oauth-url', (c) => {
   return Response.json({ url: getOAuthRedirectUrl(clientId, redirectUri, state) })
 })
 
+// 管理写操作鉴权：若设置了 MANAGE_SECRET，则所有 /api/manage/* 写端点
+// （exchange/compare/sync/cron-token）必须带匹配的 X-Manage-Secret 头。
+// oauth-url 仅构造跳转 URL、不接触敏感数据，故不强制。
+function requireManageSecret(c: { env: Env; req: { header(n: string): string | undefined } }): Response | null {
+  if (!c.env.MANAGE_SECRET) return null // 未配置则放行（向后兼容）
+  const provided = c.req.header('X-Manage-Secret')
+  if (provided && provided === c.env.MANAGE_SECRET) return null
+  return Response.json({ error: 'Unauthorized' }, { status: 401 })
+}
+
 app.get('/api/manage/exchange', async (c) => {
+  const gate = requireManageSecret(c)
+  if (gate) return gate
   const code = c.req.query('code') || ''
   const persistCron = c.req.query('cron') === '1'
   try {
@@ -99,6 +119,8 @@ app.get('/api/manage/exchange', async (c) => {
 })
 
 app.post('/api/manage/compare', async (c) => {
+  const gate = requireManageSecret(c)
+  if (gate) return gate
   const body = await c.req.json()
   try {
     const result = await compareAccounts(body.tokenA || '', body.userA || '', body.tokenB || '', body.userB || '')
@@ -109,6 +131,8 @@ app.post('/api/manage/compare', async (c) => {
 })
 
 app.post('/api/manage/sync', async (c) => {
+  const gate = requireManageSecret(c)
+  if (gate) return gate
   const body = await c.req.json()
   try {
     const results = await executeSync(body.tokenA, body.from, body.tokenB, body.to, {
@@ -121,6 +145,20 @@ app.post('/api/manage/sync', async (c) => {
   } catch (err) {
     return Response.json({ error: String(err) }, { status: 500 })
   }
+})
+
+// 清除 KV 中持久化的 cron token（重新授权前调用）。
+app.delete('/api/manage/cron-token', async (c) => {
+  const gate = requireManageSecret(c)
+  if (gate) return gate
+  const storage = new KVStorage(c.env.BANGUMI_KV)
+  await storage.delete('bgm:tokens')
+  return Response.json({ ok: true })
+})
+
+// 非破坏性探测：管理页是否启用了 MANAGE_SECRET 密码保护。
+app.get('/api/manage/gate', (c) => {
+  return Response.json({ gated: !!c.env.MANAGE_SECRET })
 })
 
 // HTTP 触发的手动同步（需要密钥）。

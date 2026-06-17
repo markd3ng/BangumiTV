@@ -23,6 +23,11 @@
     document.getElementById('bgm-age-modal').style.display = 'none'
   }
 
+  window.bgmLeaveAge = function () {
+    // window.close() 对非脚本打开的窗口无效，改为跳转离开。
+    window.location.href = 'https://www.google.com'
+  }
+
   function renderCard(entry) {
     const imgUrl = entry.images?.hash
       ? `${API}/image/${entry.images.hash}?w=300&fmt=webp`

@@ -49,6 +49,7 @@
    | `CF_API_TOKEN` | Cloudflare API Token（见上方「Cloudflare API Token 权限配置」） |
    | `CF_ACCOUNT_ID` | Cloudflare 账户 ID（Dashboard 右侧栏可见） |
    | `CRON_SECRET` | 自定义随机字符串（手动触发 `POST /__cron/sync` 认证用） |
+   | `MANAGE_SECRET` | 可选。管理页写操作密码，强烈建议配置 |
 
    **Variables:**
    | 名称 | 说明 |
@@ -127,12 +128,14 @@ curl -X POST -H "X-Cron-Secret: <CRON_SECRET>" https://<WORKER_DOMAIN>/__cron/sy
 
 ## 管理页面
 
-访问 `https://<worker>/manage` 进行多账户同步：
+访问 `https://<worker>/manage`：
 
-1. 输入两个 bgm.tv 用户名
-2. 依次完成 OAuth 授权
-3. 选择完整同步或部分同步
-4. 执行同步
+- **Cron 同步账号授权**（顶部）：一键授权 cron 同步用的账号，token 自动存入 KV 并由 Worker 自动续期；可点「清除已存 token」重新授权。
+- **多账户同步**：输入两个 bgm.tv 用户名 → 依次 OAuth 授权 → 选择完整同步或部分同步 → 执行。
+
+OAuth 授权后回调页会自动把 code 回填到管理页（弹窗模式）；若浏览器拦截了弹窗或自动回填失败，也可手动复制回调 URL 粘贴。
+
+> **管理页密码保护（推荐）：** 配置 `MANAGE_SECRET` 后，管理页的写操作（授权、比对、同步、清除 token）会要求输入该密码。未配置则放行。
 
 ## 本地开发
 
@@ -143,7 +146,9 @@ npx wrangler dev
 
 Worker 启动在 `http://localhost:8787`。
 
-本地运行需要提供 secrets（KV/R2 绑定由 `wrangler.toml` 自动接入，但环境变量需本地提供）。在项目根目录创建 `.dev.vars` 文件：
+> **KV 绑定：** `wrangler.toml` 中的 KV `id` 在 CI 部署时会被替换为真实 id。本地 `wrangler dev` 需先手动创建本地预览命名空间：`npx wrangler kv namespace create bangumi-tv-kv --preview`，把返回的 `preview_id` 填入 `wrangler.toml` 的 `preview_id` 字段，或直接用 `wrangler dev --local`（本地模拟，不连真实 KV）。
+
+本地运行需要提供 secrets。在项目根目录创建 `.dev.vars` 文件：
 
 ```
 BANGUMI_TOKEN=你的_access_token
@@ -153,6 +158,7 @@ BANGUMI_PRIMARY_USER=user1
 BANGUMI_CLIENT_ID=你的_client_id
 BANGUMI_CLIENT_SECRET=你的_client_secret
 CRON_SECRET=任意字符串
+MANAGE_SECRET=可选的管理密码
 SYNC_MODE=merge
 NSFW_SHOW=true
 ```
@@ -172,6 +178,7 @@ NSFW_SHOW=true
 | `BANGUMI_CLIENT_ID` | secret | OAuth App client_id |
 | `BANGUMI_CLIENT_SECRET` | secret | OAuth App client_secret |
 | `CRON_SECRET` | secret | 手动触发 `POST /__cron/sync` 的认证密钥（定时 cron 无需） |
+| `MANAGE_SECRET` | secret | 可选。管理页写操作密码；配置后 `/manage` 的授权/比对/同步需带此密码 |
 
 > GitHub 中：标 **var** 的配在 Settings → Secrets and variables → Actions → **Variables**；标 **secret** 的配在 **Secrets**。
 

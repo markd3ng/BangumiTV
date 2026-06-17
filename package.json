@@ -5,8 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
-    "build": "node build.js"
+    "deploy": "wrangler deploy"
   },
   "repository": {
     "type": "git",
@@ -19,8 +18,6 @@
     "hono": "^4.x"
   },
   "devDependencies": {
-    "wrangler": "^4.x",
-    "esbuild": "^0.28.1"
-  },
-  "files": ["dist", "LICENSE", "README.md"]
+    "wrangler": "^4.x"
+  }
 }

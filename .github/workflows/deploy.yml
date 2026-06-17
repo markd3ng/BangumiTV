@@ -58,9 +58,6 @@ jobs:
           p.write_text(text)
           PY
 
-      - name: Build frontend
-        run: node build.js
-
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v3
         with:
@@ -75,6 +72,7 @@ jobs:
             BANGUMI_CLIENT_ID
             BANGUMI_CLIENT_SECRET
             CRON_SECRET
+            MANAGE_SECRET
         env:
           BANGUMI_TOKEN: ${{ secrets.BANGUMI_TOKEN }}
           BANGUMI_REFRESH_TOKEN: ${{ secrets.BANGUMI_REFRESH_TOKEN }}
@@ -83,6 +81,7 @@ jobs:
           BANGUMI_CLIENT_ID: ${{ secrets.BANGUMI_CLIENT_ID }}
           BANGUMI_CLIENT_SECRET: ${{ secrets.BANGUMI_CLIENT_SECRET }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          MANAGE_SECRET: ${{ secrets.MANAGE_SECRET }}
 
       - name: Deploy Pages
         uses: cloudflare/wrangler-action@v3

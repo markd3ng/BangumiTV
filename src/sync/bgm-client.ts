@@ -114,6 +114,27 @@ export class BgmClient {
     return res.json() as Promise<{ access_token: string; refresh_token: string; user_id: number }>
   }
 
+  /**
+   * 查询 access token 状态（POST /oauth/token_status）。
+   * 返回 token 是否有效及其过期 unix 时间戳；无效时 valid=false。
+   * 这是唯一能可靠区分「token 过期(401)」与「资源不存在(404)」的探测方式。
+   */
+  async tokenStatus(token: string): Promise<{ valid: boolean; expires?: number }> {
+    const res = await fetch(`https://bgm.tv/oauth/token_status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA },
+      body: new URLSearchParams({ access_token: token }).toString(),
+      signal: AbortSignal.timeout(30000),
+    })
+    if (!res.ok) return { valid: false }
+    try {
+      const data = (await res.json()) as { expires?: number }
+      return { valid: true, expires: data.expires }
+    } catch {
+      return { valid: false }
+    }
+  }
+
   async patchCollection(token: string, subjectId: number, body: Record<string, unknown>) {
     const url = `${BGM_BASE}/v0/users/-/collections/${subjectId}`
     const res = await fetch(url, {

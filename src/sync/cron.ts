@@ -1,4 +1,4 @@
-import { BgmClient, BgmHttpError, type BgmSlimSubject } from './bgm-client'
+import { BgmClient, type BgmSlimSubject } from './bgm-client'
 import { merge, primaryMerge, type MergedCollections, type MergedEntry } from './merger'
 import type { StorageAdapter } from '../storage/adapter'
 import type { ImageStore } from '../image/store'
@@ -128,24 +128,18 @@ interface StoredTokens {
 
 const KV_TOKEN_KEY = 'bgm:tokens'
 
-/** 探测 token 是否有效。非 401 错误（如 404 用户名不存在）视为 token 有效。 */
-async function isTokenValid(token: string): Promise<boolean> {
-  const probe = new BgmClient(token)
-  try {
-    await probe.getCollections('__self_probe__', 0, 1)
-    return true
-  } catch (err) {
-    if (err instanceof BgmHttpError && err.status === 401) return false
-    return true
-  }
-}
+/** token 临近过期则提前刷新的阈值（秒）。 */
+const REFRESH_GRACE_SECONDS = 3600
 
 /**
  * 取得一个有效的 access token：
- * 1. 优先用 KV 中已持久化的 token；
- * 2. 若没有则用环境变量种子；
- * 3. 若探测到 401 且具备 refresh 条件，则刷新并把新的一对 token 写回 KV；
+ * 1. 优先用 KV 中已持久化的 token，否则用环境变量种子；
+ * 2. 用 /oauth/token_status 探测有效性 + 过期时间；
+ * 3. 无效或将在 1 小时内过期 → 用 refresh_token 刷新，并把新的一对 token 写回 KV；
  * 4. 全部失败则抛错。
+ *
+ * 用 token_status 而非请求某个用户名探测：后者无法区分 401(token 过期) 与
+ * 404(用户名不存在)，会把过期 token 误判为有效，导致续期永不触发。
  */
 async function ensureFreshToken(
   storage: StorageAdapter,
@@ -156,7 +150,6 @@ async function ensureFreshToken(
     BANGUMI_CLIENT_SECRET?: string
   },
 ): Promise<string> {
-  // KV 优先，环境变量作冷启动种子。
   const stored = await storage.get<StoredTokens>(KV_TOKEN_KEY)
   const current: StoredTokens | null = stored
     ? { access_token: stored.access_token, refresh_token: stored.refresh_token }
@@ -164,29 +157,34 @@ async function ensureFreshToken(
       ? { access_token: env.BANGUMI_TOKEN, refresh_token: env.BANGUMI_REFRESH_TOKEN }
       : null
 
-  if (current) {
-    if (await isTokenValid(current.access_token)) return current.access_token
-    // 过期，尝试刷新。
-    if (env.BANGUMI_CLIENT_ID && env.BANGUMI_CLIENT_SECRET && current.refresh_token) {
-      try {
-        const refreshed = await new BgmClient().refreshAccessToken(
-          env.BANGUMI_CLIENT_ID,
-          env.BANGUMI_CLIENT_SECRET,
-          current.refresh_token,
-        )
-        await storage.put<StoredTokens>(KV_TOKEN_KEY, {
-          access_token: refreshed.access_token,
-          refresh_token: refreshed.refresh_token,
-        })
-        return refreshed.access_token
-      } catch (err) {
-        console.error('Token refresh failed:', err)
-      }
-    }
+  if (!current) {
+    throw new Error('No valid bgm.tv token: configure BANGUMI_TOKEN/BANGUMI_REFRESH_TOKEN or run /manage to authorize')
   }
 
-  // 没有任何可用 token。
-  throw new Error('No valid bgm.tv token: configure BANGUMI_TOKEN/BANGUMI_REFRESH_TOKEN or run /manage to authorize')
+  const probe = new BgmClient()
+  const status = await probe.tokenStatus(current.access_token)
+  const nowSec = Math.floor(Date.now() / 1000)
+  const needsRefresh =
+    !status.valid ||
+    (typeof status.expires === 'number' && status.expires - nowSec < REFRESH_GRACE_SECONDS)
+
+  if (!needsRefresh) return current.access_token
+
+  if (!env.BANGUMI_CLIENT_ID || !env.BANGUMI_CLIENT_SECRET || !current.refresh_token) {
+    if (status.valid) return current.access_token // 有效但无法提前刷新，凑合用
+    throw new Error('bgm.tv token expired and no refresh credentials configured')
+  }
+
+  const refreshed = await probe.refreshAccessToken(
+    env.BANGUMI_CLIENT_ID,
+    env.BANGUMI_CLIENT_SECRET,
+    current.refresh_token,
+  )
+  await storage.put<StoredTokens>(KV_TOKEN_KEY, {
+    access_token: refreshed.access_token,
+    refresh_token: refreshed.refresh_token,
+  })
+  return refreshed.access_token
 }
 
 /**

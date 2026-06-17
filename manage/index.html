@@ -12,8 +12,8 @@
     .step { background: #16213e; border-radius: 12px; padding: 24px; margin-bottom: 16px; display: none; }
     .step.active { display: block; }
     label { display: block; margin-bottom: 8px; color: #a0a0b0; }
-    input[type="text"] { width: 100%; padding: 12px; border: 1px solid #2a2a4a; border-radius: 8px; background: #0f3460; color: #fff; font-size: 16px; margin-bottom: 16px; }
-    input[type="text"]:focus { outline: none; border-color: #e94560; }
+    input[type="text"], input[type="password"] { width: 100%; padding: 12px; border: 1px solid #2a2a4a; border-radius: 8px; background: #0f3460; color: #fff; font-size: 16px; margin-bottom: 16px; }
+    input[type="text"]:focus, input[type="password"]:focus { outline: none; border-color: #e94560; }
     button { padding: 12px 24px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; background: #e94560; color: #fff; margin-right: 8px; }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
     button.secondary { background: #0f3460; }
@@ -30,17 +30,32 @@
     .summary-card { background: #0f3460; border-radius: 8px; padding: 16px; text-align: center; }
     .summary-card .count { font-size: 28px; font-weight: bold; color: #e94560; }
     .summary-card .label { font-size: 12px; color: #a0a0b0; margin-top: 4px; }
+    .panel { background: #16213e; border-radius: 12px; padding: 24px; margin-bottom: 24px; border: 1px solid #2a2a4a; }
+    .muted { color: #a0a0b0; }
   </style>
 </head>
 <body>
 <div class="container">
   <h1>BangumiTV 多账户同步</h1>
 
-  <div class="step active" id="cron-setup" style="margin-bottom:24px;border:1px solid #2a2a4a;">
+  <div id="gate" class="panel" style="display:none;">
+    <h2>管理密码</h2>
+    <p class="muted" style="margin-bottom:12px;">本管理页受密码保护，请输入 MANAGE_SECRET：</p>
+    <input type="password" id="gate-input" placeholder="管理密码">
+    <button onclick="submitGate()">进入</button>
+  </div>
+
+  <div class="panel">
     <h2>Cron 同步账号授权（一次性）</h2>
-    <p style="color:#a0a0b0;margin-bottom:12px;">定时同步需要一个有收藏读取权限的账号。点击下方按钮授权一次，token 会自动保存并由 Worker 自动续期，无需在 GitHub 配置 token。</p>
+    <p class="muted" style="margin-bottom:12px;">定时同步需要一个有收藏读取权限的账号。点击下方按钮授权一次，token 会自动保存并由 Worker 自动续期，无需在 GitHub 配置 token。</p>
     <button onclick="authorizeCron()">授权 cron 同步账号</button>
-    <span id="cron-status" style="margin-left:12px;color:#a0a0b0;"></span>
+    <button class="secondary" onclick="clearCronToken()">清除已存 token</button>
+    <span id="cron-status" style="display:block;margin-top:12px;" class="muted"></span>
+    <div id="cron-manual" style="display:none;margin-top:12px;">
+      <p class="muted">若弹窗未自动回填，请手动粘贴回调 URL：</p>
+      <input type="text" id="cronCallback" placeholder="粘贴回调 URL">
+      <button onclick="submitCronCallback()">确认</button>
+    </div>
   </div>
 
   <div class="step active" id="step1">
@@ -82,67 +97,124 @@
   </div>
 </div>
 <script>
-let state = { userA: '', userB: '', tokenA: '', tokenB: '', differences: [] }
+let state = { userA: '', userB: '', tokenA: '', tokenB: '', differences: [], pendingFlow: null }
+let manageSecret = sessionStorage.getItem('bgm-manage-secret') || ''
+
 function showStep(n) { document.querySelectorAll('.step').forEach(s => s.classList.remove('active')); document.getElementById('step'+n).classList.add('active') }
 
-// Cron 同步账号授权：走 OAuth，exchange 时带 cron=1，token 持久化进 KV。
+// 统一的 manage API 调用：自动带 X-Manage-Secret；遇 401 弹密码框后重试一次。
+async function apiFetch(url, opts) {
+  opts = opts || {}
+  opts.headers = opts.headers || {}
+  if (manageSecret) opts.headers['X-Manage-Secret'] = manageSecret
+  let res = await fetch(url, opts)
+  if (res.status === 401 && !opts._retried) {
+    manageSecret = prompt('管理密码 (MANAGE_SECRET)：') || ''
+    if (!manageSecret) return res
+    sessionStorage.setItem('bgm-manage-secret', manageSecret)
+    opts.headers['X-Manage-Secret'] = manageSecret
+    opts._retried = true
+    res = await fetch(url, opts)
+  }
+  return res
+}
+
+// 探测是否需要密码：非破坏性查询 gate 状态。
+async function probeGate() {
+  const res = await fetch('/api/manage/gate')
+  const data = await res.json()
+  if (data.gated && !manageSecret) {
+    document.getElementById('gate').style.display = 'block'
+  }
+}
+
+function submitGate() {
+  manageSecret = document.getElementById('gate-input').value
+  sessionStorage.setItem('bgm-manage-secret', manageSecret)
+  document.getElementById('gate').style.display = 'none'
+}
+
+// 接收 OAuth 回调页 postMessage 的 code，按 state 路由。
+window.addEventListener('message', async (ev) => {
+  const d = ev.data
+  if (!d || d.type !== 'bgm-oauth' || !d.code) return
+  if (d.state === 'cron') {
+    await doExchangeCron(d.code)
+  } else if (d.state === 'A' || d.state === 'B') {
+    await doExchangeAccount(d.state, d.code)
+  }
+})
+
 async function authorizeCron() {
-  const status = document.getElementById('cron-status')
-  status.textContent = '正在发起授权...'
-  const res = await fetch('/api/manage/oauth-url?state=cron')
+  document.getElementById('cron-status').textContent = '正在发起授权...'
+  const res = await apiFetch('/api/manage/oauth-url?state=cron')
   const { url } = await res.json()
   if (!url) return alert('OAuth URL 获取失败')
   window.open(url, '_blank')
-  status.textContent = '请在弹出窗口授权，然后粘贴回调 URL：'
-  const wrap = document.getElementById('cron-setup')
-  wrap.insertAdjacentHTML('beforeend', '<input type="text" id="cronCallback" placeholder="粘贴回调 URL" style="margin-top:12px;"><button onclick="submitCronCallback()" style="margin-left:8px;">确认</button>')
+  document.getElementById('cron-status').textContent = '请在弹出窗口完成授权，将自动回填。若未自动回填，请手动粘贴回调 URL：'
+  document.getElementById('cron-manual').style.display = 'block'
 }
 async function submitCronCallback() {
   const url = document.getElementById('cronCallback').value.trim()
   const code = new URL(url).searchParams.get('code')
   if (!code) return alert('无效的回调 URL')
-  const res = await fetch('/api/manage/exchange?code=' + encodeURIComponent(code) + '&cron=1')
+  await doExchangeCron(code)
+}
+async function doExchangeCron(code) {
+  const res = await apiFetch('/api/manage/exchange?code=' + encodeURIComponent(code) + '&cron=1')
   const data = await res.json()
   const status = document.getElementById('cron-status')
   if (data.access_token) {
     status.textContent = '✓ 已授权并保存，cron 同步将自动使用该账号（token 会自动续期）'
+    document.getElementById('cron-manual').style.display = 'none'
   } else {
     status.textContent = '✗ 授权失败'
   }
+}
+async function clearCronToken() {
+  if (!confirm('确认清除已存的 cron token？清除后需重新授权。')) return
+  const res = await apiFetch('/api/manage/cron-token', { method: 'DELETE' })
+  const data = await res.json()
+  document.getElementById('cron-status').textContent = data.ok ? '已清除，请重新授权' : '清除失败'
 }
 
 async function startOAuth() {
   state.userA = document.getElementById('userA').value.trim(); state.userB = document.getElementById('userB').value.trim()
   if (!state.userA || !state.userB) return alert('请输入两个用户名')
   showStep(2)
-  document.getElementById('oauth-status').textContent = '正在为 ' + state.userA + ' 发起授权...'
-  const res = await fetch('/api/manage/oauth-url?state=A')
+  await beginAccountAuth('A')
+}
+async function beginAccountAuth(which) {
+  const user = which === 'A' ? state.userA : state.userB
+  document.getElementById('oauth-status').textContent = '正在为 ' + user + ' 发起授权...'
+  const res = await apiFetch('/api/manage/oauth-url?state=' + which)
   const { url } = await res.json()
   if (!url) return alert('OAuth URL 获取失败')
   window.open(url, '_blank')
-  document.getElementById('oauth-status').textContent = '请在弹出窗口中完成 ' + state.userA + ' 的授权，然后将回调 URL 粘贴到下方：'
-  document.getElementById('oauth-buttons').innerHTML = '<input type="text" id="callbackA" placeholder="粘贴回调 URL"><button onclick="submitCallback(\'A\')">确认</button>'
+  document.getElementById('oauth-status').textContent = '请在弹出窗口完成 ' + user + ' 的授权，将自动回填。若未自动回填，请手动粘贴回调 URL：'
+  document.getElementById('oauth-buttons').innerHTML = '<input type="text" id="callback'+which+'" placeholder="粘贴回调 URL"><button onclick="submitCallback(\''+which+'\')">确认</button>'
 }
 async function submitCallback(which) {
   const url = document.getElementById('callback'+which).value.trim()
   const code = new URL(url).searchParams.get('code')
   if (!code) return alert('无效的回调 URL')
-  const res = await fetch('/api/manage/exchange?code=' + encodeURIComponent(code))
+  await doExchangeAccount(which, code)
+}
+async function doExchangeAccount(which, code) {
+  const res = await apiFetch('/api/manage/exchange?code=' + encodeURIComponent(code))
   const data = await res.json()
   if (!data.access_token) return alert('授权失败')
   if (which === 'A') {
     state.tokenA = data.access_token
-    document.getElementById('oauth-status').textContent = '正在为 ' + state.userB + ' 发起授权...'
-    const res2 = await fetch('/api/manage/oauth-url?state=B')
-    const { url: urlB } = await res2.json()
-    if (!urlB) return alert('OAuth URL 获取失败')
-    window.open(urlB, '_blank')
-    document.getElementById('oauth-buttons').innerHTML = '<input type="text" id="callbackB" placeholder="粘贴回调 URL"><button onclick="submitCallback(\'B\')">确认</button>'
-  } else { state.tokenB = data.access_token; loadComparison() }
+    await beginAccountAuth('B')
+  } else {
+    state.tokenB = data.access_token
+    await loadComparison()
+  }
 }
 async function loadComparison() {
   showStep(3)
-  const res = await fetch('/api/manage/compare', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tokenA:state.tokenA,tokenB:state.tokenB,userA:state.userA,userB:state.userB}) })
+  const res = await apiFetch('/api/manage/compare', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tokenA:state.tokenA,tokenB:state.tokenB,userA:state.userA,userB:state.userB}) })
   const data = await res.json()
   document.getElementById('step3-summary').innerHTML = '<div class="summary-card"><div class="count">'+(data.userA?.total||0)+'</div><div class="label">'+state.userA+'</div></div><div class="summary-card"><div class="count">'+(data.userB?.total||0)+'</div><div class="label">'+state.userB+'</div></div>'
   state.differences = data.differences || []
@@ -154,7 +226,7 @@ async function doSync(mode, subjectIds) {
   const to = dir === 'A->B' ? state.userB : state.userA
   const fromToken = dir === 'A->B' ? state.tokenA : state.tokenB
   const toToken = dir === 'A->B' ? state.tokenB : state.tokenA
-  const res = await fetch('/api/manage/sync', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({mode,from,to,tokenA:fromToken,tokenB:toToken,subject_ids:subjectIds||[]}) })
+  const res = await apiFetch('/api/manage/sync', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({mode,from,to,tokenA:fromToken,tokenB:toToken,subject_ids:subjectIds||[]}) })
   const results = await res.json()
   const arr = Array.isArray(results) ? results : []
   const ok = arr.filter(r => r.status === 'ok').length
@@ -174,6 +246,8 @@ function showPartialSync() {
   document.getElementById('diff-list').innerHTML = (state.differences||[]).map(d => '<div class="diff-item"><input type="checkbox" value="'+d.subject_id+'"><div class="diff-info"><h3>'+(d.name_cn||d.name)+'</h3><p>A: '+d.epStatusA+'ep | B: '+d.epStatusB+'ep</p></div></div>').join('')
 }
 function toggleAll(el) { document.querySelectorAll('#diff-list input[type=checkbox]').forEach(c => c.checked = el.checked) }
+
+probeGate()
 </script>
 </body>
 </html>
