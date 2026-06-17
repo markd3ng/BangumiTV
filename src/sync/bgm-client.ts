@@ -1,0 +1,103 @@
+const BGM_BASE = 'https://api.bgm.tv'
+const UA = 'markd3ng/BangumiTV (https://github.com/markd3ng/BangumiTV)'
+
+export interface BgmCollection {
+  subject_id: number
+  subject_type: number
+  rate: number
+  type: number
+  comment: string
+  tags: string[]
+  ep_status: number
+  vol_status: number
+  updated_at: string
+  private: boolean
+  subject?: BgmSlimSubject
+}
+
+export interface BgmSlimSubject {
+  id: number
+  type: number
+  name: string
+  name_cn: string
+  summary: string
+  nsfw: boolean
+  date: string
+  eps: number
+  total_episodes: number
+  images: { large: string; common: string; medium: string; small: string; grid: string }
+  rating: { score: number; rank: number; total: number }
+}
+
+export interface BgmCalendarItem {
+  weekday: { en: string; cn: string; ja: string; id: number }
+  items: BgmSlimSubject[]
+}
+
+export class BgmClient {
+  constructor(private token?: string) {}
+
+  private headers(): Record<string, string> {
+    const h: Record<string, string> = { 'User-Agent': UA }
+    if (this.token) h['Authorization'] = `Bearer ${this.token}`
+    return h
+  }
+
+  async getCollections(username: string, offset = 0, limit = 50): Promise<{ data: BgmCollection[]; total: number }> {
+    const url = `${BGM_BASE}/v0/users/${username}/collections?subject_type=2&limit=${limit}&offset=${offset}`
+    const res = await fetch(url, { headers: this.headers() })
+    if (!res.ok) throw new Error(`bgm.tv collections error: ${res.status}`)
+    return res.json()
+  }
+
+  async getSubject(subjectId: number): Promise<BgmSlimSubject | null> {
+    const url = `${BGM_BASE}/v0/subjects/${subjectId}`
+    const res = await fetch(url, { headers: this.headers() })
+    if (res.status === 404) return null
+    if (!res.ok) throw new Error(`bgm.tv subject error: ${res.status}`)
+    return res.json()
+  }
+
+  async getCalendar(): Promise<BgmCalendarItem[]> {
+    const url = `${BGM_BASE}/calendar`
+    const res = await fetch(url, { headers: this.headers() })
+    if (!res.ok) throw new Error(`bgm.tv calendar error: ${res.status}`)
+    return res.json()
+  }
+
+  async downloadImage(url: string): Promise<{ data: ArrayBuffer; contentType: string } | null> {
+    const res = await fetch(url, { headers: { 'User-Agent': UA } })
+    if (!res.ok) return null
+    return {
+      data: await res.arrayBuffer(),
+      contentType: res.headers.get('content-type') || 'image/jpeg',
+    }
+  }
+
+  async oauthAccessToken(clientId: string, clientSecret: string, code: string, redirectUri: string) {
+    const res = await fetch(`https://bgm.tv/oauth/access_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'User-Agent': UA },
+      body: JSON.stringify({
+        grant_type: 'authorization_code',
+        client_id: clientId,
+        client_secret: clientSecret,
+        code,
+        redirect_uri: redirectUri,
+      }),
+    })
+    if (!res.ok) throw new Error(`oauth error: ${res.status}`)
+    return res.json() as Promise<{ access_token: string; refresh_token: string; user_id: number }>
+  }
+
+  async patchCollection(token: string, subjectId: number, body: Record<string, unknown>) {
+    const url = `${BGM_BASE}/v0/users/-/collections/${subjectId}`
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'User-Agent': UA },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) throw new Error(`patch collection error: ${res.status}`)
+    return res.json()
+  }
+}
