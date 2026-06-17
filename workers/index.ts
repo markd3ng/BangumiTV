@@ -11,6 +11,7 @@ import { executeSync } from '../src/manage/sync-write'
 import { getOAuthRedirectUrl, exchangeCode } from '../src/manage/oauth'
 import { handleImage } from '../src/image/proxy'
 import manageHtml from '../manage/index.html'
+import { INDEX_HTML, BANGUMI_JS, BANGUMI_CSS } from '../src/assets'
 
 interface Env {
   BANGUMI_KV: KVNamespace
@@ -35,6 +36,19 @@ app.use('*', cors({
   allowMethods: ['GET', 'POST', 'OPTIONS'],
   allowHeaders: ['Content-Type'],
 }))
+
+// 主页：apiUrl 由前端自动取 window.location.origin，无需硬编码域名。
+app.get('/', () => {
+  return new Response(INDEX_HTML, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+})
+
+// 静态资源（Worker 提供主页引用的 JS/CSS，避免跨域到 Pages）。
+app.get('/src/bangumi.js', () => {
+  return new Response(BANGUMI_JS, { headers: { 'Content-Type': 'application/javascript; charset=utf-8' } })
+})
+app.get('/src/bangumi.css', () => {
+  return new Response(BANGUMI_CSS, { headers: { 'Content-Type': 'text/css; charset=utf-8' } })
+})
 
 // 公开 API
 app.get('/api/collections', (c) => {

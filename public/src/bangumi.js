@@ -1,8 +1,8 @@
 (function () {
   const config = window.bgmConfig || { apiUrl: '', quote: '' }
-  const API = (config.apiUrl || '').replace(/\/$/, '')
+  const API = (config.apiUrl || window.location.origin).replace(/\/$/, '')
   const container = document.querySelector('.bgm-container')
-  if (!container || !API) return
+  if (!container) return
 
   const TYPE_NAMES = { want: '想看', watched: '看过', watching: '在看', on_hold: '搁置', dropped: '抛弃' }
 
