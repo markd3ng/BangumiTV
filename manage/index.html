@@ -35,6 +35,14 @@
 <body>
 <div class="container">
   <h1>BangumiTV 多账户同步</h1>
+
+  <div class="step active" id="cron-setup" style="margin-bottom:24px;border:1px solid #2a2a4a;">
+    <h2>Cron 同步账号授权（一次性）</h2>
+    <p style="color:#a0a0b0;margin-bottom:12px;">定时同步需要一个有收藏读取权限的账号。点击下方按钮授权一次，token 会自动保存并由 Worker 自动续期，无需在 GitHub 配置 token。</p>
+    <button onclick="authorizeCron()">授权 cron 同步账号</button>
+    <span id="cron-status" style="margin-left:12px;color:#a0a0b0;"></span>
+  </div>
+
   <div class="step active" id="step1">
     <h2>步骤 1: 输入 bgm.tv 用户名</h2>
     <label>账号 A</label>
@@ -76,6 +84,33 @@
 <script>
 let state = { userA: '', userB: '', tokenA: '', tokenB: '', differences: [] }
 function showStep(n) { document.querySelectorAll('.step').forEach(s => s.classList.remove('active')); document.getElementById('step'+n).classList.add('active') }
+
+// Cron 同步账号授权：走 OAuth，exchange 时带 cron=1，token 持久化进 KV。
+async function authorizeCron() {
+  const status = document.getElementById('cron-status')
+  status.textContent = '正在发起授权...'
+  const res = await fetch('/api/manage/oauth-url?state=cron')
+  const { url } = await res.json()
+  if (!url) return alert('OAuth URL 获取失败')
+  window.open(url, '_blank')
+  status.textContent = '请在弹出窗口授权，然后粘贴回调 URL：'
+  const wrap = document.getElementById('cron-setup')
+  wrap.insertAdjacentHTML('beforeend', '<input type="text" id="cronCallback" placeholder="粘贴回调 URL" style="margin-top:12px;"><button onclick="submitCronCallback()" style="margin-left:8px;">确认</button>')
+}
+async function submitCronCallback() {
+  const url = document.getElementById('cronCallback').value.trim()
+  const code = new URL(url).searchParams.get('code')
+  if (!code) return alert('无效的回调 URL')
+  const res = await fetch('/api/manage/exchange?code=' + encodeURIComponent(code) + '&cron=1')
+  const data = await res.json()
+  const status = document.getElementById('cron-status')
+  if (data.access_token) {
+    status.textContent = '✓ 已授权并保存，cron 同步将自动使用该账号（token 会自动续期）'
+  } else {
+    status.textContent = '✗ 授权失败'
+  }
+}
+
 async function startOAuth() {
   state.userA = document.getElementById('userA').value.trim(); state.userB = document.getElementById('userB').value.trim()
   if (!state.userA || !state.userB) return alert('请输入两个用户名')

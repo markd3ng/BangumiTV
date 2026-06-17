@@ -80,30 +80,7 @@
 
 > 回调地址必须与创建时一致。本地调试可额外用 `http://localhost:8787/manage/callback`（bgm.tv 支持多个回调地址时；若只允许一个，请以线上域名为准）。
 
-#### 2. 换取 cron 用的 access token / refresh token
-
-bgm.tv access token 有效期约 7 天，过期后 Worker 会用 refresh token 自动续期。首次获取这一对 token：
-
-1. 浏览器打开（替换 `<CLIENT_ID>` 和 `<回调地址>`，与 OAuth App 一致）：
-   ```
-   https://bgm.tv/oauth/authorize?client_id=<CLIENT_ID>&response_type=code&redirect_uri=<回调地址>
-   ```
-2. 授权后跳转到回调地址，URL 中带 `?code=<CODE>`，复制 `<CODE>`（即便页面报错也无妨，code 在地址栏里）。
-3. 用 code 换取 token：
-   ```bash
-   curl -X POST https://bgm.tv/oauth/access_token \
-     -H "Content-Type: application/json" \
-     -d '{
-       "grant_type":"authorization_code",
-       "client_id":"<CLIENT_ID>",
-       "client_secret":"<CLIENT_SECRET>",
-       "code":"<CODE>",
-       "redirect_uri":"<回调地址>"
-     }'
-   ```
-4. 返回 JSON 中的 `access_token` 即 `BANGUMI_TOKEN`，`refresh_token` 即 `BANGUMI_REFRESH_TOKEN`。
-
-#### 3. 回填剩余 Secrets 并重新部署
+#### 2. 配置 OAuth 凭证并重新部署
 
 在 GitHub Repo → Settings → Secrets and variables → Actions → **Secrets** 中补加：
 
@@ -111,15 +88,26 @@ bgm.tv access token 有效期约 7 天，过期后 Worker 会用 refresh token �
 |------|------|
 | `BANGUMI_CLIENT_ID` | 上一步 OAuth App 的 App ID |
 | `BANGUMI_CLIENT_SECRET` | 上一步 OAuth App 的 App Secret |
-| `BANGUMI_TOKEN` | 上一步换得的 access_token |
-| `BANGUMI_REFRESH_TOKEN` | 上一步换得的 refresh_token |
 
-然后在 GitHub Actions 页面手动重新运行一次 Deploy 工作流（或向 `dev` 推一个空提交）。重新部署后 cron 同步开始生效，KV 被填充，widget 即可显示追番数据。
+然后在 GitHub Actions 页面手动重新运行一次 Deploy 工作流（或向 `dev` 推一个空提交）。
 
-> 若想立即触发一次同步而不等 4 小时定时任务，可：
-> ```bash
-> curl -X POST -H "X-Cron-Secret: <CRON_SECRET>" https://<WORKER_DOMAIN>/__cron/sync
-> ```
+#### 3. 在管理页面授权 cron 同步账号（一次性）
+
+部署完成后，浏览器访问 `https://<WORKER_DOMAIN>/manage`，在顶部「Cron 同步账号授权」区域点击「授权 cron 同步账号」：
+
+1. 弹出 bgm.tv 授权页，登录并用你要展示其追番的账号授权；
+2. 授权后跳转回 `/manage/callback`，把浏览器地址栏完整的回调 URL 复制粘贴到输入框，点「确认」；
+3. 页面提示「✓ 已授权并保存」即成功——token 对已写入 KV，Worker 会自动续期，**无需每 7 天人工操作**。
+
+> **为什么不用手动配 `BANGUMI_TOKEN`？** Workers 的 secret 运行时只读，无法写回刷新后的 token；把 token 存进 KV 后，cron 在 token 过期时会自动用 refresh_token 续期并把新的一对写回 KV，形成闭环。`BANGUMI_TOKEN` / `BANGUMI_REFRESH_TOKEN` 这两个 secret 现为**可选的冷启动种子**——若你不想用管理页面授权，也可手动换一次 token 填进去作为首次种子，之后仍由 KV 接管续期。
+
+#### 4. 触发首次同步
+
+授权完成后可立即触发一次同步而不等 4 小时定时任务：
+
+```bash
+curl -X POST -H "X-Cron-Secret: <CRON_SECRET>" https://<WORKER_DOMAIN>/__cron/sync
+```
 
 ## 前端接入
 
@@ -177,8 +165,8 @@ NSFW_SHOW=true
 |------|------|------|
 | `SYNC_MODE` | var | `merge`（多账号取并集，相同条目以最新为准）或 `primary`（以主账号为准） |
 | `NSFW_SHOW` | var | 是否展示 R18 条目（`true`/`false`）。为 `true` 时前端首次访问会弹 age-18 确认窗，R18 卡片默认模糊、点击可查看；为 `false` 时 API 直接不返回 R18 条目 |
-| `BANGUMI_TOKEN` | secret | bgm.tv access token（见「获取 cron 同步用的 token」） |
-| `BANGUMI_REFRESH_TOKEN` | secret | bgm.tv refresh token，token 过期时自动续期 |
+| `BANGUMI_TOKEN` | secret | 可选。bgm.tv access token，仅作 cron 冷启动种子；推荐改用 `/manage` 页面授权（token 存 KV 自动续期） |
+| `BANGUMI_REFRESH_TOKEN` | secret | 可选。bgm.tv refresh token，同上 |
 | `BANGUMI_USERS` | var | bgm 用户名列表（逗号分隔，如 `user1,user2`） |
 | `BANGUMI_PRIMARY_USER` | var | `primary` 模式下的主账户名 |
 | `BANGUMI_CLIENT_ID` | secret | OAuth App client_id |

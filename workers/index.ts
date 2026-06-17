@@ -75,6 +75,7 @@ app.get('/api/manage/oauth-url', (c) => {
 
 app.get('/api/manage/exchange', async (c) => {
   const code = c.req.query('code') || ''
+  const persistCron = c.req.query('cron') === '1'
   try {
     const result = await exchangeCode(
       c.env.BANGUMI_CLIENT_ID || '',
@@ -82,6 +83,15 @@ app.get('/api/manage/exchange', async (c) => {
       code,
       `${new URL(c.req.url).origin}/manage/callback`,
     )
+    // 授权为 cron 同步用：把 token 对持久化进 KV，cron 自动复用与续期，
+    // 无需在 GitHub 配置 BANGUMI_TOKEN/BANGUMI_REFRESH_TOKEN。
+    if (persistCron) {
+      const storage = new KVStorage(c.env.BANGUMI_KV)
+      await storage.put('bgm:tokens', {
+        access_token: result.access_token,
+        refresh_token: result.refresh_token,
+      })
+    }
     return Response.json(result)
   } catch (err) {
     return Response.json({ error: String(err) }, { status: 500 })

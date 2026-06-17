@@ -113,34 +113,80 @@ function readJpegDimensions(bytes: Uint8Array): { w: number; h: number } {
   return { w: 0, h: 0 }
 }
 
-/** 对比两个 bgm 账号的 token，若主 token 过期则尝试用 refresh token 刷新。 */
-async function ensureFreshToken(env: {
-  BANGUMI_TOKEN: string
-  BANGUMI_REFRESH_TOKEN?: string
-  BANGUMI_CLIENT_ID?: string
-  BANGUMI_CLIENT_SECRET?: string
-}): Promise<string> {
-  const probe = new BgmClient(env.BANGUMI_TOKEN)
-  // 用一次极便宜的请求探测 token 是否有效。
-  const ok = await probe
-    .getCollections('__self_probe__', 0, 1)
-    .then(() => true)
-    .catch((err) => {
-      if (err instanceof BgmHttpError && err.status === 401) return false
-      // 非 401（如 404 用户名不存在）说明 token 本身有效，放行。
-      return true
-    })
+/**
+ * Token 持久化结构（存于 KV）。
+ *
+ * Workers 的 secret 运行时只读，无法写回刷新后的 token。因此把 token 对存进 KV：
+ * 环境变量 BANGUMI_TOKEN / BANGUMI_REFRESH_TOKEN 仅作首次冷启动种子，之后以 KV 为准。
+ * bgm.tv 刷新会返回新的 refresh_token，必须一并写回，否则旧 refresh_token 用一次后失效，
+ * 7 天后又得人工介入。
+ */
+interface StoredTokens {
+  access_token: string
+  refresh_token: string
+}
 
-  if (ok || !env.BANGUMI_REFRESH_TOKEN || !env.BANGUMI_CLIENT_ID || !env.BANGUMI_CLIENT_SECRET) {
-    return env.BANGUMI_TOKEN
+const KV_TOKEN_KEY = 'bgm:tokens'
+
+/** 探测 token 是否有效。非 401 错误（如 404 用户名不存在）视为 token 有效。 */
+async function isTokenValid(token: string): Promise<boolean> {
+  const probe = new BgmClient(token)
+  try {
+    await probe.getCollections('__self_probe__', 0, 1)
+    return true
+  } catch (err) {
+    if (err instanceof BgmHttpError && err.status === 401) return false
+    return true
+  }
+}
+
+/**
+ * 取得一个有效的 access token：
+ * 1. 优先用 KV 中已持久化的 token；
+ * 2. 若没有则用环境变量种子；
+ * 3. 若探测到 401 且具备 refresh 条件，则刷新并把新的一对 token 写回 KV；
+ * 4. 全部失败则抛错。
+ */
+async function ensureFreshToken(
+  storage: StorageAdapter,
+  env: {
+    BANGUMI_TOKEN: string
+    BANGUMI_REFRESH_TOKEN?: string
+    BANGUMI_CLIENT_ID?: string
+    BANGUMI_CLIENT_SECRET?: string
+  },
+): Promise<string> {
+  // KV 优先，环境变量作冷启动种子。
+  const stored = await storage.get<StoredTokens>(KV_TOKEN_KEY)
+  const current: StoredTokens | null = stored
+    ? { access_token: stored.access_token, refresh_token: stored.refresh_token }
+    : env.BANGUMI_REFRESH_TOKEN
+      ? { access_token: env.BANGUMI_TOKEN, refresh_token: env.BANGUMI_REFRESH_TOKEN }
+      : null
+
+  if (current) {
+    if (await isTokenValid(current.access_token)) return current.access_token
+    // 过期，尝试刷新。
+    if (env.BANGUMI_CLIENT_ID && env.BANGUMI_CLIENT_SECRET && current.refresh_token) {
+      try {
+        const refreshed = await new BgmClient().refreshAccessToken(
+          env.BANGUMI_CLIENT_ID,
+          env.BANGUMI_CLIENT_SECRET,
+          current.refresh_token,
+        )
+        await storage.put<StoredTokens>(KV_TOKEN_KEY, {
+          access_token: refreshed.access_token,
+          refresh_token: refreshed.refresh_token,
+        })
+        return refreshed.access_token
+      } catch (err) {
+        console.error('Token refresh failed:', err)
+      }
+    }
   }
 
-  const refreshed = await probe.refreshAccessToken(
-    env.BANGUMI_CLIENT_ID,
-    env.BANGUMI_CLIENT_SECRET,
-    env.BANGUMI_REFRESH_TOKEN,
-  )
-  return refreshed.access_token
+  // 没有任何可用 token。
+  throw new Error('No valid bgm.tv token: configure BANGUMI_TOKEN/BANGUMI_REFRESH_TOKEN or run /manage to authorize')
 }
 
 /**
@@ -174,7 +220,7 @@ export async function runSync(
     SYNC_MODE: string
   },
 ) {
-  const token = await ensureFreshToken(env)
+  const token = await ensureFreshToken(storage, env)
   const client = new BgmClient(token)
 
   // allSettled：单个账号失败不丢弃其余账号数据。
