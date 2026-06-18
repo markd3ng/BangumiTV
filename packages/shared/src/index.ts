@@ -1,4 +1,4 @@
-export { BgmClient, BgmHttpError } from './bgm-client'
+export { BgmClient, BgmHttpError, BgmTimeoutError, BgmNetworkError } from './bgm-client'
 export type { BgmCollection, BgmSlimSubject, BgmCalendarItem } from './bgm-client'
 
 export { merge, primaryMerge } from './merger'

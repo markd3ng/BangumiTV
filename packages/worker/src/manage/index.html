@@ -102,6 +102,18 @@ let manageSecret = sessionStorage.getItem('bgm-manage-secret') || ''
 
 function showStep(n) { document.querySelectorAll('.step').forEach(s => s.classList.remove('active')); document.getElementById('step'+n).classList.add('active') }
 
+/** 渲染服务端返回的结构化错误（code + message + status） */
+function renderError(data, defaultMsg) {
+  if (!data || !data.error) return '<p style="color:#e94560">' + (defaultMsg || '未知错误') + '</p>'
+  const e = data.error
+  let html = '<div style="background:#2a1a1a;border:1px solid #e94560;border-radius:8px;padding:12px;">'
+  html += '<p style="color:#e94560;font-weight:bold;margin-bottom:8px;">' + (e.code || '错误') + '</p>'
+  html += '<p style="color:#ffaaaa;margin-bottom:4px;">' + (e.message || defaultMsg) + '</p>'
+  if (e.status) html += '<p style="color:#a0a0b0;font-size:12px;">HTTP 状态码: ' + e.status + '</p>'
+  html += '</div>'
+  return html
+}
+
 // 统一的 manage API 调用：自动带 X-Manage-Secret；遇 401 弹密码框后重试一次。
 async function apiFetch(url, opts) {
   opts = opts || {}
@@ -165,10 +177,10 @@ async function doExchangeCron(code) {
   const data = await res.json()
   const status = document.getElementById('cron-status')
   if (data.access_token) {
-    status.textContent = '✓ 已授权并保存，cron 同步将自动使用该账号（token 会自动续期）'
+    status.innerHTML = '<span style="color:#4caf50">✓ 已授权并保存，cron 同步将自动使用该账号（token 会自动续期）</span>'
     document.getElementById('cron-manual').style.display = 'none'
   } else {
-    status.textContent = '✗ 授权失败'
+    status.innerHTML = renderError(data, 'cron 账号授权失败')
   }
 }
 async function clearCronToken() {
@@ -203,12 +215,17 @@ async function submitCallback(which) {
 async function doExchangeAccount(which, code) {
   const res = await apiFetch('/api/manage/exchange?code=' + encodeURIComponent(code))
   const data = await res.json()
-  if (!data.access_token) return alert('授权失败')
+  if (!data.access_token) {
+    document.getElementById('oauth-status').innerHTML = renderError(data, '账号 ' + which + ' OAuth 授权失败')
+    return
+  }
   if (which === 'A') {
     state.tokenA = data.access_token
+    document.getElementById('oauth-status').innerHTML = '<span style="color:#4caf50">✓ 账号 A (' + state.userA + ') 已授权</span>'
     await beginAccountAuth('B')
   } else {
     state.tokenB = data.access_token
+    document.getElementById('oauth-status').innerHTML = '<span style="color:#4caf50">✓ 账号 B (' + state.userB + ') 已授权</span>'
     await loadComparison()
   }
 }
@@ -216,11 +233,25 @@ async function loadComparison() {
   showStep(3)
   const res = await apiFetch('/api/manage/compare', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tokenA:state.tokenA,tokenB:state.tokenB,userA:state.userA,userB:state.userB}) })
   const data = await res.json()
-  if (data.error) {
-    document.getElementById('step3-summary').innerHTML = '<p style="color:#e94560">加载失败: ' + data.error + '</p>'
+
+  // 整个请求级别失败（无 userA/userB 字段）
+  if (data.error && !data.userA && !data.userB) {
+    document.getElementById('step3-summary').innerHTML = renderError(data, '加载收藏数据失败')
     return
   }
-  document.getElementById('step3-summary').innerHTML = '<div class="summary-card"><div class="count">'+(data.userA?.total||0)+'</div><div class="label">'+state.userA+'</div></div><div class="summary-card"><div class="count">'+(data.userB?.total||0)+'</div><div class="label">'+state.userB+'</div></div>'
+
+  // 逐账号展示：成功显示条目数，失败显示错误
+  let summaryHtml = ''
+  ;[{key:'userA',label:state.userA},{key:'userB',label:state.userB}].forEach(({key,label}) => {
+    const u = data[key]
+    if (u && u.error) {
+      summaryHtml += '<div class="summary-card" style="border:1px solid #e94560"><div class="count" style="color:#e94560">✗</div><div class="label">' + label + '</div><div style="font-size:11px;color:#ffaaaa;margin-top:4px;">' + u.error + '</div></div>'
+    } else {
+      summaryHtml += '<div class="summary-card"><div class="count">' + ((u&&u.total)||0) + '</div><div class="label">' + label + '</div></div>'
+    }
+  })
+  document.getElementById('step3-summary').innerHTML = summaryHtml
+
   state.differences = data.differences || []
 }
 async function doSync(mode, subjectIds) {

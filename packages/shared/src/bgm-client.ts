@@ -8,6 +8,20 @@ export class BgmHttpError extends Error {
   }
 }
 
+export class BgmTimeoutError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'BgmTimeoutError'
+  }
+}
+
+export class BgmNetworkError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'BgmNetworkError'
+  }
+}
+
 export interface BgmCollection {
   subject_id: number
   subject_type: number
@@ -50,30 +64,59 @@ export class BgmClient {
     return h
   }
 
+  /** 统一 fetch 包装：按异常类型分类错误、返回中文错误消息。 */
+  private async fetchJson(url: string, init?: RequestInit): Promise<any> {
+    let res: Response
+    try {
+      res = await fetch(url, init)
+    } catch (err: any) {
+      if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+        throw new BgmTimeoutError(`请求 bgm.tv 超时 (30s): ${url}`)
+      }
+      throw new BgmNetworkError(`无法连接 bgm.tv: ${err.message || String(err)}`)
+    }
+    if (res.status === 401) {
+      throw new BgmHttpError(401, `bgm.tv 认证失败：token 无效或已过期`)
+    }
+    if (res.status === 403) {
+      throw new BgmHttpError(403, `bgm.tv 拒绝访问：token 权限不足或 scope 缺失`)
+    }
+    if (res.status === 404) {
+      throw new BgmHttpError(404, `bgm.tv 资源不存在：${url}`)
+    }
+    if (!res.ok) {
+      throw new BgmHttpError(res.status, `bgm.tv 返回错误 (${res.status})`)
+    }
+    return res.json()
+  }
+
   async getCollections(username: string, offset = 0, limit = 50): Promise<{ data: BgmCollection[]; total: number }> {
     const url = `${BGM_BASE}/v0/users/${username}/collections?limit=${limit}&offset=${offset}`
-    const res = await fetch(url, { headers: this.headers(), signal: AbortSignal.timeout(30000) })
-    if (!res.ok) throw new BgmHttpError(res.status, `bgm.tv collections error: ${res.status}`)
-    return res.json()
+    return this.fetchJson(url, { headers: this.headers(), signal: AbortSignal.timeout(30000) })
   }
 
   async getSubject(subjectId: number): Promise<BgmSlimSubject | null> {
     const url = `${BGM_BASE}/v0/subjects/${subjectId}`
-    const res = await fetch(url, { headers: this.headers(), signal: AbortSignal.timeout(30000) })
-    if (res.status === 404) return null
-    if (!res.ok) throw new BgmHttpError(res.status, `bgm.tv subject error: ${res.status}`)
-    return res.json()
+    try {
+      return await this.fetchJson(url, { headers: this.headers(), signal: AbortSignal.timeout(30000) })
+    } catch (err) {
+      if (err instanceof BgmHttpError && err.status === 404) return null
+      throw err
+    }
   }
 
   async getCalendar(): Promise<BgmCalendarItem[]> {
     const url = `${BGM_BASE}/calendar`
-    const res = await fetch(url, { headers: this.headers(), signal: AbortSignal.timeout(30000) })
-    if (!res.ok) throw new BgmHttpError(res.status, `bgm.tv calendar error: ${res.status}`)
-    return res.json()
+    return this.fetchJson(url, { headers: this.headers(), signal: AbortSignal.timeout(30000) })
   }
 
   async downloadImage(url: string): Promise<{ data: ArrayBuffer; contentType: string } | null> {
-    const res = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(30000) })
+    let res: Response
+    try {
+      res = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(30000) })
+    } catch {
+      return null
+    }
     if (!res.ok) return null
     return {
       data: await res.arrayBuffer(),
@@ -82,7 +125,8 @@ export class BgmClient {
   }
 
   async oauthAccessToken(clientId: string, clientSecret: string, code: string, redirectUri: string) {
-    const res = await fetch(`https://bgm.tv/oauth/access_token`, {
+    const url = `https://bgm.tv/oauth/access_token`
+    return this.fetchJson(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'User-Agent': UA },
       body: JSON.stringify({
@@ -93,13 +137,12 @@ export class BgmClient {
         redirect_uri: redirectUri,
       }),
       signal: AbortSignal.timeout(30000),
-    })
-    if (!res.ok) throw new BgmHttpError(res.status, `oauth error: ${res.status}`)
-    return res.json() as Promise<{ access_token: string; refresh_token: string; user_id: number }>
+    }) as Promise<{ access_token: string; refresh_token: string; user_id: number }>
   }
 
   async refreshAccessToken(clientId: string, clientSecret: string, refreshToken: string): Promise<{ access_token: string; refresh_token: string; user_id: number }> {
-    const res = await fetch(`https://bgm.tv/oauth/access_token`, {
+    const url = `https://bgm.tv/oauth/access_token`
+    return this.fetchJson(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'User-Agent': UA },
       body: JSON.stringify({
@@ -109,9 +152,7 @@ export class BgmClient {
         refresh_token: refreshToken,
       }),
       signal: AbortSignal.timeout(30000),
-    })
-    if (!res.ok) throw new BgmHttpError(res.status, `oauth refresh error: ${res.status}`)
-    return res.json() as Promise<{ access_token: string; refresh_token: string; user_id: number }>
+    }) as Promise<{ access_token: string; refresh_token: string; user_id: number }>
   }
 
   /**
@@ -120,12 +161,18 @@ export class BgmClient {
    * 这是唯一能可靠区分「token 过期(401)」与「资源不存在(404)」的探测方式。
    */
   async tokenStatus(token: string): Promise<{ valid: boolean; expires?: number }> {
-    const res = await fetch(`https://bgm.tv/oauth/token_status`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA },
-      body: new URLSearchParams({ access_token: token }).toString(),
-      signal: AbortSignal.timeout(30000),
-    })
+    const url = `https://bgm.tv/oauth/token_status`
+    let res: Response
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA },
+        body: new URLSearchParams({ access_token: token }).toString(),
+        signal: AbortSignal.timeout(30000),
+      })
+    } catch {
+      return { valid: false }
+    }
     if (res.status === 401 || res.status === 403) return { valid: false }
     if (!res.ok) throw new BgmHttpError(res.status, `token_status error: ${res.status}`)
     try {
@@ -138,13 +185,11 @@ export class BgmClient {
 
   async patchCollection(token: string, subjectId: number, body: Record<string, unknown>) {
     const url = `${BGM_BASE}/v0/users/-/collections/${subjectId}`
-    const res = await fetch(url, {
+    return this.fetchJson(url, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'User-Agent': UA },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(30000),
     })
-    if (!res.ok) throw new Error(`patch collection error: ${res.status}`)
-    return res.json()
   }
 }

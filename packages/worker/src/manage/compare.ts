@@ -2,8 +2,8 @@ import { BgmClient, type BgmCollection } from '@bangumi-tv/shared'
 import { fetchAllCollections } from '@bangumi-tv/shared'
 
 export interface CompareResult {
-  userA: { name: string; collections: BgmCollection[]; total: number }
-  userB: { name: string; collections: BgmCollection[]; total: number }
+  userA: { name: string; collections: BgmCollection[]; total: number; error?: string }
+  userB: { name: string; collections: BgmCollection[]; total: number; error?: string }
   common: number
   differences: Difference[]
 }
@@ -29,13 +29,28 @@ export async function compareAccounts(
   tokenB: string,
   userB: string,
 ): Promise<CompareResult> {
-  const [colA, colB] = await Promise.all([
+  const [settledA, settledB] = await Promise.allSettled([
     fetchAllCollections(new BgmClient(tokenA), userA),
     fetchAllCollections(new BgmClient(tokenB), userB),
   ])
 
-  const mapA = new Map(colA.map(c => [c.subject_id, c]))
-  const mapB = new Map(colB.map(c => [c.subject_id, c]))
+  function unwrap(settled: PromiseSettledResult<BgmCollection[]>, name: string) {
+    if (settled.status === 'fulfilled') {
+      return { name, collections: settled.value, total: settled.value.length }
+    }
+    return { name, collections: [] as BgmCollection[], total: 0, error: formatError(settled.reason) }
+  }
+
+  const colA = unwrap(settledA, userA)
+  const colB = unwrap(settledB, userB)
+
+  // 如果双方都失败，直接返回无差异
+  if (colA.error && colB.error) {
+    return { userA: colA, userB: colB, common: 0, differences: [] }
+  }
+
+  const mapA = new Map(colA.collections.map(c => [c.subject_id, c]))
+  const mapB = new Map(colB.collections.map(c => [c.subject_id, c]))
 
   const differences: Difference[] = []
   const allIds = new Set([...mapA.keys(), ...mapB.keys()])
@@ -98,9 +113,14 @@ export async function compareAccounts(
   }
 
   return {
-    userA: { name: userA, collections: colA, total: colA.length },
-    userB: { name: userB, collections: colB, total: colB.length },
+    userA: colA,
+    userB: colB,
     common: [...allIds].filter(id => mapA.has(id) && mapB.has(id)).length,
     differences,
   }
+}
+
+function formatError(err: unknown): string {
+  if (err instanceof Error) return err.message
+  return String(err)
 }

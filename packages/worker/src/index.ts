@@ -12,6 +12,29 @@ import { getOAuthRedirectUrl, exchangeCode } from './manage/oauth'
 import { handleImage } from './image/proxy'
 import manageHtml from './manage/index.html'
 import { INDEX_HTML, BANGUMI_JS, BANGUMI_CSS } from './assets'
+import { BgmHttpError, BgmTimeoutError, BgmNetworkError } from '@bangumi-tv/shared'
+
+function errorToResponse(err: unknown): Response {
+  if (err instanceof BgmHttpError) {
+    const status = err.status === 401 || err.status === 403 ? 401 : 502
+    return Response.json({
+      error: { code: 'BGM_HTTP_ERROR', message: err.message, status: err.status }
+    }, { status })
+  }
+  if (err instanceof BgmTimeoutError) {
+    return Response.json({
+      error: { code: 'BGM_TIMEOUT', message: err.message }
+    }, { status: 504 })
+  }
+  if (err instanceof BgmNetworkError) {
+    return Response.json({
+      error: { code: 'BGM_NETWORK', message: err.message }
+    }, { status: 502 })
+  }
+  return Response.json({
+    error: { code: 'UNKNOWN', message: err instanceof Error ? err.message : String(err) }
+  }, { status: 500 })
+}
 
 interface Env {
   BANGUMI_KV: KVNamespace
@@ -128,7 +151,7 @@ app.get('/api/manage/exchange', async (c) => {
     }
     return Response.json(result)
   } catch (err) {
-    return Response.json({ error: String(err) }, { status: 500 })
+    return errorToResponse(err)
   }
 })
 
@@ -140,7 +163,7 @@ app.post('/api/manage/compare', async (c) => {
     const result = await compareAccounts(body.tokenA || '', body.userA || '', body.tokenB || '', body.userB || '')
     return Response.json(result)
   } catch (err) {
-    return Response.json({ error: String(err) }, { status: 500 })
+    return errorToResponse(err)
   }
 })
 
@@ -157,7 +180,7 @@ app.post('/api/manage/sync', async (c) => {
     })
     return Response.json(results)
   } catch (err) {
-    return Response.json({ error: String(err) }, { status: 500 })
+    return errorToResponse(err)
   }
 })
 
