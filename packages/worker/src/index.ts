@@ -108,12 +108,16 @@ app.get('/api/health', async (c) => {
   try {
     const merged = await storage.get('collections:merged')
     const calendar = await storage.get('calendar')
+    const lastError = await storage.get<string>('sync:last_error')
+    const lastSuccess = await storage.get<string>('sync:last_success')
     return Response.json({
       ok: true,
       data: {
         collections: merged ? { updated_at: (merged as any).updated_at, types: summarize(merged) } : null,
         calendar: calendar ? (calendar as any[]).length + ' days' : null,
         users: c.env.BANGUMI_USERS,
+        last_sync: lastSuccess || null,
+        last_error: lastError || null,
       },
     })
   } catch (err) {
@@ -250,9 +254,12 @@ app.post('/__cron/sync', async (c) => {
       BANGUMI_PRIMARY_USER: c.env.BANGUMI_PRIMARY_USER,
       SYNC_MODE: c.env.SYNC_MODE || 'merge',
     })
+    await storage.put('sync:last_success', new Date().toISOString())
+    await storage.delete('sync:last_error')
     return new Response('OK', { status: 200 })
   } catch (err) {
     console.error('Sync error:', err)
+    await storage.put('sync:last_error', err instanceof Error ? err.message : String(err))
     return new Response('Sync failed', { status: 500 })
   }
 })
@@ -271,7 +278,13 @@ async function scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext
       BANGUMI_USERS: users,
       BANGUMI_PRIMARY_USER: env.BANGUMI_PRIMARY_USER,
       SYNC_MODE: env.SYNC_MODE || 'merge',
-    }).catch((err) => console.error('Scheduled sync error:', err)),
+    }).then(async () => {
+      await storage.put('sync:last_success', new Date().toISOString())
+      await storage.delete('sync:last_error')
+    }).catch(async (err) => {
+      console.error('Scheduled sync error:', err)
+      await storage.put('sync:last_error', err instanceof Error ? err.message : String(err))
+    }),
   )
 }
 

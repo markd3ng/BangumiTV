@@ -156,7 +156,9 @@ export const BANGUMI_JS = `(function () {
       if (health.ok && health.data && health.data.collections) {
         statusHtml = '<p style="color:#00a1d6;text-align:center;font-size:12px;">已连接 | 条目 ' + health.data.collections._total + ' | 更新于 ' + (health.data.collections.updated_at || '?').slice(0, 10) + '</p>'
       } else if (health.ok) {
-        statusHtml = '<p style="color:#e94560;text-align:center;font-size:12px;">已连接，但 KV 无数据。请在 /manage 授权并触发同步</p>'
+        var hint = '请在 /manage 授权并触发同步'
+        if (health.data && health.data.last_error) hint += '<br>上次同步错误: ' + health.data.last_error
+        statusHtml = '<p style="color:#e94560;text-align:center;font-size:12px;">已连接，但 KV 无数据。' + hint + '</p>'
       } else {
         statusHtml = '<p style="color:#e94560;text-align:center;font-size:12px;">健康检查失败: ' + (health.error || '') + '</p>'
       }
