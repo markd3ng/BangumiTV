@@ -12,6 +12,7 @@ export const INDEX_HTML = `<!DOCTYPE html>
   </style>
   <script>
     const bgmConfig = {
+      apiUrl: "https://<WORKER_DOMAIN>",
       quote: "生命不止，追番不息！"
     }
   </script>
@@ -154,7 +155,8 @@ export const BANGUMI_JS = `(function () {
       var healthRes = await fetch(API + '/api/health')
       var health = await healthRes.json()
       if (health.ok && health.data && health.data.collections) {
-        statusHtml = '<p style="color:#00a1d6;text-align:center;font-size:12px;">已连接 | 条目 ' + health.data.collections._total + ' | 更新于 ' + (health.data.collections.updated_at || '?').slice(0, 10) + '</p>'
+        var c = health.data.collections
+        statusHtml = '<p style="color:#00a1d6;text-align:center;font-size:12px;">已连接 | 条目 ' + (c.types && c.types._total) + ' | 更新于 ' + (c.updated_at || '?').slice(0, 10) + '</p>'
       } else if (health.ok) {
         var hint = '请在 /manage 授权并触发同步'
         if (health.data && health.data.last_error) hint += '<br>上次同步错误: ' + health.data.last_error
