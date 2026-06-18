@@ -16,7 +16,7 @@ export async function handleImage(
 ): Promise<Response> {
   const url = new URL(request.url)
 
-  const hash = url.pathname.split('/')[2]
+  const hash = url.pathname.split('/').pop() || ''
   if (!hash || hash.length !== 64) {
     return new Response('Invalid hash', { status: 400 })
   }

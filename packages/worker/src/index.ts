@@ -1,17 +1,17 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import { KVStorage } from '../src/storage/kv'
-import { R2ImageStore } from '../src/image/store'
-import { handleCollections } from '../src/api/collections'
-import { handleCalendar } from '../src/api/calendar'
-import { handleConfig } from '../src/api/config'
-import { runSync } from '../src/sync/cron'
-import { compareAccounts } from '../src/manage/compare'
-import { executeSync } from '../src/manage/sync-write'
-import { getOAuthRedirectUrl, exchangeCode } from '../src/manage/oauth'
-import { handleImage } from '../src/image/proxy'
-import manageHtml from '../manage/index.html'
-import { INDEX_HTML, BANGUMI_JS, BANGUMI_CSS } from '../src/assets'
+import { KVStorage } from './storage/kv'
+import { R2ImageStore } from './image/store'
+import { handleCollections } from './api/collections'
+import { handleCalendar } from './api/calendar'
+import { handleConfig } from './api/config'
+import { runSync } from './cron'
+import { compareAccounts } from './manage/compare'
+import { executeSync } from './manage/sync-write'
+import { getOAuthRedirectUrl, exchangeCode } from './manage/oauth'
+import { handleImage } from './image/proxy'
+import manageHtml from './manage/index.html'
+import { INDEX_HTML, BANGUMI_JS, BANGUMI_CSS } from './assets'
 
 interface Env {
   BANGUMI_KV: KVNamespace
@@ -34,7 +34,7 @@ const app = new Hono<{ Bindings: Env }>()
 app.use('*', cors({
   origin: '*',
   allowMethods: ['GET', 'POST', 'OPTIONS'],
-  allowHeaders: ['Content-Type'],
+  allowHeaders: ['Content-Type', 'X-Manage-Secret'],
 }))
 
 // 主页：apiUrl 由前端自动取 window.location.origin，无需硬编码域名。
@@ -58,7 +58,7 @@ app.get('/api/collections', (c) => {
 
 app.get('/api/calendar', (c) => {
   const storage = new KVStorage(c.env.BANGUMI_KV)
-  return handleCalendar(storage)
+  return handleCalendar(storage, c.env.NSFW_SHOW !== 'false')
 })
 
 app.get('/api/config', (c) => {

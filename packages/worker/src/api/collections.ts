@@ -1,5 +1,5 @@
-import type { StorageAdapter } from '../storage/adapter'
-import type { MergedCollections, MergedEntry } from '../sync/merger'
+import type { StorageAdapter } from '@bangumi-tv/shared'
+import type { MergedCollections, MergedEntry } from '@bangumi-tv/shared'
 
 const VALID_TYPES = ['want', 'watched', 'watching', 'on_hold', 'dropped'] as const
 type CollectionType = (typeof VALID_TYPES)[number]

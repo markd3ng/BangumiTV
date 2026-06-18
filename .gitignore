@@ -108,3 +108,14 @@ dist
 .DS_Store
 
 # pnpm
+pnpm-lock.yaml
+
+# pnpm content-addressable store (never commit)
+.pnpm-store/
+
+# Cloudflare Wrangler runtime cache
+.wrangler/
+
+# Reasonix agent internal state
+.reasonix/
+reasonix.toml

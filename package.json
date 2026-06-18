@@ -1,11 +1,11 @@
 {
   "name": "bangumi-tv",
   "version": "2.0.0",
+  "private": true,
   "description": "render your bangumi.tv progress on a static web page",
-  "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "dev": "pnpm -F @bangumi-tv/worker dev",
+    "deploy": "pnpm -F @bangumi-tv/worker deploy"
   },
   "repository": {
     "type": "git",
@@ -13,11 +13,5 @@
   },
   "keywords": ["bangumi", "anime"],
   "author": "markd3ng",
-  "license": "MIT",
-  "dependencies": {
-    "hono": "^4.x"
-  },
-  "devDependencies": {
-    "wrangler": "^4.x"
-  }
+  "license": "MIT"
 }

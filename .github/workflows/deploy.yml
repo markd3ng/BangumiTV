@@ -29,6 +29,7 @@ jobs:
 
       # 幂等创建资源：已存在时忽略。
       - name: Provision Cloudflare resources
+        working-directory: packages/worker
         run: |
           npx wrangler kv namespace create "bangumi-tv-kv" || echo "KV namespace already exists"
           npx wrangler r2 bucket create "bangumi-tv-images" || echo "R2 bucket already exists"
@@ -37,6 +38,7 @@ jobs:
       # 在 shell 中解析 KV namespace id，trim 掉尾随换行；若未拿到则失败。
       - name: Resolve KV namespace ID
         id: kv-id
+        working-directory: packages/worker
         run: |
           set -euo pipefail
           KV_ID=$(npx wrangler kv namespace list | jq -r '.[] | select(.title == "bangumi-tv-kv") | .id' | head -n1 | tr -d '[:space:]')
@@ -47,6 +49,7 @@ jobs:
           echo "id=${KV_ID}" >> "$GITHUB_OUTPUT"
 
       - name: Inject KV id into wrangler.toml
+        working-directory: packages/worker
         env:
           KV_ID: ${{ steps.kv-id.outputs.id }}
         run: |
@@ -61,6 +64,7 @@ jobs:
 
       # 逐个上传非空的 Worker secret（空值跳过，避免 wrangler rejected）。
       - name: Upload Worker secrets
+        working-directory: packages/worker
         env:
           BANGUMI_TOKEN: ${{ secrets.BANGUMI_TOKEN }}
           BANGUMI_REFRESH_TOKEN: ${{ secrets.BANGUMI_REFRESH_TOKEN }}
@@ -87,10 +91,12 @@ jobs:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           command: deploy
+          workingDirectory: packages/worker
 
       - name: Deploy Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages deploy public/ --project-name=bangumi-tv --commit-dirty=true
+          command: pages deploy ../../public/ --project-name=bangumi-tv --commit-dirty=true
+          workingDirectory: packages/worker

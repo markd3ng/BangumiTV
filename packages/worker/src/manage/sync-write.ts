@@ -1,5 +1,5 @@
-import { BgmClient, type BgmCollection } from '../sync/bgm-client'
-import { fetchAllCollections } from '../sync/utils'
+import { BgmClient, type BgmCollection } from '@bangumi-tv/shared'
+import { fetchAllCollections } from '@bangumi-tv/shared'
 
 export interface SyncRequest {
   mode: 'full' | 'partial'
@@ -23,10 +23,6 @@ export async function executeSync(
   request: SyncRequest,
 ): Promise<SyncResult[]> {
   const fromCol = await fetchAllCollections(new BgmClient(fromToken), fromUser)
-  const fromMap = new Map(fromCol.map(c => [c.subject_id, c]))
-
-  const toCol = await fetchAllCollections(new BgmClient(toToken), toUser)
-  const toMap = new Map(toCol.map(c => [c.subject_id, c]))
 
   let targets: BgmCollection[]
   if (request.mode === 'full') {

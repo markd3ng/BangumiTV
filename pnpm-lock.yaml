@@ -6,8 +6,15 @@ settings:
 
 importers:
 
-  .:
+  .: {}
+
+  packages/shared: {}
+
+  packages/worker:
     dependencies:
+      '@bangumi-tv/shared':
+        specifier: workspace:*
+        version: link:../shared
       hono:
         specifier: ^4.x
         version: 4.12.25

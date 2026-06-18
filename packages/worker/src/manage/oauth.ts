@@ -1,4 +1,4 @@
-import { BgmClient } from '../sync/bgm-client'
+import { BgmClient } from '@bangumi-tv/shared'
 
 export function getOAuthRedirectUrl(clientId: string, redirectUri: string, state: string): string {
   const params = new URLSearchParams({
@@ -6,7 +6,6 @@ export function getOAuthRedirectUrl(clientId: string, redirectUri: string, state
     response_type: 'code',
     redirect_uri: redirectUri,
     state,
-    scope: '',
   })
   return `https://bgm.tv/oauth/authorize?${params.toString()}`
 }

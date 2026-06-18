@@ -1,8 +1,8 @@
-import { BgmClient, type BgmSlimSubject } from './bgm-client'
-import { merge, primaryMerge, type MergedCollections, type MergedEntry } from './merger'
-import type { StorageAdapter } from '../storage/adapter'
-import type { ImageStore } from '../image/store'
-import { fetchAllCollections } from './utils'
+import { BgmClient, type BgmSlimSubject } from '@bangumi-tv/shared'
+import { merge, primaryMerge, type MergedCollections, type MergedEntry } from '@bangumi-tv/shared'
+import type { StorageAdapter } from '@bangumi-tv/shared'
+import type { ImageStore } from './image/store'
+import { fetchAllCollections } from '@bangumi-tv/shared'
 
 const SUBJECT_CONCURRENCY = 8
 
@@ -93,7 +93,7 @@ function readImageDimensions(
 
 function readJpegDimensions(bytes: Uint8Array): { w: number; h: number } {
   let i = 2 // 跳过 SOI 标记
-  while (i < bytes.length) {
+  while (i + 9 <= bytes.length) {
     if (bytes[i] !== 0xff) break
     const marker = bytes[i + 1]
     // SOF0~SOF15（不含 SOF4/SOF8/SOF12）携带尺寸。
@@ -155,7 +155,9 @@ async function ensureFreshToken(
     ? { access_token: stored.access_token, refresh_token: stored.refresh_token }
     : env.BANGUMI_REFRESH_TOKEN
       ? { access_token: env.BANGUMI_TOKEN, refresh_token: env.BANGUMI_REFRESH_TOKEN }
-      : null
+      : env.BANGUMI_TOKEN
+        ? { access_token: env.BANGUMI_TOKEN, refresh_token: '' }
+        : null
 
   if (!current) {
     throw new Error('No valid bgm.tv token: configure BANGUMI_TOKEN/BANGUMI_REFRESH_TOKEN or run /manage to authorize')
@@ -197,7 +199,7 @@ function transformCalendar(
   return raw.map((d) => ({
     weekday: d.weekday,
     items: d.items
-      .filter((item) => item.name_cn !== '')
+      .filter((item) => item.name_cn !== '' || item.name !== '')
       .map((item) => {
         const { collection, rating, rank: _rank, ...rest } = item as Record<string, unknown>
         return rest
@@ -220,6 +222,10 @@ export async function runSync(
 ) {
   const token = await ensureFreshToken(storage, env)
   const client = new BgmClient(token)
+
+  if (env.BANGUMI_USERS.length === 0) {
+    throw new Error('sync: BANGUMI_USERS is empty — nothing to sync')
+  }
 
   // allSettled：单个账号失败不丢弃其余账号数据。
   const settled = await Promise.allSettled(env.BANGUMI_USERS.map((u) => fetchAllCollections(client, u)))

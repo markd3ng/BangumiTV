@@ -51,7 +51,7 @@ export class BgmClient {
   }
 
   async getCollections(username: string, offset = 0, limit = 50): Promise<{ data: BgmCollection[]; total: number }> {
-    const url = `${BGM_BASE}/v0/users/${username}/collections?subject_type=2&limit=${limit}&offset=${offset}`
+    const url = `${BGM_BASE}/v0/users/${username}/collections?limit=${limit}&offset=${offset}`
     const res = await fetch(url, { headers: this.headers(), signal: AbortSignal.timeout(30000) })
     if (!res.ok) throw new BgmHttpError(res.status, `bgm.tv collections error: ${res.status}`)
     return res.json()
@@ -126,7 +126,8 @@ export class BgmClient {
       body: new URLSearchParams({ access_token: token }).toString(),
       signal: AbortSignal.timeout(30000),
     })
-    if (!res.ok) return { valid: false }
+    if (res.status === 401 || res.status === 403) return { valid: false }
+    if (!res.ok) throw new BgmHttpError(res.status, `token_status error: ${res.status}`)
     try {
       const data = (await res.json()) as { expires?: number }
       return { valid: true, expires: data.expires }
