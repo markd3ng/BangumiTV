@@ -4,12 +4,24 @@ on:
   push:
     branches: [dev]
   workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy'
+        required: false
+        default: 'dev'
+      skip_provision:
+        description: 'Skip resource provisioning (KV/R2/Pages)'
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch || 'dev' }}
 
       - uses: pnpm/action-setup@v4
         with:

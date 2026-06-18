@@ -216,6 +216,10 @@ async function loadComparison() {
   showStep(3)
   const res = await apiFetch('/api/manage/compare', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tokenA:state.tokenA,tokenB:state.tokenB,userA:state.userA,userB:state.userB}) })
   const data = await res.json()
+  if (data.error) {
+    document.getElementById('step3-summary').innerHTML = '<p style="color:#e94560">加载失败: ' + data.error + '</p>'
+    return
+  }
   document.getElementById('step3-summary').innerHTML = '<div class="summary-card"><div class="count">'+(data.userA?.total||0)+'</div><div class="label">'+state.userA+'</div></div><div class="summary-card"><div class="count">'+(data.userB?.total||0)+'</div><div class="label">'+state.userB+'</div></div>'
   state.differences = data.differences || []
 }
