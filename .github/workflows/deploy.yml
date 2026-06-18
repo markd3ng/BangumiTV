@@ -98,17 +98,17 @@ jobs:
           done
 
       - name: Deploy Worker
-        working-directory: packages/worker
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           command: deploy
+          workingDirectory: packages/worker
 
       - name: Deploy Pages
-        working-directory: packages/worker
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           command: pages deploy ../../public/ --project-name=bangumi-tv --commit-dirty=true
+          workingDirectory: packages/worker
