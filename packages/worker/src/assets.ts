@@ -12,8 +12,7 @@ export const INDEX_HTML = `<!DOCTYPE html>
   </style>
   <script>
     const bgmConfig = {
-      apiUrl: "https://<WORKER_DOMAIN>",
-      quote: "生命不止，追番不息！"
+            quote: "生命不止，追番不息！"
     }
   </script>
   <title>BangumiTV</title>
