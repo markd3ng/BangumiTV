@@ -90,8 +90,8 @@ export class BgmClient {
     return res.json()
   }
 
-  async getCollections(username: string, offset = 0, limit = 50): Promise<{ data: BgmCollection[]; total: number }> {
-    const url = `${BGM_BASE}/v0/users/${username}/collections?limit=${limit}&offset=${offset}`
+  async getCollections(username: string, offset = 0, limit = 30): Promise<{ data: BgmCollection[]; total: number }> {
+    const url = `${BGM_BASE}/v0/users/${username}/collections?subject_type=2&limit=${limit}&offset=${offset}`
     return this.fetchJson(url, { headers: this.headers(), signal: AbortSignal.timeout(30000) })
   }
 

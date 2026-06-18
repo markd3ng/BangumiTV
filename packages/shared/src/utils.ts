@@ -2,7 +2,7 @@ import { BgmClient, type BgmCollection } from './bgm-client'
 
 export async function fetchAllCollections(client: BgmClient, username: string): Promise<BgmCollection[]> {
   const all: BgmCollection[] = []
-  const limit = 50
+  const limit = 30
   let offset = 0
 
   try {
