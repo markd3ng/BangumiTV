@@ -238,7 +238,19 @@ export async function runSync(
   })
   // 至少要有一个账号成功；否则不覆盖 KV。
   const anySuccess = settled.some((s) => s.status === 'fulfilled')
-  if (!anySuccess) throw new Error('sync: all users failed')
+  if (!anySuccess) {
+    const details = settled
+      .map((s, i) => {
+        if (s.status === 'rejected') {
+          const msg = s.reason instanceof Error ? s.reason.message : String(s.reason)
+          return `${env.BANGUMI_USERS[i]}: ${msg}`
+        }
+        return null
+      })
+      .filter(Boolean)
+      .join('; ')
+    throw new Error(`sync: all users failed — ${details}`)
+  }
 
   let merged: MergedCollections
   if (env.SYNC_MODE === 'primary' && env.BANGUMI_PRIMARY_USER) {
