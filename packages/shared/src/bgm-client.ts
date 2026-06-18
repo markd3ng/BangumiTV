@@ -64,7 +64,7 @@ export class BgmClient {
     return h
   }
 
-  /** 统一 fetch 包装：按异常类型分类错误、返回中文错误消息。 */
+  /** 统一 fetch 包装：按异常类型分类错误、返回中文错误消息。非 2xx 时附上响应体原文便于排障。 */
   private async fetchJson(url: string, init?: RequestInit): Promise<any> {
     let res: Response
     try {
@@ -76,16 +76,19 @@ export class BgmClient {
       throw new BgmNetworkError(`无法连接 bgm.tv: ${err.message || String(err)}`)
     }
     if (res.status === 401) {
-      throw new BgmHttpError(401, `bgm.tv 认证失败：token 无效或已过期`)
+      const body = await res.text().catch(() => '')
+      throw new BgmHttpError(401, `bgm.tv 认证失败：token 无效或已过期 (body: ${body.slice(0, 200)})`)
     }
     if (res.status === 403) {
-      throw new BgmHttpError(403, `bgm.tv 拒绝访问：token 权限不足或 scope 缺失`)
+      const body = await res.text().catch(() => '')
+      throw new BgmHttpError(403, `bgm.tv 拒绝访问：token 权限不足或 scope 缺失 (body: ${body.slice(0, 200)})`)
     }
     if (res.status === 404) {
       throw new BgmHttpError(404, `bgm.tv 资源不存在：${url}`)
     }
     if (!res.ok) {
-      throw new BgmHttpError(res.status, `bgm.tv 返回错误 (${res.status})`)
+      const body = await res.text().catch(() => '')
+      throw new BgmHttpError(res.status, `bgm.tv 返回错误 (${res.status}): ${body.slice(0, 300)}`)
     }
     return res.json()
   }
