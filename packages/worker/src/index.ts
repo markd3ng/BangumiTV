@@ -56,9 +56,23 @@ const app = new Hono<{ Bindings: Env }>()
 // CORS：使用 hono/cors 中间件，确保头会落到真实响应上（含 OPTIONS 预检）。
 app.use('*', cors({
   origin: '*',
-  allowMethods: ['GET', 'POST', 'OPTIONS'],
+  allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'X-Manage-Secret'],
 }))
+
+/** 统计各收藏分类条目数，供 health/排障 使用。 */
+function summarize(merged: any) {
+  const keys = ['want', 'watched', 'watching', 'on_hold', 'dropped']
+  const counts: Record<string, number> = {}
+  let total = 0
+  for (const k of keys) {
+    const n = Array.isArray(merged[k]) ? merged[k].length : 0
+    counts[k] = n
+    total += n
+  }
+  counts._total = total
+  return counts
+}
 
 // 主页：apiUrl 由前端自动取 window.location.origin，无需硬编码域名。
 app.get('/', () => {
@@ -86,6 +100,25 @@ app.get('/api/calendar', (c) => {
 
 app.get('/api/config', (c) => {
   return handleConfig(new URL(c.req.url), { NSFW_SHOW: c.env.NSFW_SHOW })
+})
+
+// 排障：健康检查 + 同步状态。
+app.get('/api/health', async (c) => {
+  const storage = new KVStorage(c.env.BANGUMI_KV)
+  try {
+    const merged = await storage.get('collections:merged')
+    const calendar = await storage.get('calendar')
+    return Response.json({
+      ok: true,
+      data: {
+        collections: merged ? { updated_at: (merged as any).updated_at, types: summarize(merged) } : null,
+        calendar: calendar ? (calendar as any[]).length + ' days' : null,
+        users: c.env.BANGUMI_USERS,
+      },
+    })
+  } catch (err) {
+    return Response.json({ ok: false, error: String(err) }, { status: 500 })
+  }
 })
 
 // 图片代理

@@ -24,75 +24,82 @@
   }
 
   window.bgmLeaveAge = function () {
-    // window.close() 对非脚本打开的窗口无效，改为跳转离开。
     window.location.href = 'https://www.google.com'
   }
 
   function renderCard(entry) {
-    const imgUrl = entry.images?.hash
-      ? `${API}/image/${entry.images.hash}?w=300&fmt=webp`
+    const imgUrl = entry.images && entry.images.hash
+      ? API + '/image/' + entry.images.hash + '?w=300&fmt=webp'
       : 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" fill="#333"><rect width="300" height="400"/></svg>')
 
     const progress = entry.total_episodes > 0
       ? Math.round((entry.ep_status / entry.total_episodes) * 100)
       : 0
 
-    return '<a href="https://bgm.tv/subject/' + entry.subject_id + '" target="_blank" class="bgm-card' + (entry.nsfw ? ' bgm-nsfw' : '') + '">' +
+    var html = '<a href="https://bgm.tv/subject/' + entry.subject_id + '" target="_blank" class="bgm-card';
+    if (entry.nsfw) html += ' bgm-nsfw';
+    html += '">' +
       '<div class="bgm-card-cover">' +
-        '<img src="' + imgUrl + '" alt="' + (entry.name_cn || entry.name) + '" loading="lazy">' +
-        (entry.nsfw ? '<div class="bgm-nsfw-overlay" onclick="event.preventDefault();this.parentElement.parentElement.classList.toggle(\'bgm-nsfw-reveal\')">R18</div>' : '') +
-      '</div>' +
+        '<img src="' + imgUrl + '" alt="' + (entry.name_cn || entry.name) + '" loading="lazy">';
+    if (entry.nsfw) html += '<div class="bgm-nsfw-overlay" onclick="event.preventDefault();this.parentElement.parentElement.classList.toggle(\'bgm-nsfw-reveal\')">R18</div>';
+    html += '</div>' +
       '<div class="bgm-card-info">' +
-        '<h3>' + (entry.name_cn || entry.name) + '</h3>' +
-        (progress > 0 ? '<div class="bgm-progress"><span style="width:' + progress + '%"></span></div>' : '') +
-        '<span class="bgm-ep">' + entry.ep_status + '/' + (entry.total_episodes || '??') + '</span>' +
+        '<h3>' + (entry.name_cn || entry.name) + '</h3>';
+    if (progress > 0) html += '<div class="bgm-progress"><span style="width:' + progress + '%"></span></div>';
+    html += '<span class="bgm-ep">' + entry.ep_status + '/' + (entry.total_episodes || '??') + '</span>' +
       '</div>' +
-    '</a>'
+    '</a>';
+    return html;
   }
 
   async function render() {
-    const nav = document.createElement('div')
+    var nav = document.createElement('div')
     nav.className = 'bgm-nav'
-    const keys = Object.keys(TYPE_NAMES)
-    let navHtml = ''
-    for (let i = 0; i < keys.length; i++) {
+    var keys = Object.keys(TYPE_NAMES)
+    var navHtml = ''
+    for (var i = 0; i < keys.length; i++) {
       navHtml += '<button data-type="' + keys[i] + '">' + TYPE_NAMES[keys[i]] + '</button>'
     }
     nav.innerHTML = navHtml
     container.appendChild(nav)
 
-    const grid = document.createElement('div')
+    var grid = document.createElement('div')
     grid.className = 'bgm-grid'
     container.appendChild(grid)
 
-    const pagination = document.createElement('div')
+    var pagination = document.createElement('div')
     pagination.className = 'bgm-pagination'
     container.appendChild(pagination)
 
-    let currentType = 'watching'
-    let currentPage = 1
+    var currentType = 'watching'
+    var currentPage = 1
 
     async function load(type, page) {
       try {
-        const res = await fetch(API + '/api/collections?type=' + type + '&page=' + page + '&limit=24')
-        const data = await res.json()
-        let cardsHtml = ''
-        for (let i = 0; i < data.data.length; i++) {
+        var res = await fetch(API + '/api/collections?type=' + type + '&page=' + page + '&limit=24')
+        if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + res.statusText)
+        var data = await res.json()
+        if (data.total === 0) {
+          grid.innerHTML = '<p style="color:#a0a0b0;padding:40px;text-align:center;">暂无数据 — 同步可能尚未执行，请在 /manage 授权并触发同步</p>'
+          return
+        }
+        var cardsHtml = ''
+        for (var i = 0; i < data.data.length; i++) {
           cardsHtml += renderCard(data.data[i])
         }
         grid.innerHTML = cardsHtml
 
-        const totalPages = Math.ceil(data.total / 24)
+        var totalPages = Math.ceil(data.total / 24)
         pagination.innerHTML = ''
-        for (let i = 1; i <= totalPages; i++) {
-          const btn = document.createElement('button')
+        for (var i = 1; i <= totalPages; i++) {
+          var btn = document.createElement('button')
           btn.textContent = i
           if (i === page) btn.classList.add('active')
           ;(function(p) { btn.onclick = function() { currentPage = p; load(currentType, p) } })(i)
           pagination.appendChild(btn)
         }
       } catch (e) {
-        grid.innerHTML = '<p style="color:#a0a0b0;">加载失败</p>'
+        grid.innerHTML = '<p style="color:#e94560;padding:40px;text-align:center;">加载失败: ' + (e.message || '未知错误') + '<br><small style="color:#a0a0b0;">API: ' + API + '</small></p>'
       }
     }
 
@@ -103,6 +110,28 @@
         load(currentType, 1)
       }
     })
+
+    // 健康检查：启动时显示连接和同步状态。
+    var statusHtml = '<p style="color:#a0a0b0;text-align:center;">正在连接...</p>'
+    grid.innerHTML = statusHtml
+    try {
+      var healthRes = await fetch(API + '/api/health')
+      var health = await healthRes.json()
+      if (health.ok && health.data && health.data.collections) {
+        statusHtml = '<p style="color:#00a1d6;text-align:center;font-size:12px;">已连接 | 条目 ' + health.data.collections._total + ' | 更新于 ' + (health.data.collections.updated_at || '?').slice(0, 10) + '</p>'
+      } else if (health.ok) {
+        statusHtml = '<p style="color:#e94560;text-align:center;font-size:12px;">已连接，但 KV 无数据。请在 /manage 授权并触发同步</p>'
+      } else {
+        statusHtml = '<p style="color:#e94560;text-align:center;font-size:12px;">健康检查失败: ' + (health.error || '') + '</p>'
+      }
+    } catch(e) {
+      statusHtml = '<p style="color:#e94560;text-align:center;font-size:12px;">无法连接 Worker: ' + (e.message||'') + '</p>'
+    }
+    var statusBar = document.createElement('div')
+    statusBar.innerHTML = statusHtml
+    statusBar.style.cssText = 'margin-bottom:12px;padding:8px;background:#16213e;border-radius:8px;'
+    container.insertBefore(statusBar, nav)
+    setTimeout(function(){ statusBar.style.opacity = '0.4' }, 3000)
 
     await checkNSFW()
     load(currentType, 1)
