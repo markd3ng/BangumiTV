@@ -28,6 +28,19 @@ const decoder = new TextDecoder()
 const purposes = new Set<OAuthPurpose>(['account-a', 'account-b', 'cron'])
 const noncePattern = /^[A-Za-z0-9_-]{22}$/
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null
+  }
+  return value as Record<string, unknown>
+}
+
+function nonBlankString(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed ? trimmed : null
+}
+
 function base64url(bytes: Uint8Array): string {
   return btoa(String.fromCharCode(...bytes))
     .replaceAll('+', '-')
@@ -139,6 +152,29 @@ export async function verifyOAuthState(
   } catch {
     return null
   }
+}
+
+export function parseOAuthPurposeBody(value: unknown): OAuthPurpose | null {
+  const body = asRecord(value)
+  if (!body) return null
+
+  const purpose = nonBlankString(body.purpose)
+  if (!purpose || !purposes.has(purpose as OAuthPurpose)) {
+    return null
+  }
+
+  return purpose as OAuthPurpose
+}
+
+export function parseOAuthExchangeBody(value: unknown): { code: string; state: string } | null {
+  const body = asRecord(value)
+  if (!body) return null
+
+  const code = nonBlankString(body.code)
+  const state = nonBlankString(body.state)
+  if (!code || !state) return null
+
+  return { code, state }
 }
 
 export async function authorizeManageRequest(

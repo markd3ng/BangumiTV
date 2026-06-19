@@ -13,6 +13,7 @@ import { handleImage } from './image/proxy'
 import manageHtml from './manage/index.html'
 import { INDEX_HTML, BANGUMI_JS, BANGUMI_CSS } from './assets'
 import { BgmHttpError, BgmTimeoutError, BgmNetworkError } from '@bangumi-tv/shared'
+import type { OAuthPurpose } from './manage/security'
 import {
   authorizeManageRequest,
   callbackPageCsp,
@@ -22,6 +23,8 @@ import {
   manageHeaders,
   managePageCsp,
   oauthCallbackHtml,
+  parseOAuthExchangeBody,
+  parseOAuthPurposeBody,
   publicError,
   verifyOAuthState,
 } from './manage/security'
@@ -167,12 +170,12 @@ app.use('/api/manage/*', async (c, next) => {
 })
 
 app.post('/api/manage/oauth-url', async (c) => {
-  const body = await c.req.json<{ purpose?: OAuthPurpose }>().catch(() => ({}))
-  if (!body.purpose || !['account-a', 'account-b', 'cron'].includes(body.purpose)) {
+  const purpose: OAuthPurpose | null = parseOAuthPurposeBody(await c.req.json().catch(() => null))
+  if (!purpose) {
     return publicError(400, 'INVALID_REQUEST')
   }
   if (!c.env.BANGUMI_CLIENT_ID) return publicError(503, 'OAUTH_NOT_CONFIGURED')
-  const created = await createOAuthState(c.env.MANAGE_SECRET!, body.purpose)
+  const created = await createOAuthState(c.env.MANAGE_SECRET!, purpose)
   const redirectUri = `${new URL(c.req.url).origin}/manage/callback`
   return Response.json({
     url: getOAuthRedirectUrl(c.env.BANGUMI_CLIENT_ID, redirectUri, created.state),
@@ -182,8 +185,8 @@ app.post('/api/manage/oauth-url', async (c) => {
 })
 
 app.post('/api/manage/exchange', async (c) => {
-  const body = await c.req.json<{ code?: string; state?: string }>().catch(() => ({}))
-  if (!body.code || !body.state) return publicError(400, 'INVALID_REQUEST')
+  const body = parseOAuthExchangeBody(await c.req.json().catch(() => null))
+  if (!body) return publicError(400, 'INVALID_REQUEST')
   const state = await verifyOAuthState(c.env.MANAGE_SECRET!, body.state)
   if (!state) return publicError(400, 'INVALID_OAUTH_STATE')
   if (!c.env.BANGUMI_CLIENT_ID || !c.env.BANGUMI_CLIENT_SECRET) {

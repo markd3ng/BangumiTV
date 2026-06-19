@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import vm from 'node:vm'
+import * as security from './security.ts'
 import {
   authorizeManageRequest,
   callbackPageCsp,
@@ -11,6 +12,7 @@ import {
   manageHeaders,
   managePageCsp,
   oauthCallbackHtml,
+  type OAuthPurpose,
   publicError,
   verifyOAuthState,
 } from './security.ts'
@@ -162,6 +164,78 @@ test('state rejects unsupported purpose after payload tampering', async () => {
   assert.equal(await verifyOAuthState('secret', changed), null)
 })
 
+test('parseOAuthPurposeBody rejects null arrays non-objects and malformed purpose values', () => {
+  assert.equal(typeof security.parseOAuthPurposeBody, 'function')
+  const parseOAuthPurposeBody = security.parseOAuthPurposeBody as (value: unknown) => OAuthPurpose | null
+
+  for (const value of [
+    undefined,
+    null,
+    [],
+    'cron',
+    1,
+    true,
+    {},
+    { purpose: null },
+    { purpose: 1 },
+    { purpose: '' },
+    { purpose: '   ' },
+    { purpose: 'admin' },
+  ]) {
+    assert.equal(parseOAuthPurposeBody(value), null)
+  }
+})
+
+test('parseOAuthPurposeBody accepts only supported oauth purposes', () => {
+  assert.equal(typeof security.parseOAuthPurposeBody, 'function')
+  const parseOAuthPurposeBody = security.parseOAuthPurposeBody as (value: unknown) => OAuthPurpose | null
+
+  assert.equal(parseOAuthPurposeBody({ purpose: 'account-a' }), 'account-a')
+  assert.equal(parseOAuthPurposeBody({ purpose: 'account-b' }), 'account-b')
+  assert.equal(parseOAuthPurposeBody({ purpose: 'cron' }), 'cron')
+})
+
+test('parseOAuthExchangeBody rejects null arrays non-objects and malformed code or state', () => {
+  assert.equal(typeof security.parseOAuthExchangeBody, 'function')
+  const parseOAuthExchangeBody = security.parseOAuthExchangeBody as (
+    value: unknown,
+  ) => { code: string; state: string } | null
+
+  for (const value of [
+    undefined,
+    null,
+    [],
+    'code',
+    1,
+    true,
+    {},
+    { code: 'ok' },
+    { state: 'ok' },
+    { code: null, state: 'ok' },
+    { code: 1, state: 'ok' },
+    { code: '', state: 'ok' },
+    { code: '   ', state: 'ok' },
+    { code: 'ok', state: null },
+    { code: 'ok', state: 1 },
+    { code: 'ok', state: '' },
+    { code: 'ok', state: '   ' },
+  ]) {
+    assert.equal(parseOAuthExchangeBody(value), null)
+  }
+})
+
+test('parseOAuthExchangeBody accepts only non-blank string code and state', () => {
+  assert.equal(typeof security.parseOAuthExchangeBody, 'function')
+  const parseOAuthExchangeBody = security.parseOAuthExchangeBody as (
+    value: unknown,
+  ) => { code: string; state: string } | null
+
+  assert.deepEqual(parseOAuthExchangeBody({ code: 'oauth-code', state: 'oauth-state' }), {
+    code: 'oauth-code',
+    state: 'oauth-state',
+  })
+})
+
 test('management headers disable storage and framing', () => {
   const headers = new Headers(manageHeaders())
   assert.equal(headers.get('Cache-Control'), 'no-store')
@@ -292,19 +366,43 @@ test('worker source protects oauth routes behind POST JSON handlers', async () =
   assert.equal(source.includes("c.req.query('cron')"), false)
 })
 
-test('worker source validates oauth-url purpose and returns state plus nonce', async () => {
+test('worker source imports OAuthPurpose as a type-only import', async () => {
+  const source = await readFile(new URL('../index.ts', import.meta.url), 'utf8')
+
+  assert.match(source, /import type \{ OAuthPurpose \} from '\.\/manage\/security'/)
+})
+
+test('worker source validates oauth-url body with parseOAuthPurposeBody and returns state plus nonce', async () => {
   const source = await readFile(new URL('../index.ts', import.meta.url), 'utf8')
   const oauthUrlBlockMatch = source.match(/app\.post\('\/api\/manage\/oauth-url',(?: async)? \(c\) => \{[\s\S]*?\n\}\)\n/)
   assert.ok(oauthUrlBlockMatch, 'expected oauth-url handler source block')
   const oauthUrlBlock = oauthUrlBlockMatch[0]
 
-  assert.match(oauthUrlBlock, /await c\.req\.json<\{ purpose\?: OAuthPurpose \}>/)
-  assert.match(oauthUrlBlock, /!body\.purpose/)
-  assert.match(oauthUrlBlock, /\['account-a', 'account-b', 'cron'\]\.includes\(body\.purpose\)/)
+  assert.match(oauthUrlBlock, /parseOAuthPurposeBody\(await c\.req\.json\(\)\.catch\(\(\) => null\)\)/)
+  assert.match(oauthUrlBlock, /if \(!purpose\) \{\s*return publicError\(400, 'INVALID_REQUEST'\)\s*\}/)
   assert.match(oauthUrlBlock, /return publicError\(400, 'INVALID_REQUEST'\)/)
   assert.match(oauthUrlBlock, /return publicError\(503, 'OAUTH_NOT_CONFIGURED'\)/)
-  assert.match(oauthUrlBlock, /createOAuthState\(c\.env\.MANAGE_SECRET!, body\.purpose\)/)
+  assert.match(oauthUrlBlock, /createOAuthState\(c\.env\.MANAGE_SECRET!, purpose\)/)
   assert.match(oauthUrlBlock, /return Response\.json\(\{[\s\S]*url:[\s\S]*state:[\s\S]*nonce:/)
+})
+
+test('worker source validates oauth exchange body before upstream and preserves token contract', async () => {
+  const source = await readFile(new URL('../index.ts', import.meta.url), 'utf8')
+  const exchangeBlockMatch = source.match(/app\.post\('\/api\/manage\/exchange',(?: async)? \(c\) => \{[\s\S]*?\n\}\)\n/)
+  assert.ok(exchangeBlockMatch, 'expected exchange handler source block')
+  const exchangeBlock = exchangeBlockMatch[0]
+
+  assert.match(exchangeBlock, /parseOAuthExchangeBody\(await c\.req\.json\(\)\.catch\(\(\) => null\)\)/)
+  assert.match(exchangeBlock, /if \(!body\) return publicError\(400, 'INVALID_REQUEST'\)/)
+  assert.match(exchangeBlock, /const state = await verifyOAuthState\(c\.env\.MANAGE_SECRET!, body\.state\)/)
+  assert.match(exchangeBlock, /if \(!state\) return publicError\(400, 'INVALID_OAUTH_STATE'\)/)
+  assert.match(exchangeBlock, /if \(!c\.env\.BANGUMI_CLIENT_ID \|\| !c\.env\.BANGUMI_CLIENT_SECRET\) \{\s*return publicError\(503, 'OAUTH_NOT_CONFIGURED'\)\s*\}/)
+  assert.ok(exchangeBlock.indexOf('verifyOAuthState') < exchangeBlock.indexOf('exchangeCode'))
+  assert.match(exchangeBlock, /if \(state\.purpose === 'cron'\) \{/)
+  assert.match(exchangeBlock, /await storage\.put\('bgm:tokens', \{/)
+  assert.match(exchangeBlock, /refresh_token: result\.refresh_token/)
+  assert.match(exchangeBlock, /return Response\.json\(\{ ok: true \}\)/)
+  assert.match(exchangeBlock, /return Response\.json\(\{ access_token: result\.access_token, user_id: result\.user_id \}\)/)
 })
 
 test('worker source keeps health endpoint free of sync:last_error and usernames', async () => {
@@ -326,8 +424,8 @@ test('worker source verifies state before exchange and never returns refresh tok
   assert.ok(exchangeBlockMatch, 'expected exchange handler source block')
   const exchangeBlock = exchangeBlockMatch[0]
 
-  assert.match(exchangeBlock, /await c\.req\.json<\{ code\?: string; state\?: string \}>/)
-  assert.match(exchangeBlock, /if \(!body\.code \|\| !body\.state\) return publicError\(400, 'INVALID_REQUEST'\)/)
+  assert.match(exchangeBlock, /parseOAuthExchangeBody\(await c\.req\.json\(\)\.catch\(\(\) => null\)\)/)
+  assert.match(exchangeBlock, /if \(!body\) return publicError\(400, 'INVALID_REQUEST'\)/)
   assert.match(exchangeBlock, /const state = await verifyOAuthState\(c\.env\.MANAGE_SECRET!, body\.state\)/)
   assert.match(exchangeBlock, /if \(!state\) return publicError\(400, 'INVALID_OAUTH_STATE'\)/)
   assert.match(exchangeBlock, /if \(!c\.env\.BANGUMI_CLIENT_ID \|\| !c\.env\.BANGUMI_CLIENT_SECRET\) \{[\s\S]*return publicError\(503, 'OAUTH_NOT_CONFIGURED'\)/)
