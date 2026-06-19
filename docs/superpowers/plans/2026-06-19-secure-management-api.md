@@ -336,7 +336,7 @@ Run:
 ```bash
 node --test packages/worker/src/manage/security.test.ts
 rm -rf /tmp/bangumitv-secure-management
-./node_modules/.bin/wrangler deploy --dry-run --outdir /tmp/bangumitv-secure-management --config packages/worker/wrangler.toml
+WRANGLER_LOG_PATH=/tmp/bangumitv-secure-management-wrangler.log ./packages/worker/node_modules/.bin/wrangler deploy --dry-run --outdir /tmp/bangumitv-secure-management --config packages/worker/wrangler.toml
 ```
 
 Expected: Node tests PASS；Wrangler 输出 `Total Upload` 且退出码 0。
@@ -473,7 +473,7 @@ Run:
 ```bash
 node --test packages/worker/src/manage/security.test.ts
 rm -rf /tmp/bangumitv-secure-management
-./node_modules/.bin/wrangler deploy --dry-run --outdir /tmp/bangumitv-secure-management --config packages/worker/wrangler.toml
+WRANGLER_LOG_PATH=/tmp/bangumitv-secure-management-wrangler.log ./packages/worker/node_modules/.bin/wrangler deploy --dry-run --outdir /tmp/bangumitv-secure-management --config packages/worker/wrangler.toml
 rg -n "app\\.get\\('/api/manage/(oauth-url|exchange)|query\\('code'\\)|query\\('cron'\\)|return Response\\.json\\(result\\)" packages/worker/src/index.ts
 ```
 
@@ -656,7 +656,7 @@ Run:
 node --test packages/worker/src/manage/index-html.test.mjs
 node --test packages/worker/src/manage/security.test.ts
 rm -rf /tmp/bangumitv-secure-management
-./node_modules/.bin/wrangler deploy --dry-run --outdir /tmp/bangumitv-secure-management --config packages/worker/wrangler.toml
+WRANGLER_LOG_PATH=/tmp/bangumitv-secure-management-wrangler.log ./packages/worker/node_modules/.bin/wrangler deploy --dry-run --outdir /tmp/bangumitv-secure-management --config packages/worker/wrangler.toml
 ```
 
 Expected: 9 个以上测试全部 PASS；Wrangler dry-run 退出码 0。
@@ -710,7 +710,7 @@ Run:
 node --test packages/worker/src/manage/security.test.ts packages/worker/src/manage/index-html.test.mjs
 OPENSPEC_TELEMETRY=0 node_modules/.bin/openspec validate secure-management-api --strict
 rm -rf /tmp/bangumitv-secure-management
-./node_modules/.bin/wrangler deploy --dry-run --outdir /tmp/bangumitv-secure-management --config packages/worker/wrangler.toml
+WRANGLER_LOG_PATH=/tmp/bangumitv-secure-management-wrangler.log ./packages/worker/node_modules/.bin/wrangler deploy --dry-run --outdir /tmp/bangumitv-secure-management --config packages/worker/wrangler.toml
 git diff --check
 ```
 
