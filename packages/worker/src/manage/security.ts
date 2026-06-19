@@ -7,6 +7,20 @@ export interface OAuthStatePayload {
   exp: number
 }
 
+export interface ManageErrorLog {
+  event: 'manage_request_failed'
+  route: string
+  kind: string
+  upstream_status: number | undefined
+  at: string
+}
+
+export interface HealthFailureLog {
+  event: 'health_failed'
+  kind: string
+  at: string
+}
+
 const STATE_TTL_SECONDS = 300
 const STATE_MAX_LENGTH = 1024
 const encoder = new TextEncoder()
@@ -53,8 +67,22 @@ async function signState(secret: string, payload: string): Promise<Uint8Array> {
   return new Uint8Array(await crypto.subtle.sign('HMAC', await stateKey(secret), encoder.encode(payload)))
 }
 
-function errorResponse(status: number, code: string, message: string): Response {
-  return Response.json({ error: { code, message } }, { status, headers: manageHeaders() })
+const publicMessages: Record<string, string> = {
+  MANAGE_NOT_CONFIGURED: 'Management API not configured',
+  UNAUTHORIZED: 'Unauthorized',
+  FORBIDDEN: 'Forbidden',
+  BGM_AUTH: 'Upstream authorization failed',
+  BGM_TIMEOUT: 'Upstream request timed out',
+  BGM_UPSTREAM: 'Upstream request failed',
+  INVALID_REQUEST: 'Invalid request',
+  INVALID_OAUTH_STATE: 'Invalid OAuth state',
+}
+
+export function publicError(status: number, code: string, _error?: unknown): Response {
+  return Response.json(
+    { error: { code, message: publicMessages[code] || 'Request failed' } },
+    { status, headers: manageHeaders() },
+  )
 }
 
 export async function createOAuthState(
@@ -117,22 +145,22 @@ export async function authorizeManageRequest(
   secret: string | undefined,
 ): Promise<Response | null> {
   if (!secret) {
-    return errorResponse(503, 'MANAGE_NOT_CONFIGURED', 'Management API not configured')
+    return publicError(503, 'MANAGE_NOT_CONFIGURED')
   }
 
   const origin = request.headers.get('Origin')
   if (origin && origin !== new URL(request.url).origin) {
-    return errorResponse(403, 'FORBIDDEN', 'Forbidden')
+    return publicError(403, 'FORBIDDEN')
   }
 
   const providedSecret = request.headers.get('X-Manage-Secret')
   if (!providedSecret) {
-    return errorResponse(401, 'UNAUTHORIZED', 'Unauthorized')
+    return publicError(401, 'UNAUTHORIZED')
   }
 
   const [providedDigest, expectedDigest] = await Promise.all([digest(providedSecret), digest(secret)])
   if (!fixedEqual(providedDigest, expectedDigest)) {
-    return errorResponse(401, 'UNAUTHORIZED', 'Unauthorized')
+    return publicError(401, 'UNAUTHORIZED')
   }
 
   return null
@@ -151,6 +179,45 @@ export function manageHeaders(csp?: string): HeadersInit {
   }
 
   return headers
+}
+
+export function managePageCsp(): string {
+  return "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' https: data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+}
+
+export function callbackPageCsp(): string {
+  return "default-src 'none'; script-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
+}
+
+export function createManageErrorLog(
+  route: string,
+  err: unknown,
+  at = new Date().toISOString(),
+): ManageErrorLog {
+  return {
+    event: 'manage_request_failed',
+    route,
+    kind: err instanceof Error ? err.name : 'Unknown',
+    upstream_status:
+      typeof err === 'object' &&
+      err !== null &&
+      'status' in err &&
+      typeof (err as { status?: unknown }).status === 'number'
+        ? (err as { status: number }).status
+        : undefined,
+    at,
+  }
+}
+
+export function createHealthFailureLog(
+  err: unknown,
+  at = new Date().toISOString(),
+): HealthFailureLog {
+  return {
+    event: 'health_failed',
+    kind: err instanceof Error ? err.name : 'Unknown',
+    at,
+  }
 }
 
 export function oauthCallbackHtml(): string {

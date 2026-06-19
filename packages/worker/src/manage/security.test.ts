@@ -1,11 +1,17 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import vm from 'node:vm'
 import {
   authorizeManageRequest,
+  callbackPageCsp,
   createOAuthState,
+  createHealthFailureLog,
+  createManageErrorLog,
   manageHeaders,
+  managePageCsp,
   oauthCallbackHtml,
+  publicError,
   verifyOAuthState,
 } from './security.ts'
 
@@ -36,6 +42,10 @@ async function signState(secret: string, payload: unknown): Promise<string> {
     await crypto.subtle.sign('HMAC', key, encoder.encode(encodedPayload)),
   )
   return `${encodedPayload}.${base64url(signature)}`
+}
+
+function namedError(name: string, message: string, extra?: Record<string, unknown>): Error {
+  return Object.assign(new Error(message), { name }, extra)
 }
 
 test('management auth denies missing configuration and bad credentials', async () => {
@@ -137,6 +147,120 @@ test('management headers disable storage and framing', () => {
   assert.equal(headers.get('X-Frame-Options'), 'DENY')
   assert.equal(headers.get('X-Content-Type-Options'), 'nosniff')
   assert.equal(headers.get('Referrer-Policy'), 'no-referrer')
+})
+
+test('public errors never echo upstream text', async () => {
+  const response = publicError(502, 'BGM_UPSTREAM', new Error('access_token=secret upstream body'))
+  const body = await response.text()
+  assert.deepEqual(JSON.parse(body), {
+    error: { code: 'BGM_UPSTREAM', message: 'Upstream request failed' },
+  })
+  assert.doesNotMatch(body, /secret|upstream body/)
+  assert.equal(response.headers.get('Cache-Control'), 'no-store')
+})
+
+test('manage error logs keep only safe structured fields', () => {
+  const authLog = createManageErrorLog(
+    '/api/manage/exchange',
+    namedError('BgmHttpError', 'access_token=secret upstream body', { status: 403 }),
+    '2026-06-19T00:00:00.000Z',
+  )
+  assert.deepEqual(authLog, {
+    event: 'manage_request_failed',
+    route: '/api/manage/exchange',
+    kind: 'BgmHttpError',
+    upstream_status: 403,
+    at: '2026-06-19T00:00:00.000Z',
+  })
+
+  const timeoutLog = createManageErrorLog(
+    '/api/manage/sync',
+    namedError('BgmTimeoutError', 'code=oauth-secret'),
+    '2026-06-19T00:00:00.000Z',
+  )
+  assert.deepEqual(timeoutLog, {
+    event: 'manage_request_failed',
+    route: '/api/manage/sync',
+    kind: 'BgmTimeoutError',
+    upstream_status: undefined,
+    at: '2026-06-19T00:00:00.000Z',
+  })
+
+  const networkLog = createManageErrorLog(
+    '/api/manage/compare',
+    namedError('BgmNetworkError', 'state=stolen'),
+    '2026-06-19T00:00:00.000Z',
+  )
+  assert.deepEqual(networkLog, {
+    event: 'manage_request_failed',
+    route: '/api/manage/compare',
+    kind: 'BgmNetworkError',
+    upstream_status: undefined,
+    at: '2026-06-19T00:00:00.000Z',
+  })
+
+  assert.deepEqual(Object.keys(networkLog).sort(), ['at', 'event', 'kind', 'route', 'upstream_status'])
+  assert.doesNotMatch(JSON.stringify(networkLog), /message|state|code|token|secret/i)
+})
+
+test('health failure logs keep only safe structured fields', () => {
+  const log = createHealthFailureLog(new Error('username=ian sync:last_error=oops'), '2026-06-19T00:00:00.000Z')
+  assert.deepEqual(log, {
+    event: 'health_failed',
+    kind: 'Error',
+    at: '2026-06-19T00:00:00.000Z',
+  })
+  assert.doesNotMatch(JSON.stringify(log), /message|request|state|code|token|username|last_error/i)
+})
+
+test('management and callback CSP stay compatible with current inline assets', () => {
+  assert.equal(
+    managePageCsp(),
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' https: data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+  )
+  assert.equal(
+    callbackPageCsp(),
+    "default-src 'none'; script-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+  )
+})
+
+test('worker source isolates public CORS and removes public manage gate', async () => {
+  const source = await readFile(new URL('../index.ts', import.meta.url), 'utf8')
+
+  assert.ok(source.includes("const publicCors = cors({ origin: '*', allowMethods: ['GET', 'OPTIONS'] })"))
+  for (const route of ['/api/collections', '/api/calendar', '/api/config', '/api/health']) {
+    assert.ok(source.includes(`app.use('${route}', publicCors)`), `expected public CORS on ${route}`)
+  }
+
+  assert.equal(source.includes("app.use('*', cors("), false)
+  assert.equal(source.includes('/api/manage/gate'), false)
+  assert.equal(source.includes('requireManageSecret'), false)
+  assert.ok(source.includes("app.use('/api/manage/*', async (c, next) => {"))
+
+  const middlewareIndex = source.indexOf("app.use('/api/manage/*', async (c, next) => {")
+  const manageRouteIndexes = [
+    source.indexOf("app.get('/api/manage/oauth-url'"),
+    source.indexOf("app.get('/api/manage/exchange'"),
+    source.indexOf("app.post('/api/manage/compare'"),
+    source.indexOf("app.post('/api/manage/sync'"),
+    source.indexOf("app.delete('/api/manage/cron-token'"),
+  ]
+  for (const index of manageRouteIndexes) {
+    assert.ok(index > middlewareIndex, 'expected manage middleware before management handlers')
+  }
+})
+
+test('worker source keeps health endpoint free of sync:last_error and usernames', async () => {
+  const source = await readFile(new URL('../index.ts', import.meta.url), 'utf8')
+  const healthBlockMatch = source.match(/app\.get\('\/api\/health', async \(c\) => \{[\s\S]*?\n\}\)\n/)
+  assert.ok(healthBlockMatch, 'expected health handler source block')
+  const healthBlock = healthBlockMatch[0]
+
+  assert.equal(healthBlock.includes('sync:last_error'), false)
+  assert.equal(healthBlock.includes('users:'), false)
+  assert.equal(healthBlock.includes('last_error:'), false)
+  assert.match(healthBlock, /console\.error\(JSON\.stringify\(createHealthFailureLog\(err\)\)\)/)
+  assert.match(healthBlock, /return Response\.json\(\{ ok: false \}/)
 })
 
 test('callback reads code and state from query, posts to current origin, and closes window', () => {
