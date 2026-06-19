@@ -159,6 +159,22 @@ test('public errors never echo upstream text', async () => {
   assert.equal(response.headers.get('Cache-Control'), 'no-store')
 })
 
+test('compare source uses a fixed safe account error message', async () => {
+  const source = await readFile(new URL('./compare.ts', import.meta.url), 'utf8')
+
+  assert.match(source, /error: '获取收藏失败，请稍后重试'/)
+  assert.equal(source.includes('err.message'), false)
+  assert.equal(source.includes('String(err)'), false)
+})
+
+test('sync-write source uses a fixed safe item error message', async () => {
+  const source = await readFile(new URL('./sync-write.ts', import.meta.url), 'utf8')
+
+  assert.match(source, /status:\s*'error',[\s\S]*error:\s*'同步失败，请稍后重试'/)
+  assert.equal(source.includes('error: String(err)'), false)
+  assert.equal(source.includes('error: err.message'), false)
+})
+
 test('manage error logs keep only safe structured fields', () => {
   const authLog = createManageErrorLog(
     '/api/manage/exchange',
@@ -261,6 +277,28 @@ test('worker source keeps health endpoint free of sync:last_error and usernames'
   assert.equal(healthBlock.includes('last_error:'), false)
   assert.match(healthBlock, /console\.error\(JSON\.stringify\(createHealthFailureLog\(err\)\)\)/)
   assert.match(healthBlock, /return Response\.json\(\{ ok: false \}/)
+})
+
+test('worker source keeps cron exchange response compatible with current manage page', async () => {
+  const source = await readFile(new URL('../index.ts', import.meta.url), 'utf8')
+  const exchangeBlockMatch = source.match(/app\.get\('\/api\/manage\/exchange', async \(c\) => \{[\s\S]*?\n\}\)\n/)
+  assert.ok(exchangeBlockMatch, 'expected exchange handler source block')
+  const exchangeBlock = exchangeBlockMatch[0]
+
+  assert.match(exchangeBlock, /if \(persistCron\) \{[\s\S]*await storage\.put\('bgm:tokens', \{[\s\S]*refresh_token: result\.refresh_token,[\s\S]*\}\)\s*\}/)
+  assert.match(exchangeBlock, /return Response\.json\(result\)/)
+  assert.equal(exchangeBlock.includes('return Response.json({ ok: true })'), false)
+})
+
+test('worker source catches cron token delete failures and maps them safely', async () => {
+  const source = await readFile(new URL('../index.ts', import.meta.url), 'utf8')
+  const deleteBlockMatch = source.match(/app\.delete\('\/api\/manage\/cron-token', async \(c\) => \{[\s\S]*?\n\}\)\n/)
+  assert.ok(deleteBlockMatch, 'expected cron token delete handler source block')
+  const deleteBlock = deleteBlockMatch[0]
+
+  assert.match(deleteBlock, /try \{/)
+  assert.match(deleteBlock, /await storage\.delete\('bgm:tokens'\)/)
+  assert.match(deleteBlock, /catch \(err\) \{\s*return errorToResponse\('\/api\/manage\/cron-token', err\)/)
 })
 
 test('callback reads code and state from query, posts to current origin, and closes window', () => {

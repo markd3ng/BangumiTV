@@ -190,7 +190,6 @@ app.get('/api/manage/exchange', async (c) => {
         access_token: result.access_token,
         refresh_token: result.refresh_token,
       })
-      return Response.json({ ok: true })
     }
     return Response.json(result)
   } catch (err) {
@@ -226,8 +225,12 @@ app.post('/api/manage/sync', async (c) => {
 // 清除 KV 中持久化的 cron token（重新授权前调用）。
 app.delete('/api/manage/cron-token', async (c) => {
   const storage = new KVStorage(c.env.BANGUMI_KV)
-  await storage.delete('bgm:tokens')
-  return Response.json({ ok: true })
+  try {
+    await storage.delete('bgm:tokens')
+    return Response.json({ ok: true })
+  } catch (err) {
+    return errorToResponse('/api/manage/cron-token', err)
+  }
 })
 
 // HTTP 触发的手动同步（需要密钥）。
