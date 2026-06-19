@@ -360,7 +360,7 @@ git commit -m "feat: isolate management API security boundary"
 
 ### Task 3: 受保护 OAuth POST 与 token 去向
 
-- [ ] Task 3 complete: 受保护 OAuth POST 与 token 去向
+- [x] Task 3 complete: 受保护 OAuth POST 与 token 去向
 
 **Files:**
 - Modify: `packages/worker/src/index.ts:138-193`
