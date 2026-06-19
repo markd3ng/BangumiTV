@@ -116,6 +116,9 @@ pnpm-lock.yaml
 # Cloudflare Wrangler runtime cache
 .wrangler/
 
+# Local isolated development worktrees
+.worktrees/
+
 # Reasonix agent internal state
 .reasonix/
 reasonix.toml
