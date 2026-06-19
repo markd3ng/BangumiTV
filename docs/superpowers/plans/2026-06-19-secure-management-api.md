@@ -41,7 +41,7 @@ base-ref: 3e346b78f4ca2833b8d6e3956bcbdb36d99c2721
 
 ### Task 1: 安全原语与签名 state
 
-- [ ] Task 1 complete: 安全原语与签名 state
+- [x] Task 1 complete: 安全原语与签名 state
 
 **Files:**
 - Create: `packages/worker/src/manage/security.ts`
