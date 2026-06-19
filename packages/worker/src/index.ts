@@ -16,12 +16,14 @@ import { BgmHttpError, BgmTimeoutError, BgmNetworkError } from '@bangumi-tv/shar
 import {
   authorizeManageRequest,
   callbackPageCsp,
+  createOAuthState,
   createHealthFailureLog,
   createManageErrorLog,
   manageHeaders,
   managePageCsp,
   oauthCallbackHtml,
   publicError,
+  verifyOAuthState,
 } from './manage/security'
 
 function errorToResponse(route: string, err: unknown): Response {
@@ -164,34 +166,46 @@ app.use('/api/manage/*', async (c, next) => {
   }
 })
 
-app.get('/api/manage/oauth-url', (c) => {
-  const clientId = c.env.BANGUMI_CLIENT_ID || ''
-  if (!clientId) return publicError(500, 'REQUEST_FAILED')
+app.post('/api/manage/oauth-url', async (c) => {
+  const body = await c.req.json<{ purpose?: OAuthPurpose }>().catch(() => ({}))
+  if (!body.purpose || !['account-a', 'account-b', 'cron'].includes(body.purpose)) {
+    return publicError(400, 'INVALID_REQUEST')
+  }
+  if (!c.env.BANGUMI_CLIENT_ID) return publicError(503, 'OAUTH_NOT_CONFIGURED')
+  const created = await createOAuthState(c.env.MANAGE_SECRET!, body.purpose)
   const redirectUri = `${new URL(c.req.url).origin}/manage/callback`
-  const state = c.req.query('state') || ''
-  return Response.json({ url: getOAuthRedirectUrl(clientId, redirectUri, state) })
+  return Response.json({
+    url: getOAuthRedirectUrl(c.env.BANGUMI_CLIENT_ID, redirectUri, created.state),
+    state: created.state,
+    nonce: created.nonce,
+  })
 })
 
-app.get('/api/manage/exchange', async (c) => {
-  const code = c.req.query('code') || ''
-  const persistCron = c.req.query('cron') === '1'
+app.post('/api/manage/exchange', async (c) => {
+  const body = await c.req.json<{ code?: string; state?: string }>().catch(() => ({}))
+  if (!body.code || !body.state) return publicError(400, 'INVALID_REQUEST')
+  const state = await verifyOAuthState(c.env.MANAGE_SECRET!, body.state)
+  if (!state) return publicError(400, 'INVALID_OAUTH_STATE')
+  if (!c.env.BANGUMI_CLIENT_ID || !c.env.BANGUMI_CLIENT_SECRET) {
+    return publicError(503, 'OAUTH_NOT_CONFIGURED')
+  }
+
   try {
     const result = await exchangeCode(
-      c.env.BANGUMI_CLIENT_ID || '',
-      c.env.BANGUMI_CLIENT_SECRET || '',
-      code,
+      c.env.BANGUMI_CLIENT_ID,
+      c.env.BANGUMI_CLIENT_SECRET,
+      body.code,
       `${new URL(c.req.url).origin}/manage/callback`,
     )
-    // 授权为 cron 同步用：把 token 对持久化进 KV，cron 自动复用与续期，
-    // 无需在 GitHub 配置 BANGUMI_TOKEN/BANGUMI_REFRESH_TOKEN。
-    if (persistCron) {
+    if (state.purpose === 'cron') {
       const storage = new KVStorage(c.env.BANGUMI_KV)
       await storage.put('bgm:tokens', {
         access_token: result.access_token,
         refresh_token: result.refresh_token,
       })
+      return Response.json({ ok: true })
     }
-    return Response.json(result)
+    return Response.json({ access_token: result.access_token, user_id: result.user_id })
   } catch (err) {
     return errorToResponse('/api/manage/exchange', err)
   }

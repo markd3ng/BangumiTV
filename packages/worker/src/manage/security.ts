@@ -69,6 +69,7 @@ async function signState(secret: string, payload: string): Promise<Uint8Array> {
 
 const publicMessages: Record<string, string> = {
   MANAGE_NOT_CONFIGURED: 'Management API not configured',
+  OAUTH_NOT_CONFIGURED: 'OAuth is not configured',
   UNAUTHORIZED: 'Unauthorized',
   FORBIDDEN: 'Forbidden',
   BGM_AUTH: 'Upstream authorization failed',

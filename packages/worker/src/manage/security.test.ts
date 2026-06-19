@@ -141,6 +141,27 @@ test('signed state rejects payload with non-integer expiry even when signature i
   assert.equal(await verifyOAuthState('secret', state, now), null)
 })
 
+test('state carries only the requested purpose and nonce', async () => {
+  const now = Date.UTC(2026, 5, 19)
+  const created = await createOAuthState('secret', 'cron', now)
+  const payload = await verifyOAuthState('secret', created.state, now)
+  assert.deepEqual(payload, {
+    v: 1,
+    nonce: created.nonce,
+    purpose: 'cron',
+    exp: Math.floor(now / 1000) + 300,
+  })
+})
+
+test('state rejects unsupported purpose after payload tampering', async () => {
+  const created = await createOAuthState('secret', 'account-b')
+  const [payload, signature] = created.state.split('.')
+  const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString())
+  decoded.purpose = 'admin'
+  const changed = Buffer.from(JSON.stringify(decoded)).toString('base64url') + '.' + signature
+  assert.equal(await verifyOAuthState('secret', changed), null)
+})
+
 test('management headers disable storage and framing', () => {
   const headers = new Headers(manageHeaders())
   assert.equal(headers.get('Cache-Control'), 'no-store')
@@ -240,7 +261,7 @@ test('management and callback CSP stay compatible with current inline assets', (
   )
 })
 
-test('worker source isolates public CORS and removes public manage gate', async () => {
+test('worker source protects oauth routes behind POST JSON handlers', async () => {
   const source = await readFile(new URL('../index.ts', import.meta.url), 'utf8')
 
   assert.ok(source.includes("const publicCors = cors({ origin: '*', allowMethods: ['GET', 'OPTIONS'] })"))
@@ -255,8 +276,8 @@ test('worker source isolates public CORS and removes public manage gate', async 
 
   const middlewareIndex = source.indexOf("app.use('/api/manage/*', async (c, next) => {")
   const manageRouteIndexes = [
-    source.indexOf("app.get('/api/manage/oauth-url'"),
-    source.indexOf("app.get('/api/manage/exchange'"),
+    source.indexOf("app.post('/api/manage/oauth-url'"),
+    source.indexOf("app.post('/api/manage/exchange'"),
     source.indexOf("app.post('/api/manage/compare'"),
     source.indexOf("app.post('/api/manage/sync'"),
     source.indexOf("app.delete('/api/manage/cron-token'"),
@@ -264,6 +285,26 @@ test('worker source isolates public CORS and removes public manage gate', async 
   for (const index of manageRouteIndexes) {
     assert.ok(index > middlewareIndex, 'expected manage middleware before management handlers')
   }
+
+  assert.equal(source.includes("app.get('/api/manage/oauth-url'"), false)
+  assert.equal(source.includes("app.get('/api/manage/exchange'"), false)
+  assert.equal(source.includes("c.req.query('code')"), false)
+  assert.equal(source.includes("c.req.query('cron')"), false)
+})
+
+test('worker source validates oauth-url purpose and returns state plus nonce', async () => {
+  const source = await readFile(new URL('../index.ts', import.meta.url), 'utf8')
+  const oauthUrlBlockMatch = source.match(/app\.post\('\/api\/manage\/oauth-url',(?: async)? \(c\) => \{[\s\S]*?\n\}\)\n/)
+  assert.ok(oauthUrlBlockMatch, 'expected oauth-url handler source block')
+  const oauthUrlBlock = oauthUrlBlockMatch[0]
+
+  assert.match(oauthUrlBlock, /await c\.req\.json<\{ purpose\?: OAuthPurpose \}>/)
+  assert.match(oauthUrlBlock, /!body\.purpose/)
+  assert.match(oauthUrlBlock, /\['account-a', 'account-b', 'cron'\]\.includes\(body\.purpose\)/)
+  assert.match(oauthUrlBlock, /return publicError\(400, 'INVALID_REQUEST'\)/)
+  assert.match(oauthUrlBlock, /return publicError\(503, 'OAUTH_NOT_CONFIGURED'\)/)
+  assert.match(oauthUrlBlock, /createOAuthState\(c\.env\.MANAGE_SECRET!, body\.purpose\)/)
+  assert.match(oauthUrlBlock, /return Response\.json\(\{[\s\S]*url:[\s\S]*state:[\s\S]*nonce:/)
 })
 
 test('worker source keeps health endpoint free of sync:last_error and usernames', async () => {
@@ -279,15 +320,31 @@ test('worker source keeps health endpoint free of sync:last_error and usernames'
   assert.match(healthBlock, /return Response\.json\(\{ ok: false \}/)
 })
 
-test('worker source keeps cron exchange response compatible with current manage page', async () => {
+test('worker source verifies state before exchange and never returns refresh token', async () => {
   const source = await readFile(new URL('../index.ts', import.meta.url), 'utf8')
-  const exchangeBlockMatch = source.match(/app\.get\('\/api\/manage\/exchange', async \(c\) => \{[\s\S]*?\n\}\)\n/)
+  const exchangeBlockMatch = source.match(/app\.post\('\/api\/manage\/exchange', async \(c\) => \{[\s\S]*?\n\}\)\n/)
   assert.ok(exchangeBlockMatch, 'expected exchange handler source block')
   const exchangeBlock = exchangeBlockMatch[0]
 
-  assert.match(exchangeBlock, /if \(persistCron\) \{[\s\S]*await storage\.put\('bgm:tokens', \{[\s\S]*refresh_token: result\.refresh_token,[\s\S]*\}\)\s*\}/)
-  assert.match(exchangeBlock, /return Response\.json\(result\)/)
-  assert.equal(exchangeBlock.includes('return Response.json({ ok: true })'), false)
+  assert.match(exchangeBlock, /await c\.req\.json<\{ code\?: string; state\?: string \}>/)
+  assert.match(exchangeBlock, /if \(!body\.code \|\| !body\.state\) return publicError\(400, 'INVALID_REQUEST'\)/)
+  assert.match(exchangeBlock, /const state = await verifyOAuthState\(c\.env\.MANAGE_SECRET!, body\.state\)/)
+  assert.match(exchangeBlock, /if \(!state\) return publicError\(400, 'INVALID_OAUTH_STATE'\)/)
+  assert.match(exchangeBlock, /if \(!c\.env\.BANGUMI_CLIENT_ID \|\| !c\.env\.BANGUMI_CLIENT_SECRET\) \{[\s\S]*return publicError\(503, 'OAUTH_NOT_CONFIGURED'\)/)
+  assert.match(exchangeBlock, /await exchangeCode\([\s\S]*body\.code/)
+  assert.match(exchangeBlock, /if \(state\.purpose === 'cron'\) \{[\s\S]*await storage\.put\('bgm:tokens', \{[\s\S]*access_token: result\.access_token,[\s\S]*refresh_token: result\.refresh_token,[\s\S]*\}\)[\s\S]*return Response\.json\(\{ ok: true \}\)/)
+  assert.match(exchangeBlock, /return Response\.json\(\{ access_token: result\.access_token, user_id: result\.user_id \}\)/)
+  assert.equal(exchangeBlock.includes('return Response.json(result)'), false)
+  assert.equal(exchangeBlock.includes('refresh_token: result.refresh_token') && exchangeBlock.includes("return Response.json({ access_token: result.access_token, user_id: result.user_id })"), true)
+})
+
+test('public errors expose a fixed oauth not configured message', async () => {
+  const response = publicError(503, 'OAUTH_NOT_CONFIGURED', new Error('client_secret missing'))
+  const body = await response.text()
+  assert.deepEqual(JSON.parse(body), {
+    error: { code: 'OAUTH_NOT_CONFIGURED', message: 'OAuth is not configured' },
+  })
+  assert.doesNotMatch(body, /client_secret|missing/i)
 })
 
 test('worker source catches cron token delete failures and maps them safely', async () => {
