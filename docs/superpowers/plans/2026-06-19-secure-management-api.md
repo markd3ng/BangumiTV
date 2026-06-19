@@ -228,7 +228,7 @@ git commit -m "feat: add management security primitives"
 
 ### Task 2: 管理路由、CORS、响应头和健康接口
 
-- [ ] Task 2 complete: 管理路由、CORS、响应头和健康接口
+- [x] Task 2 complete: 管理路由、CORS、响应头和健康接口
 
 **Files:**
 - Modify: `packages/worker/src/index.ts:1-236`
