@@ -118,6 +118,8 @@ let state = { userA: '', userB: '', tokenA: '', tokenB: '', differences: [] }
 let manageSecret = ''
 let pendingOAuth = null
 let manageLocked = true
+const MANAGE_AUTH_FAILURE_MESSAGE = '管理验证失败，请重新输入密码'
+const OAUTH_POPUP_FAILURE_MESSAGE = '授权弹窗打开失败，请稍后重试'
 
 const gate = document.getElementById('gate')
 const gateHelp = document.getElementById('gate-help')
@@ -164,6 +166,10 @@ function showText(target, text, className = 'muted') {
   target.append(textElement('p', text, className))
 }
 
+function showManageAuthFailure(target) {
+  showText(target, MANAGE_AUTH_FAILURE_MESSAGE)
+}
+
 function purposeTarget(purpose) {
   return purpose === 'cron' ? cronStatus : oauthStatus
 }
@@ -207,6 +213,7 @@ async function apiFetch(url, options = {}) {
   if (response.status === 401 || response.status === 503) {
     document.getElementById('gate').style.display = 'block'
     handleManageDenied()
+    return null
   }
   return response
 }
@@ -233,9 +240,11 @@ function renderAccountManualInput(purpose) {
   input.type = 'text'
   input.placeholder = '粘贴回调 URL'
   input.id = 'oauth-callback-input'
+  input.setAttribute('data-requires-secret', 'true')
   input.disabled = manageLocked
   const button = document.createElement('button')
   button.textContent = '确认'
+  button.setAttribute('data-requires-secret', 'true')
   button.disabled = manageLocked
   button.addEventListener('click', () => {
     submitAccountCallback(input.value.trim(), purpose)
@@ -243,9 +252,16 @@ function renderAccountManualInput(purpose) {
   oauthButtons.append(note, input, button)
 }
 
+async function consumeOAuthFlow(flow, code, signedState) {
+  if (!flow || flow.consuming) return
+  flow.consuming = true
+  return exchangeOAuth(code, signedState, flow)
+}
+
 async function beginOAuth(purpose) {
   const target = purposeTarget(purpose)
   const label = purposeUserName(purpose)
+  resetPendingOAuth()
   showText(target, '正在发起授权...')
 
   const response = await apiFetch('/api/manage/oauth-url', {
@@ -253,17 +269,23 @@ async function beginOAuth(purpose) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ purpose }),
   })
+  if (!response) {
+    return showManageAuthFailure(target)
+  }
   const data = await response.json().catch(() => null)
   if (!response.ok || !data?.url || !data?.state || !data?.nonce) {
     return showError(target, data, 'OAuth URL 获取失败')
   }
 
+  const flow = { purpose, state: data.state, nonce: data.nonce, popup: null, consuming: false }
+  pendingOAuth = flow
   const popup = window.open(data.url, 'bgm-oauth')
   if (!popup) {
-    return showError(target, null, '授权弹窗被浏览器拦截，请允许弹窗后重试')
+    resetPendingOAuth()
+    return showText(target, OAUTH_POPUP_FAILURE_MESSAGE)
   }
 
-  pendingOAuth = { purpose, state: data.state, nonce: data.nonce, popup }
+  flow.popup = popup
   if (purpose === 'cron') {
     cronCallbackInput.value = ''
     cronManual.style.display = 'block'
@@ -273,43 +295,53 @@ async function beginOAuth(purpose) {
   showText(target, `请在弹出窗口完成 ${label} 授权。若未自动回填，请手动粘贴回调 URL：`)
 }
 
-async function exchangeOAuth(code, signedState, purpose) {
-  const target = purposeTarget(purpose)
-  const response = await apiFetch('/api/manage/exchange', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code, state: signedState }),
-  })
-  const data = await response.json().catch(() => null)
-  resetPendingOAuth()
-
-  if (!response.ok) {
-    return showError(target, data, 'OAuth 授权失败')
-  }
-
-  if (purpose === 'cron') {
-    if (data.ok === true) {
-      cronManual.style.display = 'none'
-      cronCallbackInput.value = ''
-      return showText(target, '✓ 已授权并保存，cron 同步将自动使用该账号（token 会自动续期）', 'status-ok')
+async function exchangeOAuth(code, signedState, flow) {
+  const target = purposeTarget(flow.purpose)
+  let nextAction = null
+  try {
+    const response = await apiFetch('/api/manage/exchange', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, state: signedState }),
+    })
+    if (!response) {
+      return showManageAuthFailure(target)
     }
-    return showError(target, data, 'cron 账号授权失败')
-  }
+    const data = await response.json().catch(() => null)
 
-  if (!data.access_token) {
-    return showError(target, data, `账号 ${purpose === 'account-a' ? 'A' : 'B'} OAuth 授权失败`)
-  }
+    if (!response.ok) {
+      return showError(target, data, 'OAuth 授权失败')
+    }
 
-  if (purpose === 'account-a') {
-    state.tokenA = data.access_token
-    showText(target, `✓ 账号 A (${state.userA}) 已授权`, 'status-ok')
-    return beginOAuth('account-b')
-  }
+    if (flow.purpose === 'cron') {
+      if (data.ok === true) {
+        cronManual.style.display = 'none'
+        cronCallbackInput.value = ''
+        return showText(target, '✓ 已授权并保存，cron 同步将自动使用该账号（token 会自动续期）', 'status-ok')
+      }
+      return showError(target, data, 'cron 账号授权失败')
+    }
 
-  state.tokenB = data.access_token
-  clear(oauthButtons)
-  showText(target, `✓ 账号 B (${state.userB}) 已授权`, 'status-ok')
-  return loadComparison()
+    if (!data.access_token) {
+      return showError(target, data, `账号 ${flow.purpose === 'account-a' ? 'A' : 'B'} OAuth 授权失败`)
+    }
+
+    if (flow.purpose === 'account-a') {
+      state.tokenA = data.access_token
+      showText(target, `✓ 账号 A (${state.userA}) 已授权`, 'status-ok')
+      nextAction = () => beginOAuth('account-b')
+    } else {
+      state.tokenB = data.access_token
+      clear(oauthButtons)
+      showText(target, `✓ 账号 B (${state.userB}) 已授权`, 'status-ok')
+      nextAction = () => loadComparison()
+    }
+  } finally {
+    if (pendingOAuth === flow) {
+      resetPendingOAuth()
+    }
+  }
+  return nextAction ? nextAction() : undefined
 }
 
 function renderComparisonSummary(data) {
@@ -379,6 +411,9 @@ async function loadComparison() {
       userB: state.userB,
     }),
   })
+  if (!response) {
+    return showManageAuthFailure(step3Summary)
+  }
   const data = await response.json().catch(() => null)
   if (!response.ok || (data?.error && !data?.userA && !data?.userB)) {
     return showError(step3Summary, data, '加载收藏数据失败')
@@ -436,6 +471,9 @@ async function doSync(mode, subjectIds) {
       subject_ids: subjectIds || [],
     }),
   })
+  if (!response) {
+    return showManageAuthFailure(syncResults)
+  }
   const data = await response.json().catch(() => null)
   if (!response.ok || !Array.isArray(data)) {
     progressText.textContent = '同步失败'
@@ -456,9 +494,11 @@ function selectedDiffIds() {
 
 async function submitManualCallback(rawUrl, purpose) {
   const target = purposeTarget(purpose)
-  if (!pendingOAuth || pendingOAuth.purpose !== purpose) {
+  const flow = pendingOAuth
+  if (!flow || flow.purpose !== purpose) {
     return showError(target, null, '当前没有待完成的授权流程')
   }
+  if (flow.consuming) return
 
   try {
     const url = new URL(rawUrl)
@@ -466,20 +506,20 @@ async function submitManualCallback(rawUrl, purpose) {
       return showError(target, null, '回调 URL 无效')
     }
     const code = url.searchParams.get('code')
-    if (!code || url.searchParams.get('state') !== pendingOAuth.state) {
+    if (!code || url.searchParams.get('state') !== flow.state) {
       return showError(target, null, '回调 URL 无效')
     }
-    const payload = parseStatePayload(pendingOAuth.state)
+    const payload = parseStatePayload(flow.state)
     if (!payload) {
       return showError(target, null, '回调 URL 无效')
     }
-    if (payload.nonce !== pendingOAuth.nonce) {
+    if (payload.nonce !== flow.nonce) {
       return showError(target, null, '回调 URL 无效')
     }
-    if (payload.purpose !== pendingOAuth.purpose) {
+    if (payload.purpose !== flow.purpose) {
       return showError(target, null, '回调 URL 无效')
     }
-    await exchangeOAuth(code, pendingOAuth.state, pendingOAuth.purpose)
+    return consumeOAuthFlow(flow, code, flow.state)
   } catch {
     showError(target, null, '回调 URL 无效')
   }
@@ -491,14 +531,16 @@ async function submitAccountCallback(rawUrl, purpose) {
 
 window.addEventListener('message', async (ev) => {
   const d = ev.data
-  if (!pendingOAuth || ev.origin !== location.origin) return
-  if (ev.source !== pendingOAuth.popup) return
-  if (!d || d.type !== 'bgm-oauth' || !d.code || d.state !== pendingOAuth.state) return
+  const flow = pendingOAuth
+  if (!flow || ev.origin !== location.origin) return
+  if (ev.source !== flow.popup) return
+  if (flow.consuming) return
+  if (!d || d.type !== 'bgm-oauth' || !d.code || d.state !== flow.state) return
   const payload = parseStatePayload(d.state)
   if (!payload) return
-  if (payload.nonce !== pendingOAuth.nonce) return
-  if (payload.purpose !== pendingOAuth.purpose) return
-  await exchangeOAuth(d.code, d.state, pendingOAuth.purpose)
+  if (payload.nonce !== flow.nonce) return
+  if (payload.purpose !== flow.purpose) return
+  await consumeOAuthFlow(flow, d.code, d.state)
 })
 
 document.getElementById('gate-submit').addEventListener('click', () => {
@@ -519,6 +561,9 @@ document.getElementById('cron-authorize').addEventListener('click', () => beginO
 document.getElementById('cron-clear').addEventListener('click', async () => {
   if (!confirm('确认清除已存的 cron token？清除后需重新授权。')) return
   const response = await apiFetch('/api/manage/cron-token', { method: 'DELETE' })
+  if (!response) {
+    return showManageAuthFailure(cronStatus)
+  }
   const data = await response.json().catch(() => null)
   if (!response.ok || data?.ok !== true) {
     return showError(cronStatus, data, '清除失败')
