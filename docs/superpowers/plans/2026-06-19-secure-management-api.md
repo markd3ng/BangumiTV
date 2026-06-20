@@ -56,7 +56,7 @@ base-ref: 3e346b78f4ca2833b8d6e3956bcbdb36d99c2721
 - Produces: `manageHeaders(csp?) -> HeadersInit`
 - Produces: `oauthCallbackHtml() -> string`
 
-- [ ] **Step 1: 写鉴权、state 和回调页的失败测试**
+- [x] **Step 1: 写鉴权、state 和回调页的失败测试**
 
 在 `packages/worker/src/manage/security.test.ts` 使用 Node 内置测试：
 
@@ -119,7 +119,7 @@ test('callback posts only to the current origin', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试并确认因模块不存在而失败**
+- [x] **Step 2: 运行测试并确认因模块不存在而失败**
 
 Run:
 
@@ -129,7 +129,7 @@ node --test packages/worker/src/manage/security.test.ts
 
 Expected: FAIL，错误包含 `Cannot find module .../manage/security.ts`。
 
-- [ ] **Step 3: 实现最小安全模块**
+- [x] **Step 3: 实现最小安全模块**
 
 在 `packages/worker/src/manage/security.ts` 实现以下结构，使用 `crypto.subtle`、`crypto.getRandomValues`、`TextEncoder`、`btoa` 和 `atob`，不引入库：
 
@@ -209,7 +209,7 @@ function errorResponse(status: number, code: string, message: string): Response 
 `oauthCallbackHtml()` 返回固定 HTML：读取 query 中的 `code`/`state`，调用
 `window.opener.postMessage({type:"bgm-oauth",code,state}, location.origin)`，随后关闭窗口；不得拼接请求数据。
 
-- [ ] **Step 4: 运行安全测试**
+- [x] **Step 4: 运行安全测试**
 
 Run:
 
@@ -219,7 +219,7 @@ node --test packages/worker/src/manage/security.test.ts
 
 Expected: 5 tests PASS，0 fail。
 
-- [ ] **Step 5: 勾选 OpenSpec 任务 1.1 和 2.1 并提交**
+- [x] **Step 5: 勾选 OpenSpec 任务 1.1 和 2.1 并提交**
 
 ```bash
 git add packages/worker/src/manage/security.ts packages/worker/src/manage/security.test.ts openspec/changes/secure-management-api/tasks.md
@@ -240,7 +240,7 @@ git commit -m "feat: add management security primitives"
 - Produces: 所有 `/api/manage/*` 路由共用的默认拒绝中间件
 - Produces: 仅公开读取 API 使用的 `Access-Control-Allow-Origin: *`
 
-- [ ] **Step 1: 增加安全错误和公开披露的失败测试**
+- [x] **Step 1: 增加安全错误和公开披露的失败测试**
 
 向 `security.test.ts` 增加：
 
@@ -259,7 +259,7 @@ test('public errors never echo upstream text', async () => {
 
 `publicError` 的第三个参数只用于内部结构化日志分类，不进入响应。
 
-- [ ] **Step 2: 运行新增测试并确认导出不存在**
+- [x] **Step 2: 运行新增测试并确认导出不存在**
 
 Run:
 
@@ -269,7 +269,7 @@ node --test packages/worker/src/manage/security.test.ts
 
 Expected: FAIL，错误指出 `publicError` 未导出。
 
-- [ ] **Step 3: 实现固定错误映射并改造 Worker 路由**
+- [x] **Step 3: 实现固定错误映射并改造 Worker 路由**
 
 在 `security.ts` 增加：
 
@@ -329,7 +329,7 @@ console.error(JSON.stringify({
 日志对象不得包含 message、request headers/body、code、state 或 token。
 6. `/api/health` 不读取 `sync:last_error`，不返回 `users`、`last_error` 或异常文本；失败时记录 `{event:'health_failed',kind,at}` 并返回 `{ok:false}`。
 
-- [ ] **Step 4: 运行测试和 Wrangler dry-run**
+- [x] **Step 4: 运行测试和 Wrangler dry-run**
 
 Run:
 
@@ -341,7 +341,7 @@ WRANGLER_LOG_PATH=/tmp/bangumitv-secure-management-wrangler.log ./packages/worke
 
 Expected: Node tests PASS；Wrangler 输出 `Total Upload` 且退出码 0。
 
-- [ ] **Step 5: 检查管理路由没有全局通配 CORS 或公开 gate**
+- [x] **Step 5: 检查管理路由没有全局通配 CORS 或公开 gate**
 
 Run:
 
@@ -351,7 +351,7 @@ rg -n "origin: '\\*'|/api/manage/gate|requireManageSecret|users:|last_error:" pa
 
 Expected: 只允许公开 CORS 配置中出现 `origin: '*'`；其余模式无匹配。
 
-- [ ] **Step 6: 勾选任务 1.2、1.3 并提交**
+- [x] **Step 6: 勾选任务 1.2、1.3 并提交**
 
 ```bash
 git add packages/worker/src/index.ts packages/worker/src/manage/security.ts packages/worker/src/manage/security.test.ts openspec/changes/secure-management-api/tasks.md
@@ -374,7 +374,7 @@ git commit -m "feat: isolate management API security boundary"
 - Produces: `POST /api/manage/exchange` body `{ code, state }`
 - Produces: account response `{ access_token, user_id }` or cron response `{ ok: true }`
 
-- [ ] **Step 1: 增加用途和 nonce 边界测试**
+- [x] **Step 1: 增加用途和 nonce 边界测试**
 
 向 `security.test.ts` 增加：
 
@@ -401,7 +401,7 @@ test('state rejects unsupported purpose and malformed nonce', async () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试并确认失败场景有效**
+- [x] **Step 2: 运行测试并确认失败场景有效**
 
 Run:
 
@@ -411,7 +411,7 @@ node --test packages/worker/src/manage/security.test.ts
 
 Expected: 新测试在 state payload 校验未完整时 FAIL；实现完整后 PASS。
 
-- [ ] **Step 3: 将 OAuth 路由改为受保护 POST**
+- [x] **Step 3: 将 OAuth 路由改为受保护 POST**
 
 在 `index.ts`：
 
@@ -466,7 +466,7 @@ app.post('/api/manage/exchange', async (c) => {
 
 校验 OAuth client id/secret 都存在后才调用上游。删除 GET query 中的 `code`、`cron` 和客户端自选固定 state。`oauth.ts` 的 `exchangeCode` 继续返回上游完整 token 对，但只有该路由局部可见 refresh token。
 
-- [ ] **Step 4: 运行测试、dry-run 和敏感响应扫描**
+- [x] **Step 4: 运行测试、dry-run 和敏感响应扫描**
 
 Run:
 
@@ -479,7 +479,7 @@ rg -n "app\\.get\\('/api/manage/(oauth-url|exchange)|query\\('code'\\)|query\\('
 
 Expected: tests 和 dry-run PASS；最后的 `rg` 无匹配。
 
-- [ ] **Step 5: 勾选任务 2.2 并提交**
+- [x] **Step 5: 勾选任务 2.2 并提交**
 
 ```bash
 git add packages/worker/src/index.ts packages/worker/src/manage/oauth.ts packages/worker/src/manage/security.test.ts openspec/changes/secure-management-api/tasks.md
@@ -500,7 +500,7 @@ git commit -m "feat: secure OAuth exchange and token handling"
 - Consumes: exchange responses `{ access_token, user_id }` or `{ ok: true }`
 - Produces: 页面内存 `pendingOAuth = { purpose, state, nonce, popup } | null`
 
-- [ ] **Step 1: 写管理 HTML 的失败回归测试**
+- [x] **Step 1: 写管理 HTML 的失败回归测试**
 
 创建 `packages/worker/src/manage/index-html.test.mjs`：
 
@@ -536,7 +536,7 @@ test('untrusted values are not assigned through innerHTML', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试并确认现有持久化和 innerHTML 导致失败**
+- [x] **Step 2: 运行测试并确认现有持久化和 innerHTML 导致失败**
 
 Run:
 
@@ -546,7 +546,7 @@ node --test packages/worker/src/manage/index-html.test.mjs
 
 Expected: 4 tests FAIL，报告包含 `sessionStorage`、缺少 popup/origin/state 检查、GET exchange 或 `innerHTML`。
 
-- [ ] **Step 3: 改为只保留页面内存并显式绑定 OAuth 请求**
+- [x] **Step 3: 改为只保留页面内存并显式绑定 OAuth 请求**
 
 在管理页脚本顶部使用：
 
@@ -601,7 +601,7 @@ window.addEventListener('message', async (ev) => {
 手工粘贴回调 URL 必须检查 `url.origin === location.origin` 且
 `url.searchParams.get('state') === pendingOAuth.state`，再调用同一个 `exchangeOAuth`。
 
-- [ ] **Step 4: 将动态结果全部改为 DOM 文本构造**
+- [x] **Step 4: 将动态结果全部改为 DOM 文本构造**
 
 提供三个小 helper，不建立组件框架：
 
@@ -648,7 +648,7 @@ const response = await apiFetch('/api/manage/exchange', {
 
 cron 只以 `data.ok === true` 判断成功；A/B 只把 `data.access_token` 写入内存。每次交换完成后关闭 popup 并将 `pendingOAuth = null`。
 
-- [ ] **Step 5: 运行管理页回归测试和 Worker dry-run**
+- [x] **Step 5: 运行管理页回归测试和 Worker dry-run**
 
 Run:
 
@@ -661,7 +661,7 @@ WRANGLER_LOG_PATH=/tmp/bangumitv-secure-management-wrangler.log ./packages/worke
 
 Expected: 9 个以上测试全部 PASS；Wrangler dry-run 退出码 0。
 
-- [ ] **Step 6: 勾选任务 2.3、2.4、3.1 并提交**
+- [x] **Step 6: 勾选任务 2.3、2.4、3.1 并提交**
 
 ```bash
 git add packages/worker/src/manage/index.html packages/worker/src/manage/index-html.test.mjs openspec/changes/secure-management-api/tasks.md
@@ -680,7 +680,7 @@ git commit -m "feat: harden management OAuth UI"
 - Consumes: 已实现的管理鉴权和 OAuth 流程
 - Produces: 明确的部署前置条件、迁移和回滚说明
 
-- [ ] **Step 1: 更新 README 的强制配置和行为说明**
+- [x] **Step 1: 更新 README 的强制配置和行为说明**
 
 做以下精确修改：
 
@@ -692,7 +692,7 @@ git commit -m "feat: harden management OAuth UI"
 - 环境变量表将 `MANAGE_SECRET` 标为必填 secret。
 - 增加迁移顺序：先配置 secret，再部署，再验证 cron OAuth；回滚代码时不得删除 `bgm:tokens`，并继续保留 secret。
 
-- [ ] **Step 2: 扫描旧的不安全文案**
+- [x] **Step 2: 扫描旧的不安全文案**
 
 Run:
 
@@ -702,7 +702,7 @@ rg -n "MANAGE_SECRET.*可选|未配置则放行|管理页密码保护（推荐�
 
 Expected: 无匹配。
 
-- [ ] **Step 3: 运行全部本地检查**
+- [x] **Step 3: 运行全部本地检查**
 
 Run:
 
@@ -721,7 +721,7 @@ Expected:
 - Wrangler dry-run 输出 `Total Upload` 并退出 0；
 - `git diff --check` 无输出。
 
-- [ ] **Step 4: 执行敏感信息与不安全模式扫描**
+- [x] **Step 4: 执行敏感信息与不安全模式扫描**
 
 Run:
 
@@ -732,7 +732,7 @@ rg -n "\\.innerHTML\\s*=" packages/worker/src/manage/index.html
 
 Expected: 两条命令均无匹配。
 
-- [ ] **Step 5: 勾选任务 3.2，确认所有 OpenSpec 任务完成并提交**
+- [x] **Step 5: 勾选任务 3.2，确认所有 OpenSpec 任务完成并提交**
 
 Run:
 
@@ -749,7 +749,7 @@ git add README.md openspec/changes/secure-management-api/tasks.md
 git commit -m "docs: document secure management deployment"
 ```
 
-- [ ] **Step 6: 记录最终验证证据**
+- [x] **Step 6: 记录最终验证证据**
 
 Run:
 
