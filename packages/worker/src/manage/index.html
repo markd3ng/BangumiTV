@@ -314,6 +314,7 @@ async function beginOAuth(purpose) {
 async function exchangeOAuth(code, signedState, flow) {
   const target = purposeTarget(flow.purpose)
   let nextAction = null
+  let flowIsCurrent = false
   try {
     const response = await apiFetch('/api/manage/exchange', {
       method: 'POST',
@@ -324,6 +325,10 @@ async function exchangeOAuth(code, signedState, flow) {
       return showManageAuthFailure(target)
     }
     const data = await response.json().catch(() => null)
+    flowIsCurrent = pendingOAuth === flow
+    if (!flowIsCurrent) {
+      return
+    }
 
     if (!response.ok) {
       return showError(target, data, 'OAuth 授权失败')
@@ -357,6 +362,7 @@ async function exchangeOAuth(code, signedState, flow) {
       resetPendingOAuth()
     }
   }
+  if (!flowIsCurrent) return
   return nextAction ? nextAction() : undefined
 }
 
