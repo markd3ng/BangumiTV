@@ -208,11 +208,14 @@ function handleManageDenied() {
   setManageLocked(true, '管理操作需要密码，请重新输入。')
 }
 
-async function apiFetch(url, options = {}) {
+async function apiFetch(url, options = {}, control = {}) {
   const headers = new Headers(options.headers || {})
   if (manageSecret) headers.set('X-Manage-Secret', manageSecret)
   const response = await fetch(url, { ...options, headers })
   if (response.status === 401 || response.status === 503) {
+    if (control.deferManageDenied === true) {
+      return response
+    }
     document.getElementById('gate').style.display = 'block'
     handleManageDenied()
     return null
@@ -320,15 +323,20 @@ async function exchangeOAuth(code, signedState, flow) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code, state: signedState }),
-    })
+    }, { deferManageDenied: true })
     if (!response) {
       return showManageAuthFailure(target)
     }
-    const data = await response.json().catch(() => null)
     flowIsCurrent = pendingOAuth === flow
     if (!flowIsCurrent) {
       return
     }
+    if (response.status === 401 || response.status === 503) {
+      document.getElementById('gate').style.display = 'block'
+      handleManageDenied()
+      return showManageAuthFailure(target)
+    }
+    const data = await response.json().catch(() => null)
 
     if (!response.ok) {
       return showError(target, data, 'OAuth 授权失败')

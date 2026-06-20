@@ -241,7 +241,20 @@ async function createManageHarness() {
   context.window.queueMicrotask = queueMicrotask
 
   vm.runInContext(
-    `${script}\n;globalThis.__manageHooks = { beginOAuth, exchangeOAuth, pendingOAuth: () => pendingOAuth, state, oauthStatus, fetchCalls: globalThis.fetchCalls }`,
+    `${script}\n;globalThis.__manageHooks = {
+      beginOAuth,
+      exchangeOAuth,
+      pendingOAuth: () => pendingOAuth,
+      state,
+      oauthStatus,
+      fetchCalls: globalThis.fetchCalls,
+      setManageSecret: value => {
+        manageSecret = value
+        setManageLocked(!value)
+      },
+      manageSecret: () => manageSecret,
+      manageLocked: () => manageLocked,
+    }`,
     context,
   )
 
@@ -251,8 +264,11 @@ async function createManageHarness() {
     pendingOAuth: () => context.__manageHooks.pendingOAuth(),
     state: context.__manageHooks.state,
     oauthStatus: context.__manageHooks.oauthStatus,
+    setManageSecret: value => context.__manageHooks.setManageSecret(value),
+    manageSecret: () => context.__manageHooks.manageSecret(),
+    manageLocked: () => context.__manageHooks.manageLocked(),
     fetchCalls,
-    resolveExchange: data => resolveExchange(jsonResponse(data)),
+    resolveExchange: (data, status = 200) => resolveExchange(jsonResponse(data, status)),
     nodesById,
     allNodes,
   }
@@ -310,6 +326,32 @@ test('stale oauth exchange cannot write token/ui or launch the next flow after a
   assert.equal(harness.state.tokenA, '')
   assert.equal(harness.fetchCalls.filter(call => call.url === '/api/manage/oauth-url').length, 2)
   assert.match(harness.oauthStatus.textContent, /请在弹出窗口完成 .*账号甲 授权/)
+})
+
+test('stale oauth auth failures do not lock or pollute a newer pending flow ui', async () => {
+  for (const status of [401, 503]) {
+    const harness = await createManageHarness()
+    harness.state.userA = '账号甲'
+    harness.state.userB = '账号乙'
+    harness.setManageSecret('top-secret')
+
+    await harness.beginOAuth('account-a')
+    const staleFlow = harness.pendingOAuth()
+    const staleExchange = harness.exchangeOAuth('stale-code', staleFlow.state, staleFlow)
+
+    await harness.beginOAuth('account-a')
+    const currentFlow = harness.pendingOAuth()
+
+    harness.resolveExchange({ error: { code: 'MANAGE_AUTH', message: 'denied' } }, status)
+    await staleExchange
+
+    assert.strictEqual(harness.pendingOAuth(), currentFlow)
+    assert.equal(harness.manageSecret(), 'top-secret')
+    assert.equal(harness.manageLocked(), false)
+    assert.equal(harness.nodesById.get('gate').style.display, 'none')
+    assert.equal(harness.state.tokenA, '')
+    assert.match(harness.oauthStatus.textContent, /请在弹出窗口完成 .*账号甲 授权/)
+  }
 })
 
 test('pending oauth keeps popup state nonce and purpose together', () => {
