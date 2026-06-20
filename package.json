@@ -11,7 +11,13 @@
     "type": "git",
     "url": "git+https://github.com/markd3ng/BangumiTV.git"
   },
-  "keywords": ["bangumi", "anime"],
+  "keywords": [
+    "bangumi",
+    "anime"
+  ],
   "author": "markd3ng",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@fission-ai/openspec": "^1.4.1"
+  }
 }

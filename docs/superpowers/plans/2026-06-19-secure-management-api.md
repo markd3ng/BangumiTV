@@ -2,6 +2,7 @@
 change: secure-management-api
 design-doc: docs/superpowers/specs/2026-06-19-secure-management-api-design.md
 base-ref: 3e346b78f4ca2833b8d6e3956bcbdb36d99c2721
+archived-with: 2026-06-20-secure-management-api
 ---
 
 # Secure Management API Implementation Plan
@@ -26,6 +27,7 @@ base-ref: 3e346b78f4ca2833b8d6e3956bcbdb36d99c2721
 - 外部数据只通过 DOM 文本 API 渲染；服务端响应不包含上游 body、token、code、secret 或堆栈。
 - 不修改 `package.json`、锁文件、工具目录或其他三个 OpenSpec change。
 
+archived-with: 2026-06-20-secure-management-api
 ---
 
 ## File Map

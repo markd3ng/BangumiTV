@@ -17,6 +17,6 @@ verification_report: docs/superpowers/reports/2026-06-21-secure-management-api-v
 branch_status: handled
 created_at: 2026-06-19
 verified_at: 2026-06-20
-archived: false
+archived: true
 handoff_context: openspec/changes/secure-management-api/.comet/handoff/design-context.json
 handoff_hash: 4cf752db3ed79a52efeb8da8a21ca9472e30982112dbbf58314b6f8526689876

@@ -2,6 +2,8 @@
 comet_change: secure-management-api
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-06-20-secure-management-api
+status: final
 ---
 
 # Secure Management API 技术设计
