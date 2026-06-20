@@ -118,6 +118,8 @@ let state = { userA: '', userB: '', tokenA: '', tokenB: '', differences: [] }
 let manageSecret = ''
 let pendingOAuth = null
 let manageLocked = true
+let oauthLaunchGeneration = 0
+let currentOAuthLaunch = null
 const MANAGE_AUTH_FAILURE_MESSAGE = '管理验证失败，请重新输入密码'
 const OAUTH_POPUP_FAILURE_MESSAGE = '授权弹窗打开失败，请稍后重试'
 
@@ -262,37 +264,51 @@ async function beginOAuth(purpose) {
   const target = purposeTarget(purpose)
   const label = purposeUserName(purpose)
   resetPendingOAuth()
+  const launch = { id: ++oauthLaunchGeneration, purpose }
+  currentOAuthLaunch = launch
   showText(target, '正在发起授权...')
 
-  const response = await apiFetch('/api/manage/oauth-url', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ purpose }),
-  })
-  if (!response) {
-    return showManageAuthFailure(target)
-  }
-  const data = await response.json().catch(() => null)
-  if (!response.ok || !data?.url || !data?.state || !data?.nonce) {
-    return showError(target, data, 'OAuth URL 获取失败')
-  }
+  try {
+    const headers = new Headers({ 'Content-Type': 'application/json' })
+    if (manageSecret) headers.set('X-Manage-Secret', manageSecret)
+    const response = await fetch('/api/manage/oauth-url', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ purpose }),
+    })
+    if (currentOAuthLaunch !== launch) return
+    if (response.status === 401 || response.status === 503) {
+      document.getElementById('gate').style.display = 'block'
+      handleManageDenied()
+      return showManageAuthFailure(target)
+    }
 
-  const flow = { purpose, state: data.state, nonce: data.nonce, popup: null, consuming: false }
-  pendingOAuth = flow
-  const popup = window.open(data.url, 'bgm-oauth')
-  if (!popup) {
-    resetPendingOAuth()
-    return showText(target, OAUTH_POPUP_FAILURE_MESSAGE)
-  }
+    const data = await response.json().catch(() => null)
+    if (currentOAuthLaunch !== launch) return
+    if (!response.ok || !data?.url || !data?.state || !data?.nonce) {
+      return showError(target, data, 'OAuth URL 获取失败')
+    }
 
-  flow.popup = popup
-  if (purpose === 'cron') {
-    cronCallbackInput.value = ''
-    cronManual.style.display = 'block'
-  } else {
-    renderAccountManualInput(purpose)
+    const flow = { purpose, state: data.state, nonce: data.nonce, popup: null, consuming: false }
+    pendingOAuth = flow
+    const popup = window.open(data.url, 'bgm-oauth')
+    if (!popup) {
+      resetPendingOAuth()
+      return showText(target, OAUTH_POPUP_FAILURE_MESSAGE)
+    }
+
+    flow.popup = popup
+    if (purpose === 'cron') {
+      cronCallbackInput.value = ''
+      cronManual.style.display = 'block'
+    } else {
+      renderAccountManualInput(purpose)
+    }
+    showText(target, `请在弹出窗口完成 ${label} 授权。若未自动回填，请手动粘贴回调 URL：`)
+  } catch {
+    if (currentOAuthLaunch !== launch) return
+    showError(target, null, 'OAuth URL 获取失败')
   }
-  showText(target, `请在弹出窗口完成 ${label} 授权。若未自动回填，请手动粘贴回调 URL：`)
 }
 
 async function exchangeOAuth(code, signedState, flow) {
@@ -385,6 +401,7 @@ function renderDiffList() {
     const checkbox = document.createElement('input')
     checkbox.type = 'checkbox'
     checkbox.value = String(item.subject_id ?? '')
+    checkbox.setAttribute('data-requires-secret', 'true')
     checkbox.disabled = manageLocked
 
     const info = document.createElement('div')

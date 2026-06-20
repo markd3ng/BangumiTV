@@ -23,11 +23,11 @@ test('gate handling only re-shows password UI for 401 and 503', () => {
   assert.match(html, /document\.getElementById\('gate'\)\.style\.display = 'block'/)
 })
 
-test('oauth url creation uses json post with purpose body', () => {
-  assert.match(html, /apiFetch\('\/api\/manage\/oauth-url',\s*\{/)
-  assert.match(html, /method:\s*'POST'/)
-  assert.match(html, /'Content-Type': 'application\/json'/)
+test('oauth url creation uses a direct json post with purpose body', () => {
+  assert.match(html, /const headers = new Headers\(\{ 'Content-Type': 'application\/json' \}\)/)
+  assert.match(html, /const response = await fetch\('\/api\/manage\/oauth-url', \{/)
   assert.match(html, /body:\s*JSON\.stringify\(\{\s*purpose\s*\}\)/)
+  assert.doesNotMatch(html, /apiFetch\('\/api\/manage\/oauth-url'/)
   assert.doesNotMatch(html, /\/api\/manage\/oauth-url\?/)
 })
 
@@ -93,6 +93,19 @@ test('cron success depends on ok true and account flows only accept access_token
 test('manual oauth controls are marked as requiring the management secret', () => {
   assert.match(html, /input\.setAttribute\('data-requires-secret', 'true'\)/)
   assert.match(html, /button\.setAttribute\('data-requires-secret', 'true'\)/)
+})
+
+test('dynamic difference checkboxes are marked as requiring the management secret', () => {
+  assert.match(html, /checkbox\.setAttribute\('data-requires-secret', 'true'\)/)
+  assert.match(html, /checkbox\.disabled = manageLocked/)
+})
+
+test('oauth-url launches create and verify a current launch before opening a popup', () => {
+  assert.match(html, /let oauthLaunchGeneration = 0/)
+  assert.match(html, /let currentOAuthLaunch = null/)
+  assert.match(html, /currentOAuthLaunch = launch/)
+  assert.match(html, /if \(currentOAuthLaunch !== launch\) return/)
+  assert.match(html, /window\.open\(data\.url,\s*'bgm-oauth'\)/)
 })
 
 test('dynamic data rendering uses dom text apis and no innerHTML', () => {
