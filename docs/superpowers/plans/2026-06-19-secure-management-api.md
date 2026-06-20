@@ -488,7 +488,7 @@ git commit -m "feat: secure OAuth exchange and token handling"
 
 ### Task 4: 管理页内存状态、窗口关联和文本渲染
 
-- [ ] Task 4 complete: 管理页内存状态、窗口关联和文本渲染
+- [x] Task 4 complete: 管理页内存状态、窗口关联和文本渲染
 
 **Files:**
 - Modify: `packages/worker/src/manage/index.html`
