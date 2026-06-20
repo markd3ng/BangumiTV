@@ -670,7 +670,7 @@ git commit -m "feat: harden management OAuth UI"
 
 ### Task 5: 部署文档与完整验证
 
-- [ ] Task 5 complete: 部署文档与完整验证
+- [x] Task 5 complete: 部署文档与完整验证
 
 **Files:**
 - Modify: `README.md`
