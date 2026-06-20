@@ -172,6 +172,11 @@ async function createManageHarness() {
   const exchangePending = new Promise(resolve => {
     resolveExchange = resolve
   })
+  let resolveExchangeJson
+  let markExchangeJsonStarted
+  const exchangeJsonStarted = new Promise(resolve => {
+    markExchangeJsonStarted = resolve
+  })
 
   const context = vm.createContext({
     Headers,
@@ -269,6 +274,21 @@ async function createManageHarness() {
     manageLocked: () => context.__manageHooks.manageLocked(),
     fetchCalls,
     resolveExchange: (data, status = 200) => resolveExchange(jsonResponse(data, status)),
+    resolveExchangeWithDelayedJson: (status = 200) => resolveExchange({
+      ok: status >= 200 && status < 300,
+      status,
+      async json() {
+        markExchangeJsonStarted()
+        return new Promise(resolve => {
+          resolveExchangeJson = resolve
+        })
+      },
+      async text() {
+        return ''
+      },
+    }),
+    exchangeJsonStarted,
+    resolveExchangeJson: data => resolveExchangeJson(data),
     nodesById,
     allNodes,
   }
@@ -320,6 +340,30 @@ test('stale oauth exchange cannot write token/ui or launch the next flow after a
   const currentFlow = harness.pendingOAuth()
 
   harness.resolveExchange({ access_token: 'stale-token' })
+  await staleExchange
+
+  assert.strictEqual(harness.pendingOAuth(), currentFlow)
+  assert.equal(harness.state.tokenA, '')
+  assert.equal(harness.fetchCalls.filter(call => call.url === '/api/manage/oauth-url').length, 2)
+  assert.match(harness.oauthStatus.textContent, /请在弹出窗口完成 .*账号甲 授权/)
+})
+
+test('stale oauth exchange cannot write token ui or launch next flow when json resolves after a new flow starts', async () => {
+  const harness = await createManageHarness()
+  harness.state.userA = '账号甲'
+  harness.state.userB = '账号乙'
+
+  await harness.beginOAuth('account-a')
+  const firstFlow = harness.pendingOAuth()
+  const staleExchange = harness.exchangeOAuth('stale-code', firstFlow.state, firstFlow)
+
+  harness.resolveExchangeWithDelayedJson()
+  await harness.exchangeJsonStarted
+
+  await harness.beginOAuth('account-a')
+  const currentFlow = harness.pendingOAuth()
+
+  harness.resolveExchangeJson({ access_token: 'stale-token' })
   await staleExchange
 
   assert.strictEqual(harness.pendingOAuth(), currentFlow)

@@ -9,6 +9,7 @@ import {
   createOAuthState,
   createHealthFailureLog,
   createManageErrorLog,
+  createSyncFailureLog,
   manageHeaders,
   managePageCsp,
   oauthCallbackHtml,
@@ -97,6 +98,13 @@ test('signed state validates and rejects tampering, expiry, and wrong purpose da
   assert.equal(await verifyOAuthState('secret', created.state + 'x', now), null)
   assert.equal(await verifyOAuthState('secret', created.state, now + 301_000), null)
   assert.equal(await verifyOAuthState('secret', 'x'.repeat(1025), now), null)
+})
+
+test('signed state rejects an expiry beyond five minutes from verification time', async () => {
+  const now = Date.UTC(2026, 5, 19)
+  const created = await createOAuthState('secret', 'account-a', now + 1_000)
+
+  assert.equal(await verifyOAuthState('secret', created.state, now), null)
 })
 
 test('signed state rejects payload with invalid version even when signature is valid', async () => {
@@ -324,6 +332,46 @@ test('health failure logs keep only safe structured fields', () => {
   assert.doesNotMatch(JSON.stringify(log), /message|request|state|code|token|username|last_error/i)
 })
 
+test('sync failure logs keep only fixed structured fields', () => {
+  const log = createSyncFailureLog(
+    'account',
+    namedError('BgmHttpError', 'username=ian access_token=secret upstream body', { status: 502 }),
+    '2026-06-19T00:00:00.000Z',
+  )
+  assert.deepEqual(log, {
+    event: 'sync_failed',
+    phase: 'account',
+    kind: 'BgmHttpError',
+    upstream_status: 502,
+    at: '2026-06-19T00:00:00.000Z',
+  })
+  assert.doesNotMatch(JSON.stringify(log), /message|request|state|code|token|username|body|secret/i)
+
+  const unknown = createSyncFailureLog(
+    'scheduled',
+    namedError('access_token=secret', 'refresh_token=secret'),
+    '2026-06-19T00:00:00.000Z',
+  )
+  assert.equal(unknown.kind, 'Unknown')
+  assert.doesNotMatch(JSON.stringify(unknown), /access_token|refresh_token|secret/i)
+})
+
+test('worker sync logging calls never receive errors usernames or free text', async () => {
+  const [workerSource, cronSource] = await Promise.all([
+    readFile(new URL('../index.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../cron.ts', import.meta.url), 'utf8'),
+  ])
+  const source = `${workerSource}\n${cronSource}`
+
+  assert.match(cronSource, /createSyncFailureLog\('account', s\.reason\)/)
+  assert.match(workerSource, /createSyncFailureLog\('manual', err\)/)
+  assert.match(workerSource, /createSyncFailureLog\('scheduled', err\)/)
+  assert.doesNotMatch(
+    source,
+    /console\.(?:error|warn|log)\([^)]*(?:err|error|reason|user|BANGUMI_USERS)/,
+  )
+})
+
 test('management and callback CSP stay compatible with current inline assets', () => {
   assert.equal(
     managePageCsp(),
@@ -414,7 +462,10 @@ test('worker source keeps health endpoint free of sync:last_error and usernames'
   assert.equal(healthBlock.includes('sync:last_error'), false)
   assert.equal(healthBlock.includes('users:'), false)
   assert.equal(healthBlock.includes('last_error:'), false)
-  assert.match(healthBlock, /console\.error\(JSON\.stringify\(createHealthFailureLog\(err\)\)\)/)
+  assert.match(
+    healthBlock,
+    /const log = createHealthFailureLog\(err\)\s*console\.error\(JSON\.stringify\(log\)\)/,
+  )
   assert.match(healthBlock, /return Response\.json\(\{ ok: false \}/)
 })
 
@@ -456,7 +507,7 @@ test('worker source catches cron token delete failures and maps them safely', as
   assert.match(deleteBlock, /catch \(err\) \{\s*return errorToResponse\('\/api\/manage\/cron-token', err\)/)
 })
 
-test('callback reads code and state from query, posts to current origin, and closes window', () => {
+test('callback with opener posts code and state to current origin then closes window', () => {
   const html = oauthCallbackHtml()
   assert.match(html, /location\.origin/)
   assert.doesNotMatch(html, /postMessage\([^)]*,\s*["']\*["']/)
@@ -493,4 +544,37 @@ test('callback reads code and state from query, posts to current origin, and clo
   })
   assert.equal(calls[0]?.targetOrigin, 'https://worker.example')
   assert.equal(closed, true)
+})
+
+test('callback without opener stays open and shows a fixed manual copy prompt', () => {
+  const html = oauthCallbackHtml()
+  const scriptMatch = html.match(/<script>([\s\S]*?)<\/script>/)
+  assert.ok(scriptMatch, 'expected callback html to contain inline script')
+
+  const fallback = { hidden: true, textContent: 'OAuth 回调已完成。请复制地址栏中的完整 URL，返回管理页手动粘贴。' }
+  let closed = false
+
+  vm.runInNewContext(scriptMatch[1], {
+    URLSearchParams,
+    location: {
+      search: '?code=sensitive-code&state=sensitive-state',
+      origin: 'https://worker.example',
+    },
+    document: {
+      getElementById(id: string) {
+        return id === 'manual-copy' ? fallback : null
+      },
+    },
+    window: {
+      opener: null,
+      close() {
+        closed = true
+      },
+    },
+  })
+
+  assert.equal(closed, false)
+  assert.equal(fallback.hidden, false)
+  assert.equal(fallback.textContent, 'OAuth 回调已完成。请复制地址栏中的完整 URL，返回管理页手动粘贴。')
+  assert.doesNotMatch(fallback.textContent, /sensitive-code|sensitive-state/)
 })

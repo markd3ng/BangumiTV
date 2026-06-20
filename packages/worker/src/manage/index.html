@@ -337,6 +337,9 @@ async function exchangeOAuth(code, signedState, flow) {
       return showManageAuthFailure(target)
     }
     const data = await response.json().catch(() => null)
+    if (pendingOAuth !== flow) {
+      return
+    }
 
     if (!response.ok) {
       return showError(target, data, 'OAuth 授权失败')

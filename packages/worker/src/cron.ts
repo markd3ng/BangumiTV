@@ -2,6 +2,7 @@ import { BgmClient } from '@bangumi-tv/shared'
 import { merge, primaryMerge, type MergedCollections } from '@bangumi-tv/shared'
 import type { StorageAdapter } from '@bangumi-tv/shared'
 import { fetchAllCollections } from '@bangumi-tv/shared'
+import { createSyncFailureLog } from './manage/security'
 
 /**
  * Token 持久化结构（存于 KV）。
@@ -121,7 +122,8 @@ export async function runSync(
   const settled = await Promise.allSettled(env.BANGUMI_USERS.map((u) => fetchAllCollections(client, u)))
   const allCollections = settled.map((s, i) => {
     if (s.status === 'rejected') {
-      console.warn(`sync: user ${env.BANGUMI_USERS[i]} failed:`, s.reason)
+      const log = createSyncFailureLog('account', s.reason)
+      console.warn(JSON.stringify(log))
       return [] as Awaited<ReturnType<typeof fetchAllCollections>>
     }
     return s.value

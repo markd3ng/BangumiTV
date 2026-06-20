@@ -21,12 +21,28 @@ export interface HealthFailureLog {
   at: string
 }
 
+export interface SyncFailureLog {
+  event: 'sync_failed'
+  phase: 'account' | 'manual' | 'scheduled'
+  kind: string
+  upstream_status: number | undefined
+  at: string
+}
+
 const STATE_TTL_SECONDS = 300
 const STATE_MAX_LENGTH = 1024
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 const purposes = new Set<OAuthPurpose>(['account-a', 'account-b', 'cron'])
 const noncePattern = /^[A-Za-z0-9_-]{22}$/
+const safeErrorKinds = new Set([
+  'BgmHttpError',
+  'BgmTimeoutError',
+  'BgmNetworkError',
+  'SyntaxError',
+  'TypeError',
+  'Error',
+])
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -39,6 +55,19 @@ function nonBlankString(value: unknown): string | null {
   if (typeof value !== 'string') return null
   const trimmed = value.trim()
   return trimmed ? trimmed : null
+}
+
+function safeErrorKind(err: unknown): string {
+  return err instanceof Error && safeErrorKinds.has(err.name) ? err.name : 'Unknown'
+}
+
+function upstreamStatus(err: unknown): number | undefined {
+  return typeof err === 'object' &&
+    err !== null &&
+    'status' in err &&
+    typeof (err as { status?: unknown }).status === 'number'
+    ? (err as { status: number }).status
+    : undefined
 }
 
 function base64url(bytes: Uint8Array): string {
@@ -141,7 +170,11 @@ export async function verifyOAuthState(
     if (payload.v !== 1) return null
     if (!noncePattern.test(payload.nonce ?? '')) return null
     if (!purposes.has(payload.purpose as OAuthPurpose)) return null
-    if (!Number.isInteger(payload.exp) || payload.exp <= nowSeconds) return null
+    if (
+      !Number.isInteger(payload.exp) ||
+      payload.exp <= nowSeconds ||
+      payload.exp > nowSeconds + STATE_TTL_SECONDS
+    ) return null
 
     return {
       v: 1,
@@ -234,14 +267,8 @@ export function createManageErrorLog(
   return {
     event: 'manage_request_failed',
     route,
-    kind: err instanceof Error ? err.name : 'Unknown',
-    upstream_status:
-      typeof err === 'object' &&
-      err !== null &&
-      'status' in err &&
-      typeof (err as { status?: unknown }).status === 'number'
-        ? (err as { status: number }).status
-        : undefined,
+    kind: safeErrorKind(err),
+    upstream_status: upstreamStatus(err),
     at,
   }
 }
@@ -252,7 +279,21 @@ export function createHealthFailureLog(
 ): HealthFailureLog {
   return {
     event: 'health_failed',
-    kind: err instanceof Error ? err.name : 'Unknown',
+    kind: safeErrorKind(err),
+    at,
+  }
+}
+
+export function createSyncFailureLog(
+  phase: SyncFailureLog['phase'],
+  err: unknown,
+  at = new Date().toISOString(),
+): SyncFailureLog {
+  return {
+    event: 'sync_failed',
+    phase,
+    kind: safeErrorKind(err),
+    upstream_status: upstreamStatus(err),
     at,
   }
 }
@@ -265,12 +306,17 @@ export function oauthCallbackHtml(): string {
     <title>OAuth Callback</title>
   </head>
   <body>
+    <p id="manual-copy" hidden>OAuth 回调已完成。请复制地址栏中的完整 URL，返回管理页手动粘贴。</p>
     <script>
       const params = new URLSearchParams(location.search)
       const code = params.get('code')
       const state = params.get('state')
-      window.opener?.postMessage({ type: 'bgm-oauth', code, state }, location.origin)
-      window.close()
+      if (window.opener) {
+        window.opener.postMessage({ type: 'bgm-oauth', code, state }, location.origin)
+        window.close()
+      } else {
+        document.getElementById('manual-copy').hidden = false
+      }
     </script>
   </body>
 </html>`

@@ -20,6 +20,7 @@ import {
   createOAuthState,
   createHealthFailureLog,
   createManageErrorLog,
+  createSyncFailureLog,
   manageHeaders,
   managePageCsp,
   oauthCallbackHtml,
@@ -30,7 +31,8 @@ import {
 } from './manage/security'
 
 function errorToResponse(route: string, err: unknown): Response {
-  console.error(JSON.stringify(createManageErrorLog(route, err)))
+  const log = createManageErrorLog(route, err)
+  console.error(JSON.stringify(log))
 
   if (err instanceof BgmHttpError) {
     if (err.status === 401 || err.status === 403) {
@@ -131,7 +133,8 @@ app.get('/api/health', async (c) => {
       },
     })
   } catch (err) {
-    console.error(JSON.stringify(createHealthFailureLog(err)))
+    const log = createHealthFailureLog(err)
+    console.error(JSON.stringify(log))
     return Response.json({ ok: false }, { status: 500 })
   }
 })
@@ -273,7 +276,8 @@ app.post('/__cron/sync', async (c) => {
     await storage.delete('sync:last_error')
     return new Response('OK', { status: 200 })
   } catch (err) {
-    console.error('Sync error:', err)
+    const log = createSyncFailureLog('manual', err)
+    console.error(JSON.stringify(log))
     await storage.put('sync:last_error', err instanceof Error ? err.message : String(err))
     return new Response('Sync failed', { status: 500 })
   }
@@ -297,7 +301,8 @@ async function scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext
       await storage.put('sync:last_success', new Date().toISOString())
       await storage.delete('sync:last_error')
     }).catch(async (err) => {
-      console.error('Scheduled sync error:', err)
+      const log = createSyncFailureLog('scheduled', err)
+      console.error(JSON.stringify(log))
       await storage.put('sync:last_error', err instanceof Error ? err.message : String(err))
     }),
   )
