@@ -49,7 +49,7 @@
    | `CF_API_TOKEN` | Cloudflare API Token（见上方「Cloudflare API Token 权限配置」） |
    | `CF_ACCOUNT_ID` | Cloudflare 账户 ID（Dashboard 右侧栏可见） |
    | `CRON_SECRET` | 自定义随机字符串（手动触发 `POST /__cron/sync` 认证用） |
-   | `MANAGE_SECRET` | 可选。管理页写操作密码，强烈建议配置 |
+   | `MANAGE_SECRET` | 必填。管理 API 的共享密码；未配置时管理 API 返回 503 |
 
    **Variables:**
    | 名称 | 说明 |
@@ -98,9 +98,9 @@
 
 1. 弹出 bgm.tv 授权页，登录并用你要展示其追番的账号授权；
 2. 授权后跳转回 `/manage/callback`，把浏览器地址栏完整的回调 URL 复制粘贴到输入框，点「确认」；
-3. 页面提示「✓ 已授权并保存」即成功——token 对已写入 KV，Worker 会自动续期，**无需每 7 天人工操作**。
+3. 页面提示「✓ 已授权并保存」即成功。浏览器只看到成功状态；`access_token` / `refresh_token` 由 Worker 直接写入 `bgm:tokens`，Worker 会自动续期，**无需每 7 天人工操作**。
 
-> **为什么不用手动配 `BANGUMI_TOKEN`？** Workers 的 secret 运行时只读，无法写回刷新后的 token；把 token 存进 KV 后，cron 在 token 过期时会自动用 refresh_token 续期并把新的一对写回 KV，形成闭环。`BANGUMI_TOKEN` / `BANGUMI_REFRESH_TOKEN` 这两个 secret 现为**可选的冷启动种子**——若你不想用管理页面授权，也可手动换一次 token 填进去作为首次种子，之后仍由 KV 接管续期。
+> **为什么不用手动配 `BANGUMI_TOKEN`？** Workers 的 secret 运行时只读，无法写回刷新后的 token；把 token 存进 KV 后，cron 在 token 过期时会自动用 refresh_token 续期并把新的一对写回 KV，形成闭环。
 
 #### 4. 触发首次同步
 
@@ -130,12 +130,12 @@ curl -X POST -H "X-Cron-Secret: <CRON_SECRET>" https://<WORKER_DOMAIN>/__cron/sy
 
 访问 `https://<worker>/manage`：
 
-- **Cron 同步账号授权**（顶部）：一键授权 cron 同步用的账号，token 自动存入 KV 并由 Worker 自动续期；可点「清除已存 token」重新授权。
+- **Cron 同步账号授权**（顶部）：一键授权 cron 同步用的账号，浏览器只显示成功状态，token 由 Worker 写入 KV 的 `bgm:tokens` 并自动续期；可点「清除已存 token」重新授权。你在当前页面输入的管理密码只保存在内存里，刷新后需要重新输入。
 - **多账户同步**：输入两个 bgm.tv 用户名 → 依次 OAuth 授权 → 选择完整同步或部分同步 → 执行。
 
 OAuth 授权后回调页会自动把 code 回填到管理页（弹窗模式）；若浏览器拦截了弹窗或自动回填失败，也可手动复制回调 URL 粘贴。
 
-> **管理页密码保护（推荐）：** 配置 `MANAGE_SECRET` 后，管理页的写操作（授权、比对、同步、清除 token）会要求输入该密码。未配置则放行。
+> **管理页密码保护：** `MANAGE_SECRET` 是管理 API 的必填共享密码。管理页的写操作（授权、比对、同步、清除 token）都会要求输入该密码；未配置时管理 API 返回 503。
 
 ## 本地开发
 
@@ -158,7 +158,7 @@ BANGUMI_PRIMARY_USER=user1
 BANGUMI_CLIENT_ID=你的_client_id
 BANGUMI_CLIENT_SECRET=你的_client_secret
 CRON_SECRET=任意字符串
-MANAGE_SECRET=可选的管理密码
+MANAGE_SECRET=本地管理密码
 SYNC_MODE=merge
 NSFW_SHOW=true
 ```
@@ -178,9 +178,14 @@ NSFW_SHOW=true
 | `BANGUMI_CLIENT_ID` | secret | OAuth App client_id |
 | `BANGUMI_CLIENT_SECRET` | secret | OAuth App client_secret |
 | `CRON_SECRET` | secret | 手动触发 `POST /__cron/sync` 的认证密钥（定时 cron 无需） |
-| `MANAGE_SECRET` | secret | 可选。管理页写操作密码；配置后 `/manage` 的授权/比对/同步需带此密码 |
+| `MANAGE_SECRET` | secret | 必填。管理页写操作密码；未配置时管理 API 返回 503 |
 
 > GitHub 中：标 **var** 的配在 Settings → Secrets and variables → Actions → **Variables**；标 **secret** 的配在 **Secrets**。
+
+### 迁移与回滚
+
+- 迁移顺序：先在部署环境配置 `MANAGE_SECRET`，再部署代码，最后验证 `/manage` 的 cron OAuth 授权与首次同步。
+- 回滚代码时：保留 `MANAGE_SECRET`，并继续保留 `bgm:tokens` 里的 token；不要在回滚里删除 secret 或清空 KV token，否则后续 cron 需要重新授权。
 
 ## 感谢
 
