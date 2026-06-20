@@ -13,27 +13,43 @@ import { handleImage } from './image/proxy'
 import manageHtml from './manage/index.html'
 import { INDEX_HTML, BANGUMI_JS, BANGUMI_CSS } from './assets'
 import { BgmHttpError, BgmTimeoutError, BgmNetworkError } from '@bangumi-tv/shared'
+import type { OAuthPurpose } from './manage/security'
+import {
+  authorizeManageRequest,
+  callbackPageCsp,
+  createOAuthState,
+  createHealthFailureLog,
+  createManageErrorLog,
+  createSyncFailureLog,
+  manageHeaders,
+  managePageCsp,
+  oauthCallbackHtml,
+  parseOAuthExchangeBody,
+  parseOAuthPurposeBody,
+  publicError,
+  verifyOAuthState,
+} from './manage/security'
 
-function errorToResponse(err: unknown): Response {
+function errorToResponse(route: string, err: unknown): Response {
+  const log = createManageErrorLog(route, err)
+  console.error(JSON.stringify(log))
+
   if (err instanceof BgmHttpError) {
-    const status = err.status === 401 || err.status === 403 ? 401 : 502
-    return Response.json({
-      error: { code: 'BGM_HTTP_ERROR', message: err.message, status: err.status }
-    }, { status })
+    if (err.status === 401 || err.status === 403) {
+      return publicError(401, 'BGM_AUTH', err)
+    }
+    return publicError(502, 'BGM_UPSTREAM', err)
   }
   if (err instanceof BgmTimeoutError) {
-    return Response.json({
-      error: { code: 'BGM_TIMEOUT', message: err.message }
-    }, { status: 504 })
+    return publicError(504, 'BGM_TIMEOUT', err)
   }
   if (err instanceof BgmNetworkError) {
-    return Response.json({
-      error: { code: 'BGM_NETWORK', message: err.message }
-    }, { status: 502 })
+    return publicError(502, 'BGM_UPSTREAM', err)
   }
-  return Response.json({
-    error: { code: 'UNKNOWN', message: err instanceof Error ? err.message : String(err) }
-  }, { status: 500 })
+  if (err instanceof SyntaxError) {
+    return publicError(400, 'INVALID_REQUEST', err)
+  }
+  return publicError(500, 'REQUEST_FAILED', err)
 }
 
 interface Env {
@@ -53,12 +69,11 @@ interface Env {
 
 const app = new Hono<{ Bindings: Env }>()
 
-// CORS：使用 hono/cors 中间件，确保头会落到真实响应上（含 OPTIONS 预检）。
-app.use('*', cors({
-  origin: '*',
-  allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'X-Manage-Secret'],
-}))
+const publicCors = cors({ origin: '*', allowMethods: ['GET', 'OPTIONS'] })
+app.use('/api/collections', publicCors)
+app.use('/api/calendar', publicCors)
+app.use('/api/config', publicCors)
+app.use('/api/health', publicCors)
 
 /** 统计各收藏分类条目数，供 health/排障 使用。 */
 function summarize(merged: any) {
@@ -108,20 +123,19 @@ app.get('/api/health', async (c) => {
   try {
     const merged = await storage.get('collections:merged')
     const calendar = await storage.get('calendar')
-    const lastError = await storage.get<string>('sync:last_error')
     const lastSuccess = await storage.get<string>('sync:last_success')
     return Response.json({
       ok: true,
       data: {
         collections: merged ? { updated_at: (merged as any).updated_at, types: summarize(merged) } : null,
         calendar: calendar ? (calendar as any[]).length + ' days' : null,
-        users: c.env.BANGUMI_USERS,
         last_sync: lastSuccess || null,
-        last_error: lastError || null,
       },
     })
   } catch (err) {
-    return Response.json({ ok: false, error: String(err) }, { status: 500 })
+    const log = createHealthFailureLog(err)
+    console.error(JSON.stringify(log))
+    return Response.json({ ok: false }, { status: 500 })
   }
 })
 
@@ -132,83 +146,90 @@ app.get('/image/*', (c) => {
 
 // 管理页面
 app.get('/manage', () => {
-  return new Response(manageHtml, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+  return new Response(manageHtml, {
+    headers: {
+      ...manageHeaders(managePageCsp()),
+      'Content-Type': 'text/html; charset=utf-8',
+    },
+  })
 })
 
 app.get('/manage/callback', () => {
-  // 把 code 与 state 回传给打开它的 /manage 父窗口，再自动关闭。
-  const html = '<html><body><script>' +
-    'var p=new URLSearchParams(location.search);' +
-    'try{window.opener.postMessage({type:"bgm-oauth",code:p.get("code"),state:p.get("state")},"*");}catch(e){}' +
-    'window.close();' +
-    '</script>' +
-    '<noscript>请复制本页地址栏完整 URL，粘贴回管理页面。</noscript>' +
-    '</body></html>'
-  return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+  return new Response(oauthCallbackHtml(), {
+    headers: {
+      ...manageHeaders(callbackPageCsp()),
+      'Content-Type': 'text/html; charset=utf-8',
+    },
+  })
 })
 
-app.get('/api/manage/oauth-url', (c) => {
-  const clientId = c.env.BANGUMI_CLIENT_ID || ''
-  if (!clientId) return Response.json({ error: 'BANGUMI_CLIENT_ID not configured' }, { status: 500 })
+app.use('/api/manage/*', async (c, next) => {
+  const denied = await authorizeManageRequest(c.req.raw, c.env.MANAGE_SECRET)
+  if (denied) return denied
+  await next()
+  for (const [name, value] of Object.entries(manageHeaders())) {
+    c.header(name, String(value))
+  }
+})
+
+app.post('/api/manage/oauth-url', async (c) => {
+  const purpose: OAuthPurpose | null = parseOAuthPurposeBody(await c.req.json().catch(() => null))
+  if (!purpose) {
+    return publicError(400, 'INVALID_REQUEST')
+  }
+  if (!c.env.BANGUMI_CLIENT_ID) return publicError(503, 'OAUTH_NOT_CONFIGURED')
+  const created = await createOAuthState(c.env.MANAGE_SECRET!, purpose)
   const redirectUri = `${new URL(c.req.url).origin}/manage/callback`
-  const state = c.req.query('state') || ''
-  return Response.json({ url: getOAuthRedirectUrl(clientId, redirectUri, state) })
+  return Response.json({
+    url: getOAuthRedirectUrl(c.env.BANGUMI_CLIENT_ID, redirectUri, created.state),
+    state: created.state,
+    nonce: created.nonce,
+  })
 })
 
-// 管理写操作鉴权：若设置了 MANAGE_SECRET，则所有 /api/manage/* 写端点
-// （exchange/compare/sync/cron-token）必须带匹配的 X-Manage-Secret 头。
-// oauth-url 仅构造跳转 URL、不接触敏感数据，故不强制。
-function requireManageSecret(c: { env: Env; req: { header(n: string): string | undefined } }): Response | null {
-  if (!c.env.MANAGE_SECRET) return null // 未配置则放行（向后兼容）
-  const provided = c.req.header('X-Manage-Secret')
-  if (provided && provided === c.env.MANAGE_SECRET) return null
-  return Response.json({ error: 'Unauthorized' }, { status: 401 })
-}
+app.post('/api/manage/exchange', async (c) => {
+  const body = parseOAuthExchangeBody(await c.req.json().catch(() => null))
+  if (!body) return publicError(400, 'INVALID_REQUEST')
+  const state = await verifyOAuthState(c.env.MANAGE_SECRET!, body.state)
+  if (!state) return publicError(400, 'INVALID_OAUTH_STATE')
+  if (!c.env.BANGUMI_CLIENT_ID || !c.env.BANGUMI_CLIENT_SECRET) {
+    return publicError(503, 'OAUTH_NOT_CONFIGURED')
+  }
 
-app.get('/api/manage/exchange', async (c) => {
-  const gate = requireManageSecret(c)
-  if (gate) return gate
-  const code = c.req.query('code') || ''
-  const persistCron = c.req.query('cron') === '1'
   try {
     const result = await exchangeCode(
-      c.env.BANGUMI_CLIENT_ID || '',
-      c.env.BANGUMI_CLIENT_SECRET || '',
-      code,
+      c.env.BANGUMI_CLIENT_ID,
+      c.env.BANGUMI_CLIENT_SECRET,
+      body.code,
       `${new URL(c.req.url).origin}/manage/callback`,
     )
-    // 授权为 cron 同步用：把 token 对持久化进 KV，cron 自动复用与续期，
-    // 无需在 GitHub 配置 BANGUMI_TOKEN/BANGUMI_REFRESH_TOKEN。
-    if (persistCron) {
+    if (state.purpose === 'cron') {
       const storage = new KVStorage(c.env.BANGUMI_KV)
       await storage.put('bgm:tokens', {
         access_token: result.access_token,
         refresh_token: result.refresh_token,
       })
+      return Response.json({ ok: true })
     }
-    return Response.json(result)
+    return Response.json({ access_token: result.access_token, user_id: result.user_id })
   } catch (err) {
-    return errorToResponse(err)
+    return errorToResponse('/api/manage/exchange', err)
   }
 })
 
 app.post('/api/manage/compare', async (c) => {
-  const gate = requireManageSecret(c)
-  if (gate) return gate
-  const body = await c.req.json()
   try {
+    const body = await c.req.json()
     const result = await compareAccounts(body.tokenA || '', body.userA || '', body.tokenB || '', body.userB || '')
     return Response.json(result)
   } catch (err) {
-    return errorToResponse(err)
+    return errorToResponse('/api/manage/compare', err)
   }
 })
 
 app.post('/api/manage/sync', async (c) => {
-  const gate = requireManageSecret(c)
-  if (gate) return gate
-  const body = await c.req.json()
   try {
+    const body = await c.req.json()
     const results = await executeSync(body.tokenA, body.from, body.tokenB, body.to, {
       mode: body.mode,
       from: body.from,
@@ -217,22 +238,19 @@ app.post('/api/manage/sync', async (c) => {
     })
     return Response.json(results)
   } catch (err) {
-    return errorToResponse(err)
+    return errorToResponse('/api/manage/sync', err)
   }
 })
 
 // 清除 KV 中持久化的 cron token（重新授权前调用）。
 app.delete('/api/manage/cron-token', async (c) => {
-  const gate = requireManageSecret(c)
-  if (gate) return gate
   const storage = new KVStorage(c.env.BANGUMI_KV)
-  await storage.delete('bgm:tokens')
-  return Response.json({ ok: true })
-})
-
-// 非破坏性探测：管理页是否启用了 MANAGE_SECRET 密码保护。
-app.get('/api/manage/gate', (c) => {
-  return Response.json({ gated: !!c.env.MANAGE_SECRET })
+  try {
+    await storage.delete('bgm:tokens')
+    return Response.json({ ok: true })
+  } catch (err) {
+    return errorToResponse('/api/manage/cron-token', err)
+  }
 })
 
 // HTTP 触发的手动同步（需要密钥）。
@@ -258,7 +276,8 @@ app.post('/__cron/sync', async (c) => {
     await storage.delete('sync:last_error')
     return new Response('OK', { status: 200 })
   } catch (err) {
-    console.error('Sync error:', err)
+    const log = createSyncFailureLog('manual', err)
+    console.error(JSON.stringify(log))
     await storage.put('sync:last_error', err instanceof Error ? err.message : String(err))
     return new Response('Sync failed', { status: 500 })
   }
@@ -282,7 +301,8 @@ async function scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext
       await storage.put('sync:last_success', new Date().toISOString())
       await storage.delete('sync:last_error')
     }).catch(async (err) => {
-      console.error('Scheduled sync error:', err)
+      const log = createSyncFailureLog('scheduled', err)
+      console.error(JSON.stringify(log))
       await storage.put('sync:last_error', err instanceof Error ? err.message : String(err))
     }),
   )

@@ -47,8 +47,13 @@ export async function executeSync(
       }
       await client.patchCollection(toToken, entry.subject_id, body)
       results.push({ subject_id: entry.subject_id, name: entry.subject?.name_cn || entry.subject?.name || String(entry.subject_id), status: 'ok' })
-    } catch (err) {
-      results.push({ subject_id: entry.subject_id, name: entry.subject?.name_cn || entry.subject?.name || String(entry.subject_id), status: 'error', error: String(err) })
+    } catch {
+      results.push({
+        subject_id: entry.subject_id,
+        name: entry.subject?.name_cn || entry.subject?.name || String(entry.subject_id),
+        status: 'error',
+        error: '同步失败，请稍后重试',
+      })
     }
     await new Promise(r => setTimeout(r, 200))
   }

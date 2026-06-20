@@ -38,7 +38,7 @@ export async function compareAccounts(
     if (settled.status === 'fulfilled') {
       return { name, collections: settled.value, total: settled.value.length }
     }
-    return { name, collections: [] as BgmCollection[], total: 0, error: formatError(settled.reason) }
+    return { name, collections: [] as BgmCollection[], total: 0, error: '获取收藏失败，请稍后重试' }
   }
 
   const colA = unwrap(settledA, userA)
@@ -118,9 +118,4 @@ export async function compareAccounts(
     common: [...allIds].filter(id => mapA.has(id) && mapB.has(id)).length,
     differences,
   }
-}
-
-function formatError(err: unknown): string {
-  if (err instanceof Error) return err.message
-  return String(err)
 }
