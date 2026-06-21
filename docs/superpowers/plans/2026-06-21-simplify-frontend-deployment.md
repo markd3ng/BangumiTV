@@ -57,7 +57,7 @@ git commit -m "feat: extend Wrangler Text rules to cover .css and .js"
 - Modify: `public/index.html`
 - Modify: `public/src/bangumi.css`
 
-- [ ] **Step 1: 修复 index.html 中的占位域名**
+- [x] **Step 1: 修复 index.html 中的占位域名**
 
 `public/index.html` 当前包含硬编码占位符：
 
@@ -82,7 +82,7 @@ git commit -m "feat: extend Wrangler Text rules to cover .css and .js"
 
 前端 JS 中 `config.apiUrl || window.location.origin` 会自动回退到当前 origin。
 
-- [ ] **Step 2: 修复 bangumi.css 缺失的 selector 前缀**
+- [x] **Step 2: 修复 bangumi.css 缺失的 selector 前缀**
 
 `public/src/bangumi.css` 第 1 行以 `  width: 100%;` 开头，缺少容器选择器。补充 `.bgm-container {`：
 
@@ -93,7 +93,7 @@ git commit -m "feat: extend Wrangler Text rules to cover .css and .js"
 }
 ```
 
-- [ ] **Step 3: 提交**
+- [x] **Step 3: 提交**
 
 ```bash
 git add public/index.html public/src/bangumi.css
