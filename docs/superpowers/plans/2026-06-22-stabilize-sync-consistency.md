@@ -1326,7 +1326,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/worker/src/index.ts
 
 ---
 
-- [ ] **Step 1: 更新 manage/index.html UI 文案**
+- [x] **Step 1: 更新 manage/index.html UI 文案**
 
 修改 `packages/worker/src/manage/index.html`：
 
@@ -1350,7 +1350,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/worker/src/index.ts
 <button id="partial-sync-toggle" data-requires-secret="true">选择复制</button>
 ```
 
-- [ ] **Step 2: 更新同步状态显示逻辑**
+- [x] **Step 2: 更新同步状态显示逻辑**
 
 在 index.html 的 `<script>` 中，找到 `doSync` 函数相关区域，添加结构化错误显示（设计文档要求的 `sync:last_error` 升级为结构化对象）。
 
@@ -1376,7 +1376,7 @@ async function showSyncStatus() {
 }
 ```
 
-- [ ] **Step 3: 在 security.ts 中添加 SyncErrorLog 类型**
+- [x] **Step 3: 在 security.ts 中添加 SyncErrorLog 类型**
 
 ```typescript
 export interface SyncErrorLog {
@@ -1388,7 +1388,7 @@ export interface SyncErrorLog {
 
 添加到 `packages/worker/src/manage/security.ts`，在 `SyncFailureLog` 接口之后。
 
-- [ ] **Step 4: 运行现有测试检查无回归**
+- [x] **Step 4: 运行现有测试检查无回归**
 
 ```bash
 cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types packages/worker/src/manage/security.test.ts && node --experimental-strip-types packages/worker/src/manage/index-html.test.mjs
@@ -1396,7 +1396,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types pack
 
 预期输出：所有测试 PASS。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/worker/src/manage/index.html packages/worker/src/manage/security.ts && git commit -m "feat(manage): 更新 UI 语义 (全部复制/选择复制) + SyncErrorLog 类型"
