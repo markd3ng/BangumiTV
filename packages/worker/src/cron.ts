@@ -3,6 +3,8 @@ import { merge, primaryMerge, type MergedCollections } from '@bangumi-tv/shared'
 import type { StorageAdapter } from '@bangumi-tv/shared'
 import { fetchAllCollections } from '@bangumi-tv/shared'
 import type { SyncSnapshot, SyncSnapshotMeta } from './storage/snapshot.ts'
+import { downloadImagesWithLimit, type DownloadEntry } from './image/download.ts'
+import type { ImageStore } from './image/store.ts'
 
 // ── 类型 ──
 
@@ -113,7 +115,7 @@ function transformCalendar(raw: Awaited<ReturnType<BgmClient['getCalendar']>>) {
 
 export async function runSync(
   storage: StorageAdapter,
-  _imageStore: unknown,
+  imageStore: ImageStore,
   env: {
     BANGUMI_TOKEN: string
     BANGUMI_REFRESH_TOKEN?: string
@@ -170,6 +172,38 @@ export async function runSync(
       s.status === 'fulfilled' ? s.value : ([] as Awaited<ReturnType<typeof fetchAllCollections>>),
     )
     merged = merge(allCollections)
+  }
+
+  // 3.5 图片下载：收集所有有封面的条目，限流下载并写入 R2
+  const imageEntries: DownloadEntry[] = []
+  for (const collections of settled) {
+    if (collections.status !== 'fulfilled') continue
+    for (const c of collections.value) {
+      if (c.subject?.images?.large) {
+        imageEntries.push({ url: c.subject.images.large, subjectId: c.subject_id })
+      }
+    }
+  }
+  const imageHashMap = imageEntries.length > 0
+    ? await downloadImagesWithLimit(imageEntries, imageStore, client)
+    : undefined
+
+  // 3.6 带图片 hash 重新合并
+  if (env.SYNC_MODE === 'primary' && env.BANGUMI_PRIMARY_USER) {
+    // Primary 模式：重新合并（已有 merged from primaryMerge）
+    const idx = env.BANGUMI_USERS.indexOf(env.BANGUMI_PRIMARY_USER)
+    const primaryResult = settled[idx as number]
+    if (primaryResult?.status === 'fulfilled' && primaryResult.value.length > 0) {
+      merged = primaryMerge(primaryResult.value, imageHashMap)
+    }
+  } else {
+    const anySuccess = settled.some((s) => s.status === 'fulfilled')
+    if (anySuccess) {
+      const allCollections = settled.map((s) =>
+        s.status === 'fulfilled' ? s.value : ([] as Awaited<ReturnType<typeof fetchAllCollections>>),
+      )
+      merged = merge(allCollections, imageHashMap)
+    }
   }
 
   // 4. 拉取日历
