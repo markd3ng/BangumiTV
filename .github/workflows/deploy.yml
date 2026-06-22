@@ -25,19 +25,28 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: latest
+          version: 9.15.9
 
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: 'pnpm'
 
-      - run: pnpm install
+      - run: pnpm install --frozen-lockfile
 
       - name: Configure Wrangler env
         run: |
           echo "CLOUDFLARE_API_TOKEN=${{ secrets.CF_API_TOKEN }}" >> "$GITHUB_ENV"
           echo "CLOUDFLARE_ACCOUNT_ID=${{ secrets.CF_ACCOUNT_ID }}" >> "$GITHUB_ENV"
+
+      - name: TypeCheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build Check
+        run: pnpm run build:check
 
       # 幂等创建资源：已存在时忽略。
       - name: Provision Cloudflare resources
