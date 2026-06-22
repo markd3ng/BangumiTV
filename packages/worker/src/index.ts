@@ -8,6 +8,8 @@ import { handleConfig } from './api/config'
 import { runSync } from './cron'
 import { compareAccounts } from './manage/compare'
 import { executeSync } from './manage/sync-write'
+import { getSyncLockStub } from './sync-lock'
+import type { AcquireResponse } from './sync-lock'
 import { getOAuthRedirectUrl, exchangeCode } from './manage/oauth'
 import { handleImage } from './image/proxy'
 import manageHtml from './manage/index.html'
@@ -238,7 +240,7 @@ app.post('/api/manage/sync', async (c) => {
       from: body.from,
       to: body.to,
       subject_ids: body.subject_ids,
-    })
+    }, c.env as { SYNCLOCK: DurableObjectNamespace })
     return Response.json(results)
   } catch (err) {
     return errorToResponse('/api/manage/sync', err)
@@ -260,6 +262,14 @@ app.delete('/api/manage/cron-token', async (c) => {
 app.post('/__cron/sync', async (c) => {
   const secret = c.req.header('X-Cron-Secret')
   if (secret !== c.env.CRON_SECRET) return new Response('Unauthorized', { status: 401 })
+
+  // 获取同步锁
+  const lockStub = getSyncLockStub(c.env)
+  const acquireRes = await lockStub.fetch(new Request('http://do/acquire'))
+  const { acquired } = await acquireRes.json() as AcquireResponse
+  if (!acquired) {
+    return new Response('Conflict: sync already in progress', { status: 409 })
+  }
 
   const storage = new KVStorage(c.env.BANGUMI_KV)
   const imageStore = new R2ImageStore(c.env.BANGUMI_R2)
@@ -283,6 +293,8 @@ app.post('/__cron/sync', async (c) => {
     console.error(JSON.stringify(log))
     await storage.put('sync:last_error', err instanceof Error ? err.message : String(err))
     return new Response('Sync failed', { status: 500 })
+  } finally {
+    await lockStub.fetch(new Request('http://do/release'))
   }
 })
 
@@ -291,6 +303,16 @@ async function scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext
   const storage = new KVStorage(env.BANGUMI_KV)
   const imageStore = new R2ImageStore(env.BANGUMI_R2)
   const users = env.BANGUMI_USERS.split(',').map((s) => s.trim()).filter(Boolean)
+
+  // 尝试获取锁，失败则跳过本次执行
+  const lockStub = getSyncLockStub(env)
+  const acquireRes = await lockStub.fetch(new Request('http://do/acquire'))
+  const { acquired } = await acquireRes.json() as AcquireResponse
+  if (!acquired) {
+    console.warn('sync: cron skipped — another sync is in progress')
+    return
+  }
+
   ctx.waitUntil(
     runSync(storage, imageStore, {
       BANGUMI_TOKEN: env.BANGUMI_TOKEN,
@@ -307,6 +329,8 @@ async function scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext
       const log = createSyncFailureLog('scheduled', err)
       console.error(JSON.stringify(log))
       await storage.put('sync:last_error', err instanceof Error ? err.message : String(err))
+    }).finally(async () => {
+      await lockStub.fetch(new Request('http://do/release'))
     }),
   )
 }
