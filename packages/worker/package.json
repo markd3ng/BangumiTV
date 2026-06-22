@@ -5,7 +5,10 @@
   "main": "./src/index.ts",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test",
+    "build:check": "wrangler deploy --dry-run --outdir dist"
   },
   "dependencies": {
     "hono": "^4.x",

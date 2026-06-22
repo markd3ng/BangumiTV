@@ -6,7 +6,10 @@
   "description": "render your bangumi.tv progress on a static web page",
   "scripts": {
     "dev": "pnpm -F @bangumi-tv/worker dev",
-    "deploy": "pnpm -F @bangumi-tv/worker deploy"
+    "deploy": "pnpm -F @bangumi-tv/worker deploy",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "build:check": "pnpm -r build:check"
   },
   "repository": {
     "type": "git",
