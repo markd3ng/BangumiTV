@@ -30,6 +30,10 @@ Worker 通过 `assets.ts` 内联一份前端，CI 又部署 `public/` 到 Pages�
 
 先让 Worker 直接交付单一源码并验证，再删除 Pages CI 步骤。回滚只需恢复旧 Worker 资源交付，不依赖 Pages 数据。
 
-## Open Questions
+## Resolved Decisions (Design Doc)
 
-深度设计阶段比较 Wrangler 静态 assets 与构建期文本导入，选择文件更少的一种。
+选择构建期文本导入方案。详见 `docs/superpowers/specs/2026-06-21-frontend-asset-delivery-design.md`。
+
+- 扩展 wrangler.toml Text 规则覆盖 `.css` 和 `.js`
+- 新建 3 个薄导入模块（html.ts/css.ts/js.ts）替代 `assets.ts`
+- 不采用 Wrangler `[assets]` 方案，避免 Hono 路由架构重构
