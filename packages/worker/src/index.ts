@@ -12,6 +12,7 @@ import { getSyncLockStub } from './sync-lock'
 import type { AcquireResponse } from './sync-lock'
 import { getOAuthRedirectUrl, exchangeCode } from './manage/oauth'
 import { handleImage } from './image/proxy'
+import { getSnapshot } from './storage/snapshot'
 import manageHtml from './manage/index.html'
 import indexHtml from './html'
 import bangumiJs from './js'
@@ -126,14 +127,13 @@ app.get('/api/config', (c) => {
 app.get('/api/health', async (c) => {
   const storage = new KVStorage(c.env.BANGUMI_KV)
   try {
-    const merged = await storage.get('collections:merged')
-    const calendar = await storage.get('calendar')
+    const snap = await getSnapshot(storage)
     const lastSuccess = await storage.get<string>('sync:last_success')
     return Response.json({
       ok: true,
       data: {
-        collections: merged ? { updated_at: (merged as any).updated_at, types: summarize(merged) } : null,
-        calendar: calendar ? (calendar as any[]).length + ' days' : null,
+        collections: snap ? { updated_at: snap.collections.updated_at, types: summarize(snap.collections) } : null,
+        calendar: snap ? snap.calendar.length + ' days' : null,
         last_sync: lastSuccess || null,
       },
     })
@@ -263,6 +263,10 @@ app.post('/__cron/sync', async (c) => {
   const secret = c.req.header('X-Cron-Secret')
   if (secret !== c.env.CRON_SECRET) return new Response('Unauthorized', { status: 401 })
 
+  const storage = new KVStorage(c.env.BANGUMI_KV)
+  const imageStore = new R2ImageStore(c.env.BANGUMI_R2)
+  const users = c.env.BANGUMI_USERS.split(',').map((s) => s.trim()).filter(Boolean)
+
   // 获取同步锁
   const lockStub = getSyncLockStub(c.env)
   const acquireRes = await lockStub.fetch(new Request('http://do/acquire'))
@@ -270,10 +274,6 @@ app.post('/__cron/sync', async (c) => {
   if (!acquired) {
     return new Response('Conflict: sync already in progress', { status: 409 })
   }
-
-  const storage = new KVStorage(c.env.BANGUMI_KV)
-  const imageStore = new R2ImageStore(c.env.BANGUMI_R2)
-  const users = c.env.BANGUMI_USERS.split(',').map((s) => s.trim()).filter(Boolean)
 
   try {
     await runSync(storage, imageStore, {
@@ -313,26 +313,32 @@ async function scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext
     return
   }
 
-  ctx.waitUntil(
-    runSync(storage, imageStore, {
-      BANGUMI_TOKEN: env.BANGUMI_TOKEN,
-      BANGUMI_REFRESH_TOKEN: env.BANGUMI_REFRESH_TOKEN,
-      BANGUMI_CLIENT_ID: env.BANGUMI_CLIENT_ID,
-      BANGUMI_CLIENT_SECRET: env.BANGUMI_CLIENT_SECRET,
-      BANGUMI_USERS: users,
-      BANGUMI_PRIMARY_USER: env.BANGUMI_PRIMARY_USER,
-      SYNC_MODE: env.SYNC_MODE || 'merge',
-    }).then(async () => {
-      await storage.put('sync:last_success', new Date().toISOString())
-      await storage.delete('sync:last_error')
-    }).catch(async (err) => {
-      const log = createSyncFailureLog('scheduled', err)
-      console.error(JSON.stringify(log))
-      await storage.put('sync:last_error', err instanceof Error ? err.message : String(err))
-    }).finally(async () => {
-      await lockStub.fetch(new Request('http://do/release'))
-    }),
-  )
+  try {
+    ctx.waitUntil(
+      runSync(storage, imageStore, {
+        BANGUMI_TOKEN: env.BANGUMI_TOKEN,
+        BANGUMI_REFRESH_TOKEN: env.BANGUMI_REFRESH_TOKEN,
+        BANGUMI_CLIENT_ID: env.BANGUMI_CLIENT_ID,
+        BANGUMI_CLIENT_SECRET: env.BANGUMI_CLIENT_SECRET,
+        BANGUMI_USERS: users,
+        BANGUMI_PRIMARY_USER: env.BANGUMI_PRIMARY_USER,
+        SYNC_MODE: env.SYNC_MODE || 'merge',
+      }).then(async () => {
+        await storage.put('sync:last_success', new Date().toISOString())
+        await storage.delete('sync:last_error')
+      }).catch(async (err) => {
+        const log = createSyncFailureLog('scheduled', err)
+        console.error(JSON.stringify(log))
+        await storage.put('sync:last_error', err instanceof Error ? err.message : String(err))
+      }).finally(async () => {
+        await lockStub.fetch(new Request('http://do/release'))
+      }),
+    )
+  } catch (e) {
+    // ctx.waitUntil 同步抛出异常时锁不会通过 .finally() 释放，需在此释放
+    await lockStub.fetch(new Request('http://do/release'))
+    throw e
+  }
 }
 
 export { SyncLock } from './sync-lock'
