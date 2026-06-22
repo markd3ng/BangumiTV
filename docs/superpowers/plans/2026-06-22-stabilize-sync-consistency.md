@@ -174,7 +174,7 @@ test('tokenStatus returns probe_failed on network error', async () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试，验证失败**
+- [x] **Step 2: 运行测试，验证失败**
 
 ```bash
 cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types packages/shared/src/bgm-client.test.ts
@@ -232,7 +232,7 @@ export type TokenStatus =
 export type { TokenStatus } from './bgm-client'
 ```
 
-- [ ] **Step 4: 运行测试，验证全部通过**
+- [x] **Step 4: 运行测试，验证全部通过**
 
 ```bash
 cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types packages/shared/src/bgm-client.test.ts
@@ -240,7 +240,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types pack
 
 预期输出：所有 7 个测试 PASS。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/shared/src/bgm-client.ts packages/shared/src/bgm-client.test.ts packages/shared/src/index.ts && git commit -m "feat(bgm-client): tokenStatus 返回三态 TokenStatus (valid/invalid/probe_failed)"
@@ -419,7 +419,7 @@ test('SyncLock acquire with custom ttl', async () => {
 })
 ```
 
-- [ ] **Step 3: 运行测试验证通过**
+- [x] **Step 3: 运行测试验证通过**
 
 ```bash
 cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types packages/worker/src/sync-lock.test.ts
@@ -427,7 +427,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types pack
 
 预期输出：5 个测试 PASS。
 
-- [ ] **Step 4: 修改 wrangler.toml 添加 DO 配置**
+- [x] **Step 4: 修改 wrangler.toml 添加 DO 配置**
 
 在 `packages/worker/wrangler.toml` 末尾追加：
 
@@ -441,7 +441,7 @@ tag = "v1-sync-lock"
 new_classes = ["SyncLock"]
 ```
 
-- [ ] **Step 5: 在 index.ts 注册 SyncLock DO**
+- [x] **Step 5: 在 index.ts 注册 SyncLock DO**
 
 修改 `packages/worker/src/index.ts`：
 
@@ -488,7 +488,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/worker/src/sync-loc
 
 ---
 
-- [ ] **Step 1: 写入测试**
+- [x] **Step 1: 写入测试**
 
 `packages/worker/src/storage/snapshot.test.ts`：
 
@@ -555,7 +555,7 @@ test('getSnapshot returns collections-only fallback when calendar missing', asyn
 })
 ```
 
-- [ ] **Step 2: 运行测试，验证失败**
+- [x] **Step 2: 运行测试，验证失败**
 
 ```bash
 cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types packages/worker/src/storage/snapshot.test.ts
@@ -563,7 +563,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types pack
 
 预期输出：FAIL（`getSnapshot` 未定义）。
 
-- [ ] **Step 3: 实现 getSnapshot + 类型**
+- [x] **Step 3: 实现 getSnapshot + 类型**
 
 `packages/worker/src/storage/snapshot.ts`：
 
@@ -621,7 +621,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types pack
 
 预期输出：5 个测试 PASS。
 
-- [ ] **Step 5: 修改 collections API handler**
+- [x] **Step 5: 修改 collections API handler**
 
 `packages/worker/src/api/collections.ts`：替换对 `storage.get<MergedCollections>('collections:merged')` 的调用。
 
@@ -676,7 +676,7 @@ export async function handleCollections(
 
 确保移除旧的类型导入（`import type { MergedCollections, MergedEntry } from '@bangumi-tv/shared'`）—— `MergedEntry` 仍需要保留，`MergedCollections` 也被 `snapshot.collections` 类型推断覆盖，可保留导入或移除均可。
 
-- [ ] **Step 6: 修改 calendar API handler**
+- [x] **Step 6: 修改 calendar API handler**
 
 `packages/worker/src/api/calendar.ts`：
 
@@ -696,7 +696,7 @@ export async function handleCalendar(storage: StorageAdapter, nsfwShow: boolean)
 }
 ```
 
-- [ ] **Step 7: 运行现有测试，确保无回归**
+- [x] **Step 7: 运行现有测试，确保无回归**
 
 ```bash
 cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types packages/worker/src/manage/security.test.ts
@@ -704,7 +704,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types pack
 
 预期输出：所有现有测试 PASS。
 
-- [ ] **Step 8: 提交**
+- [x] **Step 8: 提交**
 
 ```bash
 cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/worker/src/storage/snapshot.ts packages/worker/src/storage/snapshot.test.ts packages/worker/src/api/collections.ts packages/worker/src/api/calendar.ts && git commit -m "feat(worker): 合并快照为 sync:snapshot + getSnapshot 兼容读取"
@@ -724,7 +724,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/worker/src/storage/
 
 ---
 
-- [ ] **Step 1: 写入 ensureFreshToken 三态测试**
+- [x] **Step 1: 写入 ensureFreshToken 三态测试**
 
 `packages/worker/src/cron.test.ts`：
 
@@ -751,7 +751,7 @@ function createMockStorage(store: Record<string, unknown> = {}): StorageAdapter 
 
 然后逐步添加更多测试，下一步补充。
 
-- [ ] **Step 2: 运行空测试（确保文件加载正常）**
+- [x] **Step 2: 运行空测试（确保文件加载正常）**
 
 ```bash
 cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types packages/worker/src/cron.test.ts
@@ -759,7 +759,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types pack
 
 预期输出：1 个 PASS（setup）。
 
-- [ ] **Step 3: 重写 cron.ts**
+- [x] **Step 3: 重写 cron.ts**
 
 完整重写 `packages/worker/src/cron.ts`：
 
@@ -967,7 +967,7 @@ export async function runSync(
 }
 ```
 
-- [ ] **Step 4: 补充 cron.test.ts 测试**
+- [x] **Step 4: 补充 cron.test.ts 测试**
 
 追加到 `packages/worker/src/cron.test.ts`：
 
@@ -997,7 +997,7 @@ test('runSync throws when calendar fetch fails (stage=fetch_calendar)', () => {
 })
 ```
 
-- [ ] **Step 5: 运行测试**
+- [x] **Step 5: 运行测试**
 
 ```bash
 cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types packages/worker/src/cron.test.ts
@@ -1005,7 +1005,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types pack
 
 预期输出：所有测试 PASS。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/worker/src/cron.ts packages/worker/src/cron.test.ts && git commit -m "feat(worker): runSync 重构 — 三态 token + primary 保护 + 快照写入 + 结构化错误"
@@ -1026,7 +1026,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/worker/src/cron.ts 
 
 ---
 
-- [ ] **Step 1: 写入 executeSync 输入验证测试**
+- [x] **Step 1: 写入 executeSync 输入验证测试**
 
 `packages/worker/src/manage/sync-write.test.ts`：
 
