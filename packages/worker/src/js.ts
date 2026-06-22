@@ -1,2 +1,2 @@
-import js from '../../public/src/bangumi.js'
+import js from '../../../public/src/bangumi.js'
 export default js

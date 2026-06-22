@@ -1,2 +1,2 @@
-import css from '../../public/src/bangumi.css'
+import css from '../../../public/src/bangumi.css'
 export default css
