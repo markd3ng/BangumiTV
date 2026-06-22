@@ -613,7 +613,7 @@ export async function getSnapshot(storage: StorageAdapter): Promise<SyncSnapshot
 }
 ```
 
-- [ ] **Step 4: 运行测试，验证通过**
+- [x] **Step 4: 运行测试，验证通过**
 
 ```bash
 cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types packages/worker/src/storage/snapshot.test.ts
