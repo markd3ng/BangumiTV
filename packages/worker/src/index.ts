@@ -67,6 +67,7 @@ interface Env {
   BANGUMI_CLIENT_SECRET?: string
   CRON_SECRET: string
   MANAGE_SECRET?: string
+  SYNCLOCK: DurableObjectNamespace
 }
 
 const app = new Hono<{ Bindings: Env }>()
@@ -309,6 +310,8 @@ async function scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext
     }),
   )
 }
+
+export { SyncLock } from './sync-lock'
 
 export default {
   fetch: app.fetch,

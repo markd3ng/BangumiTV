@@ -22,3 +22,11 @@ bucket_name = "bangumi-tv-images"
 type = "Text"
 globs = ["**/*.html", "**/*.css", "**/*.js"]
 fallthrough = true
+
+[[durable_objects.bindings]]
+name = "SYNCLOCK"
+class_name = "SyncLock"
+
+[[migrations]]
+tag = "v1-sync-lock"
+new_classes = ["SyncLock"]
