@@ -2,7 +2,7 @@
 
 > 在静态页面中渲染你的 Bangumi 追番进度
 
-基于 Cloudflare Workers，数据直接来源于 bgm.tv API，条目图片通过 R2 缓存分发。
+基于 Cloudflare Workers，数据直接来源于 bgm.tv API。条目封面在同步时自动下载，计算哈希后存入 R2 bucket，通过 `/image/:hash` 路由提供（支持 webp 格式转换和尺寸调整）。
 
 ## Demo
 
@@ -125,6 +125,14 @@ curl -X POST -H "X-Cron-Secret: <CRON_SECRET>" https://bangumi-tv.<你的子域�
 <script src="/src/bangumi.js"></script>
 <div class="bgm-container"></div>
 ```
+
+## 图片策略
+
+Worker 在 cron 同步时自动下载条目封面（来源：bgm.tv），计算 SHA-256 哈希后存入 R2 bucket（`bangumi-tv-images`）。图片通过 `/image/:hash` 路由按需提供，支持格式转换（webp）和尺寸调整（`?w=` 参数）。
+
+- 下载限流至最多 2 个并行，单张超时 8 秒，失败不影响同步整体流程
+- 前端在 hash 为 null 时使用纯色占位 SVG，避免构造损坏 URL
+- 图片缓存头：`Cache-Control: public, max-age=31536000, immutable`
 
 ## 管理页面
 
