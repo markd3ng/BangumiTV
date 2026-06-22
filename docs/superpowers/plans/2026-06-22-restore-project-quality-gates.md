@@ -2,6 +2,7 @@
 change: restore-project-quality-gates
 design-doc: docs/superpowers/specs/2026-06-22-restore-project-quality-gates-design.md
 base-ref: 20c5f751b913928464d974851d39886e70c00178
+archived-with: 2026-06-22-restore-project-quality-gates
 ---
 
 # 恢复项目质量门禁 — 实施计划
@@ -24,6 +25,7 @@ base-ref: 20c5f751b913928464d974851d39886e70c00178
 - 图片下载最多 2 个并行，单张超时 8s，失败静默跳过
 - 不要引入新的测试框架——使用 `node --test` 内建 runner
 
+archived-with: 2026-06-22-restore-project-quality-gates
 ---
 
 ## 文件变更清单
@@ -46,6 +48,7 @@ base-ref: 20c5f751b913928464d974851d39886e70c00178
 | 新建 | `packages/shared/src/merger.test.ts` |
 | 新建 | `packages/worker/src/image/download.test.ts` |
 
+archived-with: 2026-06-22-restore-project-quality-gates
 ---
 
 ### Task 1: 包管理恢复 — 固定 pnpm 版本、唯一 lockfile、更新 .gitignore
@@ -124,6 +127,7 @@ git add package.json package-lock.json .gitignore pnpm-lock.yaml
 git commit -m "fix: lock pnpm to 9.15.9, adopt pnpm-lock.yaml as single lockfile"
 ```
 
+archived-with: 2026-06-22-restore-project-quality-gates
 ---
 
 ### Task 2: 包脚本配置 — 添加 typecheck、test、build:check
@@ -213,6 +217,7 @@ git add package.json packages/shared/package.json packages/worker/package.json
 git commit -m "feat: add typecheck, test, build:check scripts to all packages"
 ```
 
+archived-with: 2026-06-22-restore-project-quality-gates
 ---
 
 ### Task 3: CI 质量门禁 — 固定 pnpm 版本、添加质量检查步骤
@@ -299,6 +304,7 @@ git add .github/workflows/deploy.yml
 git commit -m "ci: pin pnpm to 9.15.9, add frozen-lockfile and quality gates"
 ```
 
+archived-with: 2026-06-22-restore-project-quality-gates
 ---
 
 ### Task 4: Env 类型生成 — wrangler types + index.ts 适配
@@ -373,6 +379,7 @@ git add packages/worker/worker-configuration.d.ts packages/worker/src/index.ts
 git commit -m "feat: generate Env types via wrangler types, remove hand-written interface"
 ```
 
+archived-with: 2026-06-22-restore-project-quality-gates
 ---
 
 ### Task 5: R2 图片下载限流器 — download.ts
@@ -457,6 +464,7 @@ git add packages/worker/src/image/download.ts
 git commit -m "feat: add downloadImagesWithLimit — concurrent image downloader for R2 pipeline"
 ```
 
+archived-with: 2026-06-22-restore-project-quality-gates
 ---
 
 ### Task 6: merger 图片 hash 传递 — 修改 toMergedEntry 和 merge 接口
@@ -576,6 +584,7 @@ git add packages/shared/src/merger.ts
 git commit -m "feat: merge() accepts imageHashMap, images.hash is string | null"
 ```
 
+archived-with: 2026-06-22-restore-project-quality-gates
 ---
 
 ### Task 7: cron.ts 集成图片下载管线
@@ -682,6 +691,7 @@ git add packages/worker/src/cron.ts
 git commit -m "feat: integrate image download pipeline into cron sync"
 ```
 
+archived-with: 2026-06-22-restore-project-quality-gates
 ---
 
 ### Task 8: 前端适配与死代码清理
@@ -736,6 +746,7 @@ git add data/calendar.json README.md
 git commit -m "chore: remove dead data/calendar.json, update README image strategy"
 ```
 
+archived-with: 2026-06-22-restore-project-quality-gates
 ---
 
 ### Task 9: merger.test.ts — 核心测试
@@ -918,6 +929,7 @@ git add packages/shared/src/merger.test.ts
 git commit -m "test: add merger.test.ts — single/multi merge, primary, empty, NSFW, image hash"
 ```
 
+archived-with: 2026-06-22-restore-project-quality-gates
 ---
 
 ### Task 10: download.test.ts — 限流与降级测试
@@ -1074,6 +1086,7 @@ git add packages/worker/src/image/download.test.ts
 git commit -m "test: add download.test.ts — concurrency limit, failure degradation, full success"
 ```
 
+archived-with: 2026-06-22-restore-project-quality-gates
 ---
 
 ## 自检清单
@@ -1103,6 +1116,7 @@ git commit -m "test: add download.test.ts — concurrency limit, failure degrada
 - `downloadImagesWithLimit` 返回 `Map<number, string>`（Task 5）— `merge()` 接受 `Map<number, string> | undefined`（Task 6）。
 - `toMergedEntry(c, imageHashMap?)` 的内部逻辑：`imageHashMap?.get(c.subject_id) ?? null` — 当无 map 或无条目时返回 `null`。
 
+archived-with: 2026-06-22-restore-project-quality-gates
 ---
 
 ## 执行交接

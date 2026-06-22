@@ -2,6 +2,8 @@
 comet_change: restore-project-quality-gates
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-06-22-restore-project-quality-gates
+status: final
 ---
 
 # Design Doc: restore-project-quality-gates
