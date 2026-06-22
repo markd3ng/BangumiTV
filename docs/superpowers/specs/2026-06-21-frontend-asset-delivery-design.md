@@ -2,6 +2,8 @@
 comet_change: simplify-frontend-deployment
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-06-22-simplify-frontend-deployment
+status: final
 ---
 
 # Frontend Asset Delivery Design

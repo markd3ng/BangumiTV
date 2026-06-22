@@ -2,6 +2,7 @@
 change: simplify-frontend-deployment
 design-doc: docs/superpowers/specs/2026-06-21-frontend-asset-delivery-design.md
 base-ref: 767bade07a73c8f897c8ade7fcffb454a26150d7
+archived-with: 2026-06-22-simplify-frontend-deployment
 ---
 
 # Simplify Frontend Deployment — 实施计划
@@ -22,6 +23,7 @@ base-ref: 767bade07a73c8f897c8ade7fcffb454a26150d7
 - 回滚只需恢复旧 Worker 资源交付，不依赖 Pages 数据。
 - 迁移期间 `assets.ts` 与新建导入模块可共存，验证通过后再删除。
 
+archived-with: 2026-06-22-simplify-frontend-deployment
 ---
 
 ### Task 1: 扩展 Wrangler Text 规则
@@ -49,6 +51,7 @@ git add packages/worker/wrangler.toml
 git commit -m "feat: extend Wrangler Text rules to cover .css and .js"
 ```
 
+archived-with: 2026-06-22-simplify-frontend-deployment
 ---
 
 ### Task 2: 修复 public/ 源码问题
@@ -100,6 +103,7 @@ git add public/index.html public/src/bangumi.css
 git commit -m "fix: remove placeholder domain in HTML and add missing CSS selector"
 ```
 
+archived-with: 2026-06-22-simplify-frontend-deployment
 ---
 
 ### Task 3: 创建薄导入模块
@@ -139,6 +143,7 @@ git add packages/worker/src/html.ts packages/worker/src/css.ts packages/worker/s
 git commit -m "feat: create thin import modules for HTML, CSS, JS"
 ```
 
+archived-with: 2026-06-22-simplify-frontend-deployment
 ---
 
 ### Task 4: 更新 Worker 路由
@@ -187,6 +192,7 @@ git add packages/worker/src/index.ts
 git commit -m "refactor: switch from assets.ts inline strings to text-import modules"
 ```
 
+archived-with: 2026-06-22-simplify-frontend-deployment
 ---
 
 ### Task 5: 删除 assets.ts
@@ -205,6 +211,7 @@ git rm packages/worker/src/assets.ts
 git commit -m "chore: remove outdated assets.ts inline copy"
 ```
 
+archived-with: 2026-06-22-simplify-frontend-deployment
 ---
 
 ### Task 6: 更新 CI/CD — 删除 Pages 部署链路
@@ -266,6 +273,7 @@ git add .github/workflows/deploy.yml
 git commit -m "ci: remove Pages deployment, add pre-deploy validation"
 ```
 
+archived-with: 2026-06-22-simplify-frontend-deployment
 ---
 
 ### Task 7: 文档更新
@@ -296,6 +304,7 @@ git add README.md docs/superpowers/specs/2026-06-21-frontend-asset-delivery-desi
 git commit -m "docs: update README and design doc after simplify-frontend-deployment"
 ```
 
+archived-with: 2026-06-22-simplify-frontend-deployment
 ---
 
 ### Task 8: 端到端验证
@@ -324,6 +333,7 @@ cd packages/worker && npx wrangler dev
 
 确认 `openspec/changes/simplify-frontend-deployment/tasks.md` 中所有项已勾选。
 
+archived-with: 2026-06-22-simplify-frontend-deployment
 ---
 
 ## 回滚方案
