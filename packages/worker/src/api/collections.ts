@@ -1,5 +1,6 @@
 import type { StorageAdapter } from '@bangumi-tv/shared'
-import type { MergedCollections, MergedEntry } from '@bangumi-tv/shared'
+import type { MergedEntry } from '@bangumi-tv/shared'
+import { getSnapshot } from '../storage/snapshot.ts'
 
 const VALID_TYPES = ['want', 'watched', 'watching', 'on_hold', 'dropped'] as const
 type CollectionType = (typeof VALID_TYPES)[number]
@@ -26,10 +27,11 @@ export async function handleCollections(
   // 环境变量 NSFW_SHOW=false 时一律不返回 NSFW；为 true 时允许 ?nsfw=false 显式过滤。
   const nsfwShow = nsfwEnvShow && url.searchParams.get('nsfw') !== 'false'
 
-  const merged = await storage.get<MergedCollections>('collections:merged')
-  if (!merged) {
+  const snapshot = await getSnapshot(storage)
+  if (!snapshot) {
     return Response.json({ data: [], total: 0, page, limit, types: emptyTypes() })
   }
+  const merged = snapshot.collections
 
   // 先按 NSFW 开关过滤每个分桶，确保 total 与 types 计数一致。
   const filteredBuckets: Record<CollectionType, MergedEntry[]> = {
