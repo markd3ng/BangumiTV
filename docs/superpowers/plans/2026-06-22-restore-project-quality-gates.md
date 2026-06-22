@@ -6,7 +6,7 @@ base-ref: 20c5f751b913928464d974851d39886e70c00178
 
 # 恢复项目质量门禁 — 实施计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 恢复包管理一致性、CI 质量门禁、R2 图片管线，使项目达到可验证、可部署的稳定状态。
 
@@ -137,7 +137,7 @@ git commit -m "fix: lock pnpm to 9.15.9, adopt pnpm-lock.yaml as single lockfile
 - Consumes: 无
 - Produces: 根 `"typecheck": "pnpm -r typecheck"`、`"test": "pnpm -r test"`、`"build:check": "pnpm -r build:check"`
 
-- [ ] **Step 1: 根 package.json 添加递归脚本**
+- [x] **Step 1: 根 package.json 添加递归脚本**
 
 编辑根 `package.json` 的 `scripts` 对象：
 
@@ -151,7 +151,7 @@ git commit -m "fix: lock pnpm to 9.15.9, adopt pnpm-lock.yaml as single lockfile
 }
 ```
 
-- [ ] **Step 2: packages/shared/package.json 添加脚本**
+- [x] **Step 2: packages/shared/package.json 添加脚本**
 
 编辑 `packages/shared/package.json`，在 `"main"` 后添加 `"scripts"`：
 
@@ -172,7 +172,7 @@ git commit -m "fix: lock pnpm to 9.15.9, adopt pnpm-lock.yaml as single lockfile
 }
 ```
 
-- [ ] **Step 3: packages/worker/package.json 添加脚本**
+- [x] **Step 3: packages/worker/package.json 添加脚本**
 
 编辑 `packages/worker/package.json` 的 `scripts`：
 
@@ -186,7 +186,7 @@ git commit -m "fix: lock pnpm to 9.15.9, adopt pnpm-lock.yaml as single lockfile
 }
 ```
 
-- [ ] **Step 4: 验证脚本可用**
+- [x] **Step 4: 验证脚本可用**
 
 ```bash
 pnpm typecheck
@@ -206,7 +206,7 @@ pnpm build:check
 
 预期：worker 能通过 dry-run 构建。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add package.json packages/shared/package.json packages/worker/package.json
@@ -224,7 +224,7 @@ git commit -m "feat: add typecheck, test, build:check scripts to all packages"
 - Consumes: Task 2 添加的脚本
 - Produces: CI 包含 typecheck → test → build:check 三步顺序门禁
 
-- [ ] **Step 1: 固定 pnpm 版本**
+- [x] **Step 1: 固定 pnpm 版本**
 
 `.github/workflows/deploy.yml` 第 26-28 行：
 
@@ -242,7 +242,7 @@ git commit -m "feat: add typecheck, test, build:check scripts to all packages"
           version: 9.15.9
 ```
 
-- [ ] **Step 2: pnpm install 添加 --frozen-lockfile**
+- [x] **Step 2: pnpm install 添加 --frozen-lockfile**
 
 第 35 行：
 
@@ -256,7 +256,7 @@ git commit -m "feat: add typecheck, test, build:check scripts to all packages"
       - run: pnpm install --frozen-lockfile
 ```
 
-- [ ] **Step 3: 在「Configure Wrangler env」之后添加质量检查步骤**
+- [x] **Step 3: 在「Configure Wrangler env」之后添加质量检查步骤**
 
 在 `# 幂等创建资源` 步骤前（第 42 行前），插入三个步骤：
 
@@ -273,7 +273,7 @@ git commit -m "feat: add typecheck, test, build:check scripts to all packages"
 
 这三个步骤在 deploy 之前执行。若任意步骤失败，流程终止，不部署。
 
-- [ ] **Step 4: 验证 CI 配置语法**
+- [x] **Step 4: 验证 CI 配置语法**
 
 ```bash
 node -e "
@@ -292,7 +292,7 @@ console.log('Build Check:', lines.find(l => l.startsWith('      - name: Build Ch
 
 预期：所有关键行都能找到。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add .github/workflows/deploy.yml
@@ -311,7 +311,7 @@ git commit -m "ci: pin pnpm to 9.15.9, add frozen-lockfile and quality gates"
 - Consumes: `packages/worker/wrangler.toml`（已有）
 - Produces: `worker-configuration.d.ts` 导出 `interface Env`
 
-- [ ] **Step 1: 运行 wrangler types 生成类型声明**
+- [x] **Step 1: 运行 wrangler types 生成类型声明**
 
 ```bash
 cd packages/worker && npx wrangler types --env-interface Env worker-configuration.d.ts
@@ -338,7 +338,7 @@ interface Env {
 }
 ```
 
-- [ ] **Step 2: 修改 index.ts — 删除手写 interface Env，添加 import**
+- [x] **Step 2: 修改 index.ts — 删除手写 interface Env，添加 import**
 
 删除 `packages/worker/src/index.ts` 第 60-74 行（`interface Env { ... }` 的整个块）。
 
@@ -358,7 +358,7 @@ import type { Env } from './worker-configuration.d.ts'
 
 检查生成的 `worker-configuration.d.ts` 的导出形式，使用匹配的导入方式。
 
-- [ ] **Step 3: 验证类型检查通过**
+- [x] **Step 3: 验证类型检查通过**
 
 ```bash
 cd packages/worker && npx tsc --noEmit
@@ -366,7 +366,7 @@ cd packages/worker && npx tsc --noEmit
 
 预期：无类型错误。如果出现 `.d.ts` 识别问题，检查 `tsconfig.json` 是否包含 `"include": ["**/*.ts", "**/*.d.ts"]`。
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add packages/worker/worker-configuration.d.ts packages/worker/src/index.ts
@@ -384,7 +384,7 @@ git commit -m "feat: generate Env types via wrangler types, remove hand-written 
 - Consumes: `BgmClient.downloadImage(url: string)` 返回 `Promise<{ data: ArrayBuffer; contentType: string } | null>`（已有）；`ImageStore.putOriginal(hash, data, contentType)`（已有）
 - Produces: 导出 `async function downloadImagesWithLimit(entries: Array<{ url: string; subjectId: number }>, imageStore: ImageStore, bgmClient: BgmClient, concurrency?: number): Promise<Map<number, string>>`
 
-- [ ] **Step 1: 创建 download.ts**
+- [x] **Step 1: 创建 download.ts**
 
 ```typescript
 import { BgmClient } from '@bangumi-tv/shared'
@@ -442,7 +442,7 @@ export async function downloadImagesWithLimit(
 }
 ```
 
-- [ ] **Step 2: 验证文件语法**
+- [x] **Step 2: 验证文件语法**
 
 ```bash
 cd packages/worker && npx tsc --noEmit src/image/download.ts
@@ -450,7 +450,7 @@ cd packages/worker && npx tsc --noEmit src/image/download.ts
 
 预期：无类型错误。
 
-- [ ] **Step 3: 提交**
+- [x] **Step 3: 提交**
 
 ```bash
 git add packages/worker/src/image/download.ts
@@ -468,7 +468,7 @@ git commit -m "feat: add downloadImagesWithLimit — concurrent image downloader
 - Consumes: 合并时外部提供的 `imageHashMap: Map<number, string>`（key: subjectId, value: hash hex）
 - Produces: `MergedEntry.images.hash` 类型从 `string` 变为 `string | null`；`merge(usersCollections, imageHashMap?)` 签名；`primaryMerge(masterCollections, imageHashMap?)` 签名
 
-- [ ] **Step 1: 修改 MergedEntry.images 类型**
+- [x] **Step 1: 修改 MergedEntry.images 类型**
 
 `packages/shared/src/merger.ts` 第 8 行：
 
@@ -482,7 +482,7 @@ images: { hash: string; w: number; h: number }
 images: { hash: string | null; w: number; h: number }
 ```
 
-- [ ] **Step 2: 修改 toMergedEntry 接受可选 imageHashMap**
+- [x] **Step 2: 修改 toMergedEntry 接受可选 imageHashMap**
 
 修改 `toMergedEntry` 函数签名和实现（第 45-64 行）：
 
@@ -516,7 +516,7 @@ function toMergedEntry(
 
 注意：`w` 和 `h` 从硬编码 `0` 改为实际图片尺寸。由于 bgm.tv 不直接返回尺寸，使用标准封面尺寸 `300x400` 作为合理默认。
 
-- [ ] **Step 3: 修改 merge 函数签名**
+- [x] **Step 3: 修改 merge 函数签名**
 
 `packages/shared/src/merger.ts` 第 67 行：
 
@@ -539,7 +539,7 @@ export function merge(
 const entry = toMergedEntry(c, imageHashMap)
 ```
 
-- [ ] **Step 4: 修改 primaryMerge 函数签名**
+- [x] **Step 4: 修改 primaryMerge 函数签名**
 
 `packages/shared/src/merger.ts` 第 91 行：
 
@@ -560,7 +560,7 @@ export function primaryMerge(
 }
 ```
 
-- [ ] **Step 5: 验证类型检查**
+- [x] **Step 5: 验证类型检查**
 
 ```bash
 cd packages/shared && npx tsc --noEmit
@@ -569,7 +569,7 @@ cd packages/worker && npx tsc --noEmit
 
 预期：已有调用者（`cron.ts`、`index.ts`、`api/collections.ts`）由于 `imageHashMap` 为可选参数，无需修改即通过类型检查。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add packages/shared/src/merger.ts
@@ -587,7 +587,7 @@ git commit -m "feat: merge() accepts imageHashMap, images.hash is string | null"
 - Consumes: `downloadImagesWithLimit`（Task 5）、修改后的 `merge`/`primaryMerge`（Task 6）、`BgmClient`（已有）、`ImageStore`（已有）
 - Produces: `runSync` 第三个参数类型从 `_imageStore: unknown` 改为 `_imageStore: ImageStore`
 
-- [ ] **Step 1: 更新 runSync 签名 — 替换 _imageStore 类型**
+- [x] **Step 1: 更新 runSync 签名 — 替换 _imageStore 类型**
 
 `packages/worker/src/cron.ts` 第 2-3 行 import 添加 `ImageStore`：
 
@@ -614,7 +614,7 @@ import type { ImageStore } from './image/store.ts'
   imageStore: ImageStore,
 ```
 
-- [ ] **Step 2: 在 collection fetch 之后、merge 之前，提取需下载图片的条目**
+- [x] **Step 2: 在 collection fetch 之后、merge 之前，提取需下载图片的条目**
 
 在 `packages/worker/src/cron.ts` 的 `runSync` 函数中，现有代码在第 137 行拉取 collections，第 140-173 行进行 merge。在 merge 之前（第 137 行后），插入图片下载逻辑。
 
@@ -645,7 +645,7 @@ import type { ImageStore } from './image/store.ts'
   }
 ```
 
-- [ ] **Step 3: 将 imageHashMap 传递给 merge/primaryMerge**
+- [x] **Step 3: 将 imageHashMap 传递给 merge/primaryMerge**
 
 第 152 行 `merged = primaryMerge(primaryResult.value)` 改为：
 
@@ -659,7 +659,7 @@ import type { ImageStore } from './image/store.ts'
     merged = merge(allCollections, imageHashMap)
 ```
 
-- [ ] **Step 4: 在文件顶部添加 downloadImagesWithLimit 的 import**
+- [x] **Step 4: 在文件顶部添加 downloadImagesWithLimit 的 import**
 
 在 import 区域添加：
 
@@ -667,7 +667,7 @@ import type { ImageStore } from './image/store.ts'
 import { downloadImagesWithLimit } from './image/download.ts'
 ```
 
-- [ ] **Step 5: 验证类型检查**
+- [x] **Step 5: 验证类型检查**
 
 ```bash
 cd packages/worker && npx tsc --noEmit
@@ -675,7 +675,7 @@ cd packages/worker && npx tsc --noEmit
 
 预期：无类型错误。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add packages/worker/src/cron.ts
@@ -691,7 +691,7 @@ git commit -m "feat: integrate image download pipeline into cron sync"
 - Delete: `data/calendar.json`
 - Modify: `README.md`（更新图片策略说明）
 
-- [ ] **Step 1: 确认 bangumi.js 已正确适配 null hash**
+- [x] **Step 1: 确认 bangumi.js 已正确适配 null hash**
 
 查看 `public/src/bangumi.js` 第 31 行：
 
@@ -705,7 +705,7 @@ const imgUrl = entry.images && entry.images.hash
 
 在 `packages/shared/src/merger.ts` 中 `MergedEntry.images.hash` 改为 `string | null` 后，前端收到的 JSON 中 `hash` 为 `null` 时会正确走 fallback。
 
-- [ ] **Step 2: 删除 data/calendar.json**
+- [x] **Step 2: 删除 data/calendar.json**
 
 ```bash
 rm data/calendar.json
@@ -713,7 +713,7 @@ rm data/calendar.json
 
 验证：`ls data/calendar.json` → `ls: data/calendar.json: No such file or directory`
 
-- [ ] **Step 3: 更新 README.md 图片策略说明**
+- [x] **Step 3: 更新 README.md 图片策略说明**
 
 在 README.md 中找到图片相关部分（可能在「架构」或「功能」章节），更新为反映真实状态：
 
@@ -729,7 +729,7 @@ Worker 在 cron 同步时自动下载条目封面，计算 SHA-256 哈希后存�
 
 如果 README 中没有图片章节，在「功能」或「部署」部分添加上述内容。
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add data/calendar.json README.md
@@ -746,7 +746,7 @@ git commit -m "chore: remove dead data/calendar.json, update README image strate
 **Interfaces:**
 - Consumes: `merge`、`primaryMerge`、`MergedEntry`、`MergedCollections` from `./merger`；`BgmCollection` from `./bgm-client`
 
-- [ ] **Step 1: 创建测试文件**
+- [x] **Step 1: 创建测试文件**
 
 ```typescript
 import { describe, it, before } from 'node:test'
@@ -897,7 +897,7 @@ it('图片 hash 传递 — 不传 imageHashMap 时所有 hash 为 null', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试确认全部通过**
+- [x] **Step 2: 运行测试确认全部通过**
 
 ```bash
 cd packages/shared && node --test src/merger.test.ts
@@ -911,7 +911,7 @@ cd packages/shared && pnpm test
 
 预期：新旧测试全部通过。
 
-- [ ] **Step 3: 提交**
+- [x] **Step 3: 提交**
 
 ```bash
 git add packages/shared/src/merger.test.ts
@@ -928,7 +928,7 @@ git commit -m "test: add merger.test.ts — single/multi merge, primary, empty, 
 **Interfaces:**
 - Consumes: `downloadImagesWithLimit`、`ImageStore`（mock）、`BgmClient`（mock）
 
-- [ ] **Step 1: 创建测试文件**
+- [x] **Step 1: 创建测试文件**
 
 ```typescript
 import { describe, it, mock } from 'node:test'
@@ -1053,7 +1053,7 @@ it('全部成功 — 3 个有效 URL 返回 3 个 hash 映射', async () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试确认全部通过**
+- [x] **Step 2: 运行测试确认全部通过**
 
 ```bash
 cd packages/worker && node --test src/image/download.test.ts
@@ -1067,7 +1067,7 @@ cd packages/worker && pnpm test
 
 预期：新旧测试全部通过。
 
-- [ ] **Step 3: 提交**
+- [x] **Step 3: 提交**
 
 ```bash
 git add packages/worker/src/image/download.test.ts
