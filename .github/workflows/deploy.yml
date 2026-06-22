@@ -109,7 +109,8 @@ jobs:
             if [ -f "$f" ]; then
               last_char=$(tail -c 1 "$f")
               if [ "$last_char" != "}" ]; then
-                echo "WARNING: $f may have incomplete CSS syntax" >&2
+                echo "ERROR: $f may have incomplete CSS syntax" >&2
+                exit 1
               fi
             fi
           done
