@@ -109,21 +109,21 @@ git commit -m "fix: remove placeholder domain in HTML and add missing CSS select
 - Create: `packages/worker/src/css.ts`
 - Create: `packages/worker/src/js.ts`
 
-- [ ] **Step 1: 创建 html.ts**
+- [x] **Step 1: 创建 html.ts**
 
 ```ts
 import html from '../../public/index.html'
 export default html
 ```
 
-- [ ] **Step 2: 创建 css.ts**
+- [x] **Step 2: 创建 css.ts**
 
 ```ts
 import css from '../../public/src/bangumi.css'
 export default css
 ```
 
-- [ ] **Step 3: 创建 js.ts**
+- [x] **Step 3: 创建 js.ts**
 
 ```ts
 import js from '../../public/src/bangumi.js'
@@ -132,7 +132,7 @@ export default js
 
 这些模块是薄胶水层，将 `public/` 源文件通过 Wrangler Text 规则转为 TypeScript 可导入的字符串。`assets.ts` 仍存在，此步骤可安全回滚。
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add packages/worker/src/html.ts packages/worker/src/css.ts packages/worker/src/js.ts
