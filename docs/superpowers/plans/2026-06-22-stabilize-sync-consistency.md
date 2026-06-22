@@ -262,7 +262,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/shared/src/bgm-clie
 
 ---
 
-- [ ] **Step 1: 创建 SyncLock DO 实现**
+- [x] **Step 1: 创建 SyncLock DO 实现**
 
 写入 `packages/worker/src/sync-lock.ts`：
 
@@ -345,7 +345,7 @@ export function getSyncLockStub(env: { SYNCLOCK: DurableObjectNamespace }): Dura
 }
 ```
 
-- [ ] **Step 2: 写入 SyncLock 测试**
+- [x] **Step 2: 写入 SyncLock 测试**
 
 `packages/worker/src/sync-lock.test.ts`：
 
@@ -466,7 +466,7 @@ export default {
 export { SyncLock } from './sync-lock'
 ```
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/worker/src/sync-lock.ts packages/worker/src/sync-lock.test.ts packages/worker/wrangler.toml packages/worker/src/index.ts && git commit -m "feat(worker): 新增 SyncLock Durable Object 实现全局同步互斥"
