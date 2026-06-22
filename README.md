@@ -2,7 +2,7 @@
 
 > 在静态页面中渲染你的 Bangumi 追番进度
 
-基于 Cloudflare Workers + Pages，数据直接来源于 bgm.tv API，条目图片通过 R2 缓存分发。
+基于 Cloudflare Workers，数据直接来源于 bgm.tv API，条目图片通过 R2 缓存分发。
 
 ## Demo
 
@@ -63,9 +63,9 @@
    git push origin dev
    ```
 
-   GitHub Actions 将自动：检查并创建 Cloudflare KV / R2 资源 → 构建前端 → 注入环境变量 → 部署 Worker 和 Pages。
+   GitHub Actions 将自动：检查并创建 Cloudflare KV / R2 资源 → 构建前端 → 注入环境变量 → 部署 Worker。
 
-4. 部署完成后，到 Cloudflare Dashboard → Workers & Pages 找到 `bangumi-tv` 项目，记下它的访问域名（形如 `https://bangumi-tv.<你的子域名>.workers.dev`，下文记作 `WORKER_DOMAIN`）。此时公开 widget 已可访问，但 cron 同步尚未生效（token 未配置）。
+4. 部署完成后，你的 Worker 访问域名为 `https://bangumi-tv.<你的子域名>.workers.dev`。此时公开 widget 已可访问，但 cron 同步尚未生效（token 未配置）。
 
 ### 阶段二：注册 OAuth App、换取 cron token、回填并重新部署
 
@@ -74,7 +74,7 @@
 登录 [bgm.tv](https://bgm.tv)，前往 [https://bgm.tv/dev/app](https://bgm.tv/dev/app) 创建应用：
 
 - **应用名称**：自定义，如 `BangumiTV`
-- **回调地址 (redirect_uri)**：填 `https://<WORKER_DOMAIN>/manage/callback`
+- **回调地址 (redirect_uri)**：填 `https://bangumi-tv.<你的子域名>.workers.dev/manage/callback`
 - **应用描述**：可选
 
 创建后记录 **App ID**（= `BANGUMI_CLIENT_ID`）和 **App Secret**（= `BANGUMI_CLIENT_SECRET`）。
@@ -94,7 +94,7 @@
 
 #### 3. 在管理页面授权 cron 同步账号（一次性）
 
-部署完成后，浏览器访问 `https://<WORKER_DOMAIN>/manage`，在顶部「Cron 同步账号授权」区域点击「授权 cron 同步账号」：
+部署完成后，浏览器访问 `https://bangumi-tv.<你的子域名>.workers.dev/manage`，在顶部「Cron 同步账号授权」区域点击「授权 cron 同步账号」：
 
 1. 弹出 bgm.tv 授权页，登录并用你要展示其追番的账号授权；
 2. 授权后跳转回 `/manage/callback`，把浏览器地址栏完整的回调 URL 复制粘贴到输入框，点「确认」；
@@ -107,7 +107,7 @@
 授权完成后可立即触发一次同步而不等 4 小时定时任务：
 
 ```bash
-curl -X POST -H "X-Cron-Secret: <CRON_SECRET>" https://<WORKER_DOMAIN>/__cron/sync
+curl -X POST -H "X-Cron-Secret: <CRON_SECRET>" https://bangumi-tv.<你的子域名>.workers.dev/__cron/sync
 ```
 
 ## 前端接入
@@ -115,20 +115,20 @@ curl -X POST -H "X-Cron-Secret: <CRON_SECRET>" https://<WORKER_DOMAIN>/__cron/sy
 在任意页面中引入 Widget：
 
 ```html
-<link rel="stylesheet" href="https://bangumi-tv.<你的域名>.workers.dev/src/bangumi.css">
+<link rel="stylesheet" href="/src/bangumi.css">
 <script>
-  const bgmConfig = {
-    apiUrl: "https://bangumi-tv.<你的域名>.workers.dev",
+  window.bgmConfig = {
+    apiUrl: window.location.origin,
     quote: "生命不止，追番不息！"
   }
 </script>
-<script src="https://bangumi-tv.<你的域名>.workers.dev/src/bangumi.js"></script>
+<script src="/src/bangumi.js"></script>
 <div class="bgm-container"></div>
 ```
 
 ## 管理页面
 
-访问 `https://<worker>/manage`：
+访问 `https://bangumi-tv.<你的子域名>.workers.dev/manage`：
 
 - **Cron 同步账号授权**（顶部）：一键授权 cron 同步用的账号，浏览器只显示成功状态，token 由 Worker 写入 KV 的 `bgm:tokens` 并自动续期；可点「清除已存 token」重新授权。你在当前页面输入的管理密码只保存在内存里，刷新后需要重新输入。
 - **多账户同步**：输入两个 bgm.tv 用户名 → 依次 OAuth 授权 → 选择完整同步或部分同步 → 执行。

@@ -8,9 +8,9 @@
 
 - [x] 2.1 删除 Pages 资源创建和部署步骤
 - [x] 2.2 添加占位符、资源语法和 Wrangler dry-run 检查
-- [ ] 2.3 验证 Worker 首页、JS、CSS 和 API 使用同一 origin
+- [x] 2.3 验证 Worker 首页、JS、CSS 和 API 使用同一 origin
 
 ## 3. 文档
 
-- [ ] 3.1 更新 README 的部署和嵌入说明
-- [ ] 3.2 修正迁移设计中的 Pages 与重复资源描述
+- [x] 3.1 更新 README 的部署和嵌入说明
+- [x] 3.2 修正迁移设计中的 Pages 与重复资源描述
