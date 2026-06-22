@@ -29,6 +29,12 @@ export interface SyncFailureLog {
   at: string
 }
 
+export interface SyncErrorLog {
+  timestamp: number
+  error: string
+  stage: 'token_refresh' | 'fetch_collections' | 'fetch_calendar' | 'write_snapshot' | 'lock_timeout'
+}
+
 const STATE_TTL_SECONDS = 300
 const STATE_MAX_LENGTH = 1024
 const encoder = new TextEncoder()
