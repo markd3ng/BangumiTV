@@ -275,21 +275,21 @@ git commit -m "ci: remove Pages deployment, add pre-deploy validation"
 - Modify: `docs/superpowers/specs/2026-06-21-frontend-asset-delivery-design.md`（更新任务状态）
 - Modify: `openspec/changes/simplify-frontend-deployment/tasks.md`（勾选完成项）
 
-- [ ] **Step 1: 更新 README 部署说明**
+- [x] **Step 1: 更新 README 部署说明**
 
 - 将正式入口统一为 Worker URL，移除 Pages URL 引用
 - 更新嵌入代码示例，确保使用 `window.location.origin`
 - 说明单一部署入口的变更
 
-- [ ] **Step 2: 更新设计文档中的迁移状态**
+- [x] **Step 2: 更新设计文档中的迁移状态**
 
 在 `2026-06-21-frontend-asset-delivery-design.md` 中确认迁移步骤已完成。
 
-- [ ] **Step 3: 勾选 OpenSpec tasks**
+- [x] **Step 3: 勾选 OpenSpec tasks**
 
 根据实际完成情况勾选 `openspec/changes/simplify-frontend-deployment/tasks.md` 中的 checklist 项。
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add README.md docs/superpowers/specs/2026-06-21-frontend-asset-delivery-design.md openspec/changes/simplify-frontend-deployment/tasks.md
