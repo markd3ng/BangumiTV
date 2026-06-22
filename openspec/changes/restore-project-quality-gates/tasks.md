@@ -1,7 +1,7 @@
 ## 1. 包管理与类型
 
-- [ ] 1.1 固定 pnpm 版本并同步唯一 lockfile
-- [ ] 1.2 移除 npm lockfile 和不属于产品的根运行依赖
+- [x] 1.1 固定 pnpm 版本并同步唯一 lockfile
+- [x] 1.2 移除 npm lockfile 和不属于产品的根运行依赖
 - [ ] 1.3 添加 TypeScript 与 Wrangler 生成的 Env 类型
 
 ## 2. 架构清理
