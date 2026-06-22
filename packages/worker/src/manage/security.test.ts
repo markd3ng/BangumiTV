@@ -363,7 +363,9 @@ test('worker sync logging calls never receive errors usernames or free text', as
   ])
   const source = `${workerSource}\n${cronSource}`
 
-  assert.match(cronSource, /createSyncFailureLog\('account', s\.reason\)/)
+  // cron.ts 新实现直接抛错，不再使用 createSyncFailureLog
+  assert.doesNotMatch(cronSource, /createSyncFailureLog/)
+  assert.doesNotMatch(cronSource, /console\.(?:error|warn|log)\(/)
   assert.match(workerSource, /createSyncFailureLog\('manual', err\)/)
   assert.match(workerSource, /createSyncFailureLog\('scheduled', err\)/)
   assert.doesNotMatch(

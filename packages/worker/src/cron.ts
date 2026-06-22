@@ -1,37 +1,32 @@
-import { BgmClient } from '@bangumi-tv/shared'
+import { BgmClient, type TokenStatus } from '@bangumi-tv/shared'
 import { merge, primaryMerge, type MergedCollections } from '@bangumi-tv/shared'
 import type { StorageAdapter } from '@bangumi-tv/shared'
 import { fetchAllCollections } from '@bangumi-tv/shared'
-import { createSyncFailureLog } from './manage/security'
+import type { SyncSnapshot, SyncSnapshotMeta } from './storage/snapshot.ts'
 
-/**
- * Token 持久化结构（存于 KV）。
- *
- * Workers 的 secret 运行时只读，无法写回刷新后的 token。因此把 token 对存进 KV：
- * 环境变量 BANGUMI_TOKEN / BANGUMI_REFRESH_TOKEN 仅作首次冷启动种子，之后以 KV 为准。
- * bgm.tv 刷新会返回新的 refresh_token，必须一并写回，否则旧 refresh_token 用一次后失效，
- * 7 天后又得人工介入。
- */
+// ── 类型 ──
+
 interface StoredTokens {
   access_token: string
   refresh_token: string
 }
 
-const KV_TOKEN_KEY = 'bgm:tokens'
+export interface SyncErrorLog {
+  timestamp: number
+  error: string
+  stage: 'token_refresh' | 'fetch_collections' | 'fetch_calendar' | 'write_snapshot' | 'lock_timeout'
+}
 
-/** token 临近过期则提前刷新的阈值（秒）。 */
+// ── 常量 ──
+
+const KV_TOKEN_KEY = 'bgm:tokens'
+const SNAPSHOT_KEY = 'sync:snapshot'
+const LAST_ERROR_KEY = 'sync:last_error'
+const LAST_SUCCESS_KEY = 'sync:last_success'
 const REFRESH_GRACE_SECONDS = 3600
 
-/**
- * 取得一个有效的 access token：
- * 1. 优先用 KV 中已持久化的 token，否则用环境变量种子；
- * 2. 用 /oauth/token_status 探测有效性 + 过期时间；
- * 3. 无效或将在 1 小时内过期 → 用 refresh_token 刷新，并把新的一对 token 写回 KV；
- * 4. 全部失败则抛错。
- *
- * 用 token_status 而非请求某个用户名探测：后者无法区分 401(token 过期) 与
- * 404(用户名不存在)，会把过期 token 误判为有效，导致续期永不触发。
- */
+// ── Token 刷新 ▸ 适配三态 ──
+
 async function ensureFreshToken(
   storage: StorageAdapter,
   env: {
@@ -55,22 +50,42 @@ async function ensureFreshToken(
   }
 
   const probe = new BgmClient()
-  const status = await probe.tokenStatus(current.access_token)
+  const status: TokenStatus = await probe.tokenStatus(current.access_token)
   const nowSec = Math.floor(Date.now() / 1000)
-  const needsRefresh =
-    !status.valid ||
-    (typeof status.expires === 'number' && status.expires - nowSec < REFRESH_GRACE_SECONDS)
 
-  if (!needsRefresh) return current.access_token
-
-  if (!env.BANGUMI_CLIENT_ID || !env.BANGUMI_CLIENT_SECRET || !current.refresh_token) {
-    if (status.valid) return current.access_token // 有效但无法提前刷新，凑合用
-    throw new Error('bgm.tv token expired and no refresh credentials configured')
+  // probe_failed → 放弃，不消费 refresh_token
+  if (status.status === 'probe_failed') {
+    throw new Error('bgm.tv token probe failed (network/5xx); skipping sync')
   }
 
+  // invalid → 必须刷新
+  if (status.status === 'invalid') {
+    if (!env.BANGUMI_CLIENT_ID || !env.BANGUMI_CLIENT_SECRET || !current.refresh_token) {
+      throw new Error('bgm.tv token invalid and no refresh credentials configured')
+    }
+    return refreshAndPersist(storage, probe, env, current)
+  }
+
+  // valid → 检查是否临近过期
+  const needsRefresh = typeof status.expires === 'number' && status.expires - nowSec < REFRESH_GRACE_SECONDS
+  if (!needsRefresh) return current.access_token
+
+  // 临近过期 → 尝试提前刷新
+  if (!env.BANGUMI_CLIENT_ID || !env.BANGUMI_CLIENT_SECRET || !current.refresh_token) {
+    return current.access_token // 有效但无法刷新，凑合用
+  }
+  return refreshAndPersist(storage, probe, env, current)
+}
+
+async function refreshAndPersist(
+  storage: StorageAdapter,
+  probe: BgmClient,
+  env: { BANGUMI_CLIENT_ID?: string; BANGUMI_CLIENT_SECRET?: string },
+  current: StoredTokens,
+): Promise<string> {
   const refreshed = await probe.refreshAccessToken(
-    env.BANGUMI_CLIENT_ID,
-    env.BANGUMI_CLIENT_SECRET,
+    env.BANGUMI_CLIENT_ID!,
+    env.BANGUMI_CLIENT_SECRET!,
     current.refresh_token,
   )
   await storage.put<StoredTokens>(KV_TOKEN_KEY, {
@@ -80,13 +95,9 @@ async function ensureFreshToken(
   return refreshed.access_token
 }
 
-/**
- * 日历响应精简：过滤 name_cn 为空的条目，并剥离 collection/rating/rank。
- * 与旧 Vercel buildCalendar 的变换保持一致。
- */
-function transformCalendar(
-  raw: Awaited<ReturnType<BgmClient['getCalendar']>>,
-) {
+// ── 日历精简 ──
+
+function transformCalendar(raw: Awaited<ReturnType<BgmClient['getCalendar']>>) {
   return raw.map((d) => ({
     weekday: d.weekday,
     items: d.items
@@ -97,6 +108,8 @@ function transformCalendar(
       }),
   }))
 }
+
+// ── 主同步函数 ──
 
 export async function runSync(
   storage: StorageAdapter,
@@ -110,57 +123,79 @@ export async function runSync(
     BANGUMI_PRIMARY_USER?: string
     SYNC_MODE: string
   },
-) {
+): Promise<{ merged: MergedCollections; calendar: ReturnType<typeof transformCalendar>; generation: number }> {
+  // 1. Token 刷新（三态适配）
   const token = await ensureFreshToken(storage, env)
-  const client = new BgmClient(token)
 
   if (env.BANGUMI_USERS.length === 0) {
     throw new Error('sync: BANGUMI_USERS is empty — nothing to sync')
   }
 
-  // allSettled：单个账号失败不丢弃其余账号数据。
-  const settled = await Promise.allSettled(env.BANGUMI_USERS.map((u) => fetchAllCollections(client, u)))
-  const allCollections = settled.map((s, i) => {
-    if (s.status === 'rejected') {
-      const log = createSyncFailureLog('account', s.reason)
-      console.warn(JSON.stringify(log))
-      return [] as Awaited<ReturnType<typeof fetchAllCollections>>
-    }
-    return s.value
-  })
-  // 至少要有一个账号成功；否则不覆盖 KV。
-  const anySuccess = settled.some((s) => s.status === 'fulfilled')
-  if (!anySuccess) {
-    const details = settled
-      .map((s, i) => {
-        if (s.status === 'rejected') {
-          const msg = s.reason instanceof Error ? s.reason.message : String(s.reason)
-          return `${env.BANGUMI_USERS[i]}: ${msg}`
-        }
-        return null
-      })
-      .filter(Boolean)
-      .join('; ')
-    throw new Error(`sync: all users failed — ${details}`)
-  }
+  const client = new BgmClient(token)
 
+  // 2. 拉取所有用户收藏
+  const settled = await Promise.allSettled(env.BANGUMI_USERS.map((u) => fetchAllCollections(client, u)))
+
+  // 3. Primary 保护
   let merged: MergedCollections
   if (env.SYNC_MODE === 'primary' && env.BANGUMI_PRIMARY_USER) {
     const idx = env.BANGUMI_USERS.indexOf(env.BANGUMI_PRIMARY_USER)
     if (idx === -1) throw new Error(`Primary user ${env.BANGUMI_PRIMARY_USER} not in users list`)
-    merged = primaryMerge(allCollections[idx])
+
+    const primaryResult = settled[idx as number]
+    if (!primaryResult || primaryResult.status === 'rejected') {
+      throw new Error(`Primary user (${env.BANGUMI_PRIMARY_USER}) fetch failed; aborting sync`)
+    }
+    if (primaryResult.value.length === 0) {
+      throw new Error(`Primary user (${env.BANGUMI_PRIMARY_USER}) returned empty collections; aborting sync`)
+    }
+    merged = primaryMerge(primaryResult.value)
   } else {
+    // Merge 模式：只合并成功的
+    const anySuccess = settled.some((s) => s.status === 'fulfilled')
+    if (!anySuccess) {
+      const details = settled
+        .map((s, i) => {
+          if (s.status === 'rejected') {
+            const msg = s.reason instanceof Error ? s.reason.message : String(s.reason)
+            return `${env.BANGUMI_USERS[i]}: ${msg}`
+          }
+          return null
+        })
+        .filter(Boolean)
+        .join('; ')
+      throw new Error(`sync: all users failed — ${details}`)
+    }
+    const allCollections = settled.map((s) =>
+      s.status === 'fulfilled' ? s.value : ([] as Awaited<ReturnType<typeof fetchAllCollections>>),
+    )
     merged = merge(allCollections)
   }
 
-  // subject 详情（name/nsfw/eps/images）已由收藏接口内嵌在每条数据的 subject 字段中，
-  // toMergedEntry 已从 c.subject 填充，无需独立 getSubject 调用。图片 hash 在后续 R2 管线
-  // 就绪后再填充。
+  // 4. 拉取日历
+  let calendar: ReturnType<typeof transformCalendar>
+  try {
+    calendar = transformCalendar(await client.getCalendar())
+  } catch (err) {
+    throw new Error(`Calendar fetch failed; aborting sync: ${err instanceof Error ? err.message : String(err)}`)
+  }
 
-  const calendar = transformCalendar(await client.getCalendar())
+  // 5. 写快照（仅完整成功才写）
+  // 读取当前 generation
+  const previousSnap = await storage.get<SyncSnapshot>(SNAPSHOT_KEY)
+  const generation = previousSnap ? previousSnap.meta.generation + 1 : 1
 
-  await storage.put('collections:merged', merged)
-  await storage.put('calendar', calendar)
+  const meta: SyncSnapshotMeta = {
+    synced_at: Math.floor(Date.now() / 1000),
+    mode: env.SYNC_MODE === 'primary' ? 'primary' : 'merge',
+    ...(env.SYNC_MODE === 'primary' && env.BANGUMI_PRIMARY_USER ? { primary_user: env.BANGUMI_PRIMARY_USER } : {}),
+    generation,
+  }
 
-  return { merged, calendar }
+  const snapshot: SyncSnapshot = { collections: merged, calendar, meta }
+  await storage.put(SNAPSHOT_KEY, snapshot)
+  await storage.put(LAST_SUCCESS_KEY, new Date().toISOString())
+  await storage.delete(LAST_ERROR_KEY)
+
+  return { merged, calendar, generation }
 }
