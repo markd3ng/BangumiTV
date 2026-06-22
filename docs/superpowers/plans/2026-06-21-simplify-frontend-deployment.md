@@ -300,7 +300,7 @@ git commit -m "docs: update README and design doc after simplify-frontend-deploy
 
 ### Task 8: 端到端验证
 
-- [ ] **Step 1: 本地 dev 模式验证**
+- [x] **Step 1: 本地 dev 模式验证**
 
 ```bash
 cd packages/worker && npx wrangler dev
@@ -312,15 +312,15 @@ cd packages/worker && npx wrangler dev
 - 确认页面加载无 404 资源
 - 确认 API 接口正常工作（`/api/health`、`/api/collections`）
 
-- [ ] **Step 2: 验证单一 origin**
+- [x] **Step 2: 验证单一 origin**
 
 所有前端资源（HTML、JS、CSS）均从同一 Worker origin 返回，无跨域请求。
 
-- [ ] **Step 3: 验证 CI dry-run 通过**
+- [x] **Step 3: 验证 CI dry-run 通过**
 
 确认 `npx wrangler deploy --dry-run` 成功，无占位域名泄漏。
 
-- [ ] **Step 4: 更新 tasks.md 最终状态**
+- [x] **Step 4: 更新 tasks.md 最终状态**
 
 确认 `openspec/changes/simplify-frontend-deployment/tasks.md` 中所有项已勾选。
 
