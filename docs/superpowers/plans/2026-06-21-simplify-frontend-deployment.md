@@ -146,7 +146,7 @@ git commit -m "feat: create thin import modules for HTML, CSS, JS"
 **Files:**
 - Modify: `packages/worker/src/index.ts`
 
-- [ ] **Step 1: 替换 import 语句**
+- [x] **Step 1: 替换 import 语句**
 
 将：
 
@@ -162,7 +162,7 @@ import bangumiJs from './js'
 import bangumiCss from './css'
 ```
 
-- [ ] **Step 2: 更新路由引用**
+- [x] **Step 2: 更新路由引用**
 
 将路由中的变量名同步更新：
 
@@ -180,7 +180,7 @@ app.get('/src/bangumi.css', () => {
 })
 ```
 
-- [ ] **Step 3: 提交**
+- [x] **Step 3: 提交**
 
 ```bash
 git add packages/worker/src/index.ts
