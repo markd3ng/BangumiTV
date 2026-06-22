@@ -128,7 +128,7 @@ curl -X POST -H "X-Cron-Secret: <CRON_SECRET>" https://bangumi-tv.<你的子域�
 
 ## 图片策略
 
-Worker 在 cron 同步时自动下载条目封面（来源：bgm.tv），计算 SHA-256 哈希后存入 R2 bucket（`bangumi-tv-images`）。图片通过 `/image/:hash` 路由按需提供，支持格式转换（webp）和尺寸调整（`?w=` 参数）。
+Worker 在 cron 同步时自动下载条目封面（来源：bgm.tv），计算 SHA-256 哈希后存入 R2 bucket（`bangumi-tv-images`）。图片通过 `/image/:hash` 路由按需提供（预留了 webp 格式转换和尺寸调整的参数接口，待后续实现）。
 
 - 下载限流至最多 2 个并行，单张超时 8 秒，失败不影响同步整体流程
 - 前端在 hash 为 null 时使用纯色占位 SVG，避免构造损坏 URL

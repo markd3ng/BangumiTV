@@ -7,7 +7,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "types": ["@cloudflare/workers-types"],
+    "types": [],
     "outDir": "./dist"
   },
   "include": ["src", "worker-configuration.d.ts"]

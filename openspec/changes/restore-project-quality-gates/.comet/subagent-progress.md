@@ -9,6 +9,11 @@
 
 ## Task 1: 包管理恢复 — 固定 pnpm 版本、唯一 lockfile、更新 .gitignore
 
+- Status: done
+- Commits: 7a0cfb9
+
+## Task 2: 包脚本配置 — 添加 typecheck、test、build:check
+
 - Status: implementing
-- BASE: 20c5f751b913928464d974851d39886e70c00178
+- BASE: 05a438c
 - Started: 2026-06-22

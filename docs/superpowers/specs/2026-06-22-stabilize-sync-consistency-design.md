@@ -2,6 +2,8 @@
 comet_change: stabilize-sync-consistency
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-06-22-stabilize-sync-consistency
+status: final
 ---
 
 # Design Doc: 同步稳定性加固
@@ -25,6 +27,8 @@ canonical_spec: openspec
 - 不修改 bgm.tv API 客户端签名（tokenStatus 返回值类型扩展除外）
 - 不修改 `/api/collections` 和 `/api/calendar` 的 HTTP 响应 schema
 
+archived-with: 2026-06-22-stabilize-sync-consistency
+status: final
 ---
 
 ## 2. 架构变更
@@ -211,6 +215,8 @@ interface SyncErrorLog {
 
 写入 KV key `sync:last_error`（替代旧版纯字符串）。
 
+archived-with: 2026-06-22-stabilize-sync-consistency
+status: final
 ---
 
 ## 3. 数据流
@@ -263,6 +269,8 @@ API 读取路径自动切换:
   1-2 周后手动删除
 ```
 
+archived-with: 2026-06-22-stabilize-sync-consistency
+status: final
 ---
 
 ## 4. 文件影响面
@@ -279,6 +287,8 @@ API 读取路径自动切换:
 | `wrangler.toml` / `wrangler.jsonc` | MODIFY | DO binding 配置 |
 | `packages/worker/src/storage/kv.ts` | MODIFY | 可选：新增 getSnapshot() 便捷方法 |
 
+archived-with: 2026-06-22-stabilize-sync-consistency
+status: final
 ---
 
 ## 5. 测试策略
@@ -300,6 +310,8 @@ API 读取路径自动切换:
 - Cloudflare Miniflare 本地模拟 DO + KV 的完整同步流程
 - 模拟 bgm.tv API 的网络故障场景
 
+archived-with: 2026-06-22-stabilize-sync-consistency
+status: final
 ---
 
 ## 6. 风险与缓解
@@ -311,6 +323,8 @@ API 读取路径自动切换:
 | refresh_token 被并发消费（锁外的极端竞态） | 极低 | 中 | 全局锁覆盖所有 token 操作路径；仅锁实现 bug 才可能 |
 | DO 冷启动延迟导致锁获取变慢 | 中 | 低 | 首次请求 DO 冷启动 ~100ms；后续热实例无延迟；同步本就是后台任务 |
 
+archived-with: 2026-06-22-stabilize-sync-consistency
+status: final
 ---
 
 ## 7. 部署注意事项

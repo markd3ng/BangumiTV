@@ -26,7 +26,13 @@ export async function downloadImagesWithLimit(
     while (idx < entries.length) {
       const entry = entries[idx++]
       try {
-        const downloaded = await bgmClient.downloadImage(entry.url)
+        const timeoutMs = 8000
+        const downloaded = await Promise.race([
+          bgmClient.downloadImage(entry.url),
+          new Promise<null>((_, reject) =>
+            setTimeout(() => reject(new Error('Image download timeout')), timeoutMs),
+          ),
+        ])
         if (!downloaded) continue
 
         // 计算 SHA-256 哈希

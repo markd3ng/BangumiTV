@@ -1,4 +1,4 @@
-import { describe, it, mock } from 'node:test'
+import { it, mock } from 'node:test'
 import assert from 'node:assert/strict'
 import { downloadImagesWithLimit } from './download.ts'
 import type { ImageStore } from './store.ts'

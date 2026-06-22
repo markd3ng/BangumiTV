@@ -2,6 +2,7 @@
 change: stabilize-sync-consistency
 design-doc: docs/superpowers/specs/2026-06-22-stabilize-sync-consistency-design.md
 base-ref: 0823553ff9936c967e2c02243dd934e50dac32bd
+archived-with: 2026-06-22-stabilize-sync-consistency
 ---
 
 # 同步稳定性加固 — 实施计划
@@ -24,6 +25,7 @@ base-ref: 0823553ff9936c967e2c02243dd934e50dac32bd
 - 旧 KV key（`collections:merged`、`calendar`）在部署后 1-2 周内保留兼容回退，之后手动清理
 - 遵循 TDD：每个功能步骤先写测试 → 验证失败 → 实现 → 验证通过 → 提交
 
+archived-with: 2026-06-22-stabilize-sync-consistency
 ---
 
 ## 文件清单
@@ -48,6 +50,7 @@ base-ref: 0823553ff9936c967e2c02243dd934e50dac32bd
 | `packages/worker/src/manage/index.html` | MODIFY | 按钮文案 full→全部复制、partial→选择复制；同步状态显示 |
 | `packages/worker/src/manage/security.ts` | MODIFY | 新增 `SyncErrorLog` 结构化类型 |
 
+archived-with: 2026-06-22-stabilize-sync-consistency
 ---
 
 ### Task 1: Token 三态探测
@@ -61,6 +64,7 @@ base-ref: 0823553ff9936c967e2c02243dd934e50dac32bd
 - 消费：无（独立，不依赖其他任务）
 - 产出：`TokenStatus` 类型 + 新 `tokenStatus()` 签名
 
+archived-with: 2026-06-22-stabilize-sync-consistency
 ---
 
 - [x] **Step 1: 写入三态 TokenStatus 类型 + 失败的测试**
@@ -246,6 +250,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types pack
 cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/shared/src/bgm-client.ts packages/shared/src/bgm-client.test.ts packages/shared/src/index.ts && git commit -m "feat(bgm-client): tokenStatus 返回三态 TokenStatus (valid/invalid/probe_failed)"
 ```
 
+archived-with: 2026-06-22-stabilize-sync-consistency
 ---
 
 ### Task 2: SyncLock Durable Object
@@ -260,6 +265,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/shared/src/bgm-clie
 - 消费：无（独立 DO，仅依赖 Worker 运行时类型）
 - 产出：`SyncLock` 类（Durable Object），暴露 `fetch()` 路由 `POST /acquire`、`POST /release`
 
+archived-with: 2026-06-22-stabilize-sync-consistency
 ---
 
 - [x] **Step 1: 创建 SyncLock DO 实现**
@@ -472,6 +478,7 @@ export { SyncLock } from './sync-lock'
 cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/worker/src/sync-lock.ts packages/worker/src/sync-lock.test.ts packages/worker/wrangler.toml packages/worker/src/index.ts && git commit -m "feat(worker): 新增 SyncLock Durable Object 实现全局同步互斥"
 ```
 
+archived-with: 2026-06-22-stabilize-sync-consistency
 ---
 
 ### Task 3: 快照合并与兼容读取
@@ -486,6 +493,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/worker/src/sync-loc
 - 消费：`StorageAdapter`（来自 `@bangumi-tv/shared`）
 - 产出：`SyncSnapshot`、`SyncSnapshotMeta` 类型 + `getSnapshot(storage)` 函数
 
+archived-with: 2026-06-22-stabilize-sync-consistency
 ---
 
 - [x] **Step 1: 写入测试**
@@ -710,6 +718,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types pack
 cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/worker/src/storage/snapshot.ts packages/worker/src/storage/snapshot.test.ts packages/worker/src/api/collections.ts packages/worker/src/api/calendar.ts && git commit -m "feat(worker): 合并快照为 sync:snapshot + getSnapshot 兼容读取"
 ```
 
+archived-with: 2026-06-22-stabilize-sync-consistency
 ---
 
 ### Task 4: runSync 主流程重构
@@ -722,6 +731,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/worker/src/storage/
 - 消费：`TokenStatus`（Task 1）、`getSnapshot`（Task 3）—— 但 runSync *写入*快照而非读取，所以 `getSnapshot` 不作为 runSync 的输入
 - 产出：新 `runSync()` 签名，外部调用者通过返回值/副作用判断结果
 
+archived-with: 2026-06-22-stabilize-sync-consistency
 ---
 
 - [x] **Step 1: 写入 ensureFreshToken 三态测试**
@@ -1011,6 +1021,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types pack
 cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/worker/src/cron.ts packages/worker/src/cron.test.ts && git commit -m "feat(worker): runSync 重构 — 三态 token + primary 保护 + 快照写入 + 结构化错误"
 ```
 
+archived-with: 2026-06-22-stabilize-sync-consistency
 ---
 
 ### Task 5: 同步入口加锁 + 管理端输入验证
@@ -1024,6 +1035,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/worker/src/cron.ts 
 - 消费：`getSyncLockStub`（Task 2）、`SyncRequest`（现有）
 - 产出：加锁的同步入口 + 严格输入验证的 `executeSync`
 
+archived-with: 2026-06-22-stabilize-sync-consistency
 ---
 
 - [x] **Step 1: 写入 executeSync 输入验证测试**
@@ -1312,6 +1324,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types pack
 cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/worker/src/index.ts packages/worker/src/manage/sync-write.ts packages/worker/src/manage/sync-write.test.ts && git commit -m "feat(worker): 同步入口加锁 (SyncLock) + executeSync 输入校验"
 ```
 
+archived-with: 2026-06-22-stabilize-sync-consistency
 ---
 
 ### Task 6: 管理端语义更新与错误报告
@@ -1324,6 +1337,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/worker/src/index.ts
 - 消费：无（独立 UI 变更 + 类型新增）
 - 产出：更新后的 UI 文案 + SyncErrorLog 类型
 
+archived-with: 2026-06-22-stabilize-sync-consistency
 ---
 
 - [x] **Step 1: 更新 manage/index.html UI 文案**
@@ -1402,6 +1416,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types pack
 cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/worker/src/manage/index.html packages/worker/src/manage/security.ts && git commit -m "feat(manage): 更新 UI 语义 (全部复制/选择复制) + SyncErrorLog 类型"
 ```
 
+archived-with: 2026-06-22-stabilize-sync-consistency
 ---
 
 ## Self-Review
@@ -1437,6 +1452,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/worker/src/manage/i
 - `SyncSnapshot` / `SyncSnapshotMeta`（Task 3）→ `runSync` 写入逻辑（Task 4）→ 字段匹配
 - `SyncRequest.mode`（Task 5）→ `'full' | 'partial'` → UI 文案（Task 6）→ 对应「全部复制」/「选择复制」✅
 
+archived-with: 2026-06-22-stabilize-sync-consistency
 ---
 
 **计划完成并保存到 `docs/superpowers/plans/2026-06-22-stabilize-sync-consistency.md`。两个执行选项：**

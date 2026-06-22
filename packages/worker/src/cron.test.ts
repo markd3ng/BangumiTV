@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { StorageAdapter } from '@bangumi-tv/shared'
+import type { ImageStore } from './image/store.ts'
 
 // 使用动态导入，确保在类型可用后加载
 let cronModule: typeof import('./cron.ts')
@@ -15,6 +16,13 @@ function createMockStorage(store: Record<string, unknown> = {}): StorageAdapter 
     put: async <T>(key: string, value: T) => { store[key] = value },
     delete: async (key: string) => { delete store[key] },
   }
+}
+
+const mockImageStore: ImageStore = {
+  getOriginal: async () => null,
+  putOriginal: async () => {},
+  getVariant: async () => null,
+  putVariant: async () => {},
 }
 
 // 模拟 token_status 返回有效 token，避免真实网络请求
@@ -67,7 +75,7 @@ test('runSync throws when BANGUMI_USERS is empty', async () => {
     const storage = createMockStorage()
     await assert.rejects(
       () =>
-        cronModule.runSync(storage, null, {
+        cronModule.runSync(storage, mockImageStore, {
           BANGUMI_TOKEN: 'test-token',
           BANGUMI_USERS: [],
           SYNC_MODE: 'merge',
@@ -87,7 +95,7 @@ test('runSync throws when primary user is not in users list', async () => {
     const storage = createMockStorage()
     await assert.rejects(
       () =>
-        cronModule.runSync(storage, null, {
+        cronModule.runSync(storage, mockImageStore, {
           BANGUMI_TOKEN: 'test-token',
           BANGUMI_USERS: ['user-a'],
           BANGUMI_PRIMARY_USER: 'nonexistent-user',
@@ -113,7 +121,7 @@ test('runSync writes sync:snapshot key on success', async () => {
     // 由于 fetchAllCollections 会 fetch，而我们的 mock 处理 collections
     // 但用户 "user-a" 收藏为空 → primaryMerge 将成功合并
     // 注意：env.BANGUMI_USERS 是 string[] 类型
-    const ret = await cronModule.runSync(storage, null, {
+    const ret = await cronModule.runSync(storage, mockImageStore, {
       BANGUMI_TOKEN: 'test-token',
       BANGUMI_USERS: ['user-a', 'user-b'],
       SYNC_MODE: 'merge',

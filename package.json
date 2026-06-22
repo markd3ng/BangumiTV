@@ -23,5 +23,8 @@
   "license": "MIT",
   "dependencies": {
     "@fission-ai/openspec": "^1.4.1"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3"
   }
 }
