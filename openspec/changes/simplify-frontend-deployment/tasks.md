@@ -6,8 +6,8 @@
 
 ## 2. 部署收敛
 
-- [ ] 2.1 删除 Pages 资源创建和部署步骤
-- [ ] 2.2 添加占位符、资源语法和 Wrangler dry-run 检查
+- [x] 2.1 删除 Pages 资源创建和部署步骤
+- [x] 2.2 添加占位符、资源语法和 Wrangler dry-run 检查
 - [ ] 2.3 验证 Worker 首页、JS、CSS 和 API 使用同一 origin
 
 ## 3. 文档

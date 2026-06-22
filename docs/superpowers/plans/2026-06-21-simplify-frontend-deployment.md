@@ -212,7 +212,7 @@ git commit -m "chore: remove outdated assets.ts inline copy"
 **Files:**
 - Modify: `.github/workflows/deploy.yml`
 
-- [ ] **Step 1: 删除 Pages provisioning 步骤**
+- [x] **Step 1: 删除 Pages provisioning 步骤**
 
 在 "Provision Cloudflare resources" 步骤中删除：
 
@@ -220,7 +220,7 @@ git commit -m "chore: remove outdated assets.ts inline copy"
 npx wrangler pages project create bangumi-tv --production-branch dev || echo "Pages project already exists"
 ```
 
-- [ ] **Step 2: 删除 Pages deploy 步骤**
+- [x] **Step 2: 删除 Pages deploy 步骤**
 
 删除整个 "Deploy Pages" 步骤块：
 
@@ -234,7 +234,7 @@ npx wrangler pages project create bangumi-tv --production-branch dev || echo "Pa
     workingDirectory: packages/worker
 ```
 
-- [ ] **Step 3: 添加部署前验证步骤**
+- [x] **Step 3: 添加部署前验证步骤**
 
 在 "Deploy Worker" 之前添加 Wrangler dry-run 检查，阻止占位域名和资源漂移：
 
@@ -259,7 +259,7 @@ npx wrangler pages project create bangumi-tv --production-branch dev || echo "Pa
     echo "Validation passed"
 ```
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add .github/workflows/deploy.yml
