@@ -107,8 +107,8 @@ dist
 # macOS
 .DS_Store
 
-# pnpm
-pnpm-lock.yaml
+# npm lockfile (conflicts with pnpm)
+package-lock.json
 
 # pnpm content-addressable store (never commit)
 .pnpm-store/

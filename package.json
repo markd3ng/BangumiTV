@@ -2,6 +2,7 @@
   "name": "bangumi-tv",
   "version": "2.0.0",
   "private": true,
+  "packageManager": "pnpm@9.15.9",
   "description": "render your bangumi.tv progress on a static web page",
   "scripts": {
     "dev": "pnpm -F @bangumi-tv/worker dev",
