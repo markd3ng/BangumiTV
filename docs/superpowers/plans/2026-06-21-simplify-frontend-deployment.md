@@ -194,11 +194,11 @@ git commit -m "refactor: switch from assets.ts inline strings to text-import mod
 **Files:**
 - Delete: `packages/worker/src/assets.ts`
 
-- [ ] **Step 1: 删除文件并验证**
+- [x] **Step 1: 删除文件并验证**
 
 确认 index.ts 已无 `'./assets'` 引用后，删除 `packages/worker/src/assets.ts`。
 
-- [ ] **Step 2: 提交**
+- [x] **Step 2: 提交**
 
 ```bash
 git rm packages/worker/src/assets.ts
