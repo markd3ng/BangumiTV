@@ -10,7 +10,7 @@ on:
         required: false
         default: 'dev'
       skip_provision:
-        description: 'Skip resource provisioning (KV/R2/Pages)'
+        description: 'Skip resource provisioning (KV/R2)'
         type: boolean
         required: false
         default: false
@@ -45,7 +45,6 @@ jobs:
         run: |
           npx wrangler kv namespace create "bangumi-tv-kv" || echo "KV namespace already exists"
           npx wrangler r2 bucket create "bangumi-tv-images" || echo "R2 bucket already exists"
-          npx wrangler pages project create bangumi-tv --production-branch dev || echo "Pages project already exists"
 
       # 在 shell 中解析 KV namespace id，trim 掉尾随换行；若未拿到则失败。
       - name: Resolve KV namespace ID
@@ -97,6 +96,27 @@ jobs:
             fi
           done
 
+      - name: Validate assets before deploy
+        working-directory: packages/worker
+        run: |
+          # 检查占位域名未进入 public/
+          if grep -r '<WORKER_DOMAIN>' ../../public/; then
+            echo "ERROR: Placeholder <WORKER_DOMAIN> found in public/ files" >&2
+            exit 1
+          fi
+          # 检查 CSS 语法完整性（简单检验：CSS 文件是否以 } 结尾）
+          for f in ../../public/src/*.css; do
+            if [ -f "$f" ]; then
+              last_char=$(tail -c 1 "$f")
+              if [ "$last_char" != "}" ]; then
+                echo "WARNING: $f may have incomplete CSS syntax" >&2
+              fi
+            fi
+          done
+          # Wrangler dry-run 验证 bundle
+          npx wrangler deploy --dry-run --outdir dist-check
+          echo "Validation passed"
+
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v3
         with:
@@ -105,10 +125,4 @@ jobs:
           command: deploy
           workingDirectory: packages/worker
 
-      - name: Deploy Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages deploy ../../public/ --project-name=bangumi-tv --commit-dirty=true
-          workingDirectory: packages/worker
+
