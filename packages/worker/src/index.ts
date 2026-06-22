@@ -1,3 +1,4 @@
+/// <reference path="./worker-configuration.d.ts" />
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { KVStorage } from './storage/kv'
@@ -55,22 +56,6 @@ function errorToResponse(route: string, err: unknown): Response {
     return publicError(400, 'INVALID_REQUEST', err)
   }
   return publicError(500, 'REQUEST_FAILED', err)
-}
-
-interface Env {
-  BANGUMI_KV: KVNamespace
-  BANGUMI_R2: R2Bucket
-  SYNC_MODE: string
-  NSFW_SHOW: string
-  BANGUMI_TOKEN: string
-  BANGUMI_REFRESH_TOKEN?: string
-  BANGUMI_USERS: string
-  BANGUMI_PRIMARY_USER?: string
-  BANGUMI_CLIENT_ID?: string
-  BANGUMI_CLIENT_SECRET?: string
-  CRON_SECRET: string
-  MANAGE_SECRET?: string
-  SYNCLOCK: DurableObjectNamespace
 }
 
 const app = new Hono<{ Bindings: Env }>()
