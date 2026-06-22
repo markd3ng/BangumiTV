@@ -1,0 +1,129 @@
+name: Deploy to Cloudflare
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy'
+        required: false
+        default: 'dev'
+      skip_provision:
+        description: 'Skip resource provisioning (KV/R2)'
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch || 'dev' }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - run: pnpm install
+
+      - name: Configure Wrangler env
+        run: |
+          echo "CLOUDFLARE_API_TOKEN=${{ secrets.CF_API_TOKEN }}" >> "$GITHUB_ENV"
+          echo "CLOUDFLARE_ACCOUNT_ID=${{ secrets.CF_ACCOUNT_ID }}" >> "$GITHUB_ENV"
+
+      # 幂等创建资源：已存在时忽略。
+      - name: Provision Cloudflare resources
+        working-directory: packages/worker
+        run: |
+          npx wrangler kv namespace create "bangumi-tv-kv" || echo "KV namespace already exists"
+          npx wrangler r2 bucket create "bangumi-tv-images" || echo "R2 bucket already exists"
+
+      # 在 shell 中解析 KV namespace id，trim 掉尾随换行；若未拿到则失败。
+      - name: Resolve KV namespace ID
+        id: kv-id
+        working-directory: packages/worker
+        run: |
+          set -euo pipefail
+          KV_ID=$(npx wrangler kv namespace list | jq -r '.[] | select(.title == "bangumi-tv-kv") | .id' | head -n1 | tr -d '[:space:]')
+          if [ -z "${KV_ID}" ]; then
+            echo "Failed to resolve KV namespace id" >&2
+            exit 1
+          fi
+          echo "id=${KV_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Inject KV id into wrangler.toml
+        working-directory: packages/worker
+        env:
+          KV_ID: ${{ steps.kv-id.outputs.id }}
+        run: |
+          python3 - <<'PY'
+          import os, re, pathlib
+          kv_id = os.environ["KV_ID"]
+          p = pathlib.Path("wrangler.toml")
+          text = p.read_text()
+          text = re.sub(r'id = "bangumi-tv-kv"', f'id = "{kv_id}"', text)
+          p.write_text(text)
+          PY
+
+      # 逐个上传非空的 Worker secret（空值跳过，避免 wrangler rejected）。
+      - name: Upload Worker secrets
+        working-directory: packages/worker
+        env:
+          BANGUMI_TOKEN: ${{ secrets.BANGUMI_TOKEN }}
+          BANGUMI_REFRESH_TOKEN: ${{ secrets.BANGUMI_REFRESH_TOKEN }}
+          BANGUMI_USERS: ${{ vars.BANGUMI_USERS }}
+          BANGUMI_PRIMARY_USER: ${{ vars.BANGUMI_PRIMARY_USER }}
+          BANGUMI_CLIENT_ID: ${{ secrets.BANGUMI_CLIENT_ID }}
+          BANGUMI_CLIENT_SECRET: ${{ secrets.BANGUMI_CLIENT_SECRET }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          MANAGE_SECRET: ${{ secrets.MANAGE_SECRET }}
+        run: |
+          for name in BANGUMI_TOKEN BANGUMI_REFRESH_TOKEN BANGUMI_USERS BANGUMI_PRIMARY_USER \
+                      BANGUMI_CLIENT_ID BANGUMI_CLIENT_SECRET CRON_SECRET MANAGE_SECRET; do
+            val="${!name}"
+            if [ -n "${val}" ]; then
+              echo "${val}" | npx wrangler secret put "$name"
+            else
+              echo "Skipping $name (empty — will use KV / not configured)"
+            fi
+          done
+
+      - name: Validate assets before deploy
+        working-directory: packages/worker
+        run: |
+          # 检查占位域名未进入 public/
+          if grep -r '<WORKER_DOMAIN>' ../../public/; then
+            echo "ERROR: Placeholder <WORKER_DOMAIN> found in public/ files" >&2
+            exit 1
+          fi
+          # 检查 CSS 语法完整性（简单检验：CSS 文件是否以 } 结尾）
+          for f in ../../public/src/*.css; do
+            if [ -f "$f" ]; then
+              last_char=$(tail -c 1 "$f")
+              if [ "$last_char" != "}" ]; then
+                echo "ERROR: $f may have incomplete CSS syntax" >&2
+                exit 1
+              fi
+            fi
+          done
+          # Wrangler dry-run 验证 bundle
+          npx wrangler deploy --dry-run --outdir dist-check
+          echo "Validation passed"
+
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: deploy
+          workingDirectory: packages/worker
+
+
