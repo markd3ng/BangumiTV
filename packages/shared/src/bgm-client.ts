@@ -1,6 +1,11 @@
 const BGM_BASE = 'https://api.bgm.tv'
 const UA = 'markd3ng/BangumiTV (https://github.com/markd3ng/BangumiTV)'
 
+export type TokenStatus =
+  | { status: 'valid'; expires: number }
+  | { status: 'invalid' }
+  | { status: 'probe_failed' }
+
 export class BgmHttpError extends Error {
   constructor(public status: number, message: string) {
     super(message)
@@ -163,7 +168,7 @@ export class BgmClient {
    * 返回 token 是否有效及其过期 unix 时间戳；无效时 valid=false。
    * 这是唯一能可靠区分「token 过期(401)」与「资源不存在(404)」的探测方式。
    */
-  async tokenStatus(token: string): Promise<{ valid: boolean; expires?: number }> {
+  async tokenStatus(token: string): Promise<TokenStatus> {
     const url = `https://bgm.tv/oauth/token_status`
     let res: Response
     try {
@@ -174,15 +179,19 @@ export class BgmClient {
         signal: AbortSignal.timeout(30000),
       })
     } catch {
-      return { valid: false }
+      return { status: 'probe_failed' }
     }
-    if (res.status === 401 || res.status === 403) return { valid: false }
-    if (!res.ok) throw new BgmHttpError(res.status, `token_status error: ${res.status}`)
+    if (res.status === 401 || res.status === 403) return { status: 'invalid' }
+    if (res.status >= 500) return { status: 'probe_failed' }
+    if (!res.ok) return { status: 'probe_failed' }
     try {
-      const data = (await res.json()) as { expires?: number }
-      return { valid: true, expires: data.expires }
+      const data = (await res.json()) as { valid?: boolean; expires?: number }
+      if (data.valid === true && typeof data.expires === 'number') {
+        return { status: 'valid', expires: data.expires }
+      }
+      return { status: 'invalid' }
     } catch {
-      return { valid: false }
+      return { status: 'invalid' }
     }
   }
 
