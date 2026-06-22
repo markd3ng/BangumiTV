@@ -1056,7 +1056,7 @@ test('executeSync rejects empty subject_ids in partial mode', async () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试，验证失败预期**
+- [x] **Step 2: 运行测试，验证失败预期**
 
 ```bash
 cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types packages/worker/src/manage/sync-write.test.ts
@@ -1064,7 +1064,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types pack
 
 预期输出：至少部分测试 FAIL（当前 sync-write.ts 没有输入校验）。
 
-- [ ] **Step 3: 重写 sync-write.ts（加校验 + 锁调用）**
+- [x] **Step 3: 重写 sync-write.ts（加校验 + 锁调用）**
 
 `packages/worker/src/manage/sync-write.ts`：
 
@@ -1185,7 +1185,7 @@ async function doSync(
 }
 ```
 
-- [ ] **Step 4: 修改 index.ts 中的同步入口**
+- [x] **Step 4: 修改 index.ts 中的同步入口**
 
 **修改 `/api/manage/sync` handler（第 232-245 行）：**
 
@@ -1298,7 +1298,7 @@ async function scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext
 import { getSyncLockStub } from './sync-lock'
 ```
 
-- [ ] **Step 5: 运行所有测试**
+- [x] **Step 5: 运行所有测试**
 
 ```bash
 cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types packages/worker/src/manage/sync-write.test.ts && node --experimental-strip-types packages/worker/src/manage/security.test.ts
@@ -1306,7 +1306,7 @@ cd /Users/ian/Desktop/Projects/BangumiTV && node --experimental-strip-types pack
 
 预期输出：所有测试 PASS。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 cd /Users/ian/Desktop/Projects/BangumiTV && git add packages/worker/src/index.ts packages/worker/src/manage/sync-write.ts packages/worker/src/manage/sync-write.test.ts && git commit -m "feat(worker): 同步入口加锁 (SyncLock) + executeSync 输入校验"
