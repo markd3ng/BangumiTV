@@ -35,7 +35,7 @@ async function signState(secret: string, payload: unknown): Promise<string> {
   const material = await digest(`bangumi-tv:oauth-state:v1\0${secret}`)
   const key = await crypto.subtle.importKey(
     'raw',
-    material,
+    material.buffer as ArrayBuffer,
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['sign'],

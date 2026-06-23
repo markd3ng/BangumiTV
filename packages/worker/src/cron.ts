@@ -105,10 +105,10 @@ function transformCalendar(raw: Awaited<ReturnType<BgmClient['getCalendar']>>) {
     items: d.items
       .filter((item) => item.name_cn !== '' || item.name !== '')
       .map((item) => {
-        const { collection, rating, rank: _rank, ...rest } = item as Record<string, unknown>
-        return rest
+        const { collection, rating, rank: _rank, ...rest } = item as unknown as Record<string, unknown>
+        return rest as unknown as typeof item
       }),
-  }))
+  })) as typeof raw
 }
 
 // ── 主同步函数 ──

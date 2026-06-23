@@ -108,11 +108,12 @@ function fixedEqual(a: Uint8Array, b: Uint8Array): boolean {
 
 async function stateKey(secret: string): Promise<CryptoKey> {
   const material = await digest(`bangumi-tv:oauth-state:v1\0${secret}`)
-  return crypto.subtle.importKey('raw', material, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  return crypto.subtle.importKey('raw', material.buffer as ArrayBuffer, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
 }
 
 async function signState(secret: string, payload: string): Promise<Uint8Array> {
-  return new Uint8Array(await crypto.subtle.sign('HMAC', await stateKey(secret), encoder.encode(payload)))
+  const sig = await crypto.subtle.sign('HMAC', await stateKey(secret), encoder.encode(payload))
+  return new Uint8Array(sig)
 }
 
 const publicMessages: Record<string, string> = {
@@ -170,23 +171,20 @@ export async function verifyOAuthState(
     const expectedSignature = await signState(secret, encodedPayload)
     if (!fixedEqual(providedSignature, expectedSignature)) return null
 
-    const payload = JSON.parse(decoder.decode(unbase64url(encodedPayload))) as Partial<OAuthStatePayload>
+    const payload = JSON.parse(decoder.decode(unbase64url(encodedPayload))) as Record<string, unknown>
     const nowSeconds = Math.floor(now / 1000)
 
     if (payload.v !== 1) return null
-    if (!noncePattern.test(payload.nonce ?? '')) return null
-    if (!purposes.has(payload.purpose as OAuthPurpose)) return null
-    if (
-      !Number.isInteger(payload.exp) ||
-      payload.exp <= nowSeconds ||
-      payload.exp > nowSeconds + STATE_TTL_SECONDS
-    ) return null
+    if (typeof payload.nonce !== 'string' || !noncePattern.test(payload.nonce)) return null
+    if (typeof payload.purpose !== 'string' || !purposes.has(payload.purpose as OAuthPurpose)) return null
+    const exp = Number(payload.exp)
+    if (!Number.isInteger(exp) || exp <= nowSeconds || exp > nowSeconds + STATE_TTL_SECONDS) return null
 
     return {
       v: 1,
       nonce: payload.nonce,
       purpose: payload.purpose as OAuthPurpose,
-      exp: payload.exp,
+      exp,
     }
   } catch {
     return null

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { StorageAdapter } from '@bangumi-tv/shared'
 import type { ImageStore } from './image/store.ts'
+import type { SyncErrorLog } from './cron.ts'
 
 // 使用动态导入，确保在类型可用后加载
 let cronModule: typeof import('./cron.ts')
@@ -57,7 +58,7 @@ test('cron module exports runSync as a function', () => {
 // ── SyncErrorLog 类型验证 ──
 
 test('SyncErrorLog is exported with correct shape', () => {
-  const log: cronModule.SyncErrorLog = {
+  const log: SyncErrorLog = {
     timestamp: 1718000000,
     error: 'test error',
     stage: 'fetch_collections',

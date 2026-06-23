@@ -7,7 +7,7 @@ export async function handleCalendar(storage: StorageAdapter, nsfwShow: boolean)
 
   const filtered = snapshot.calendar.map((d) => ({
     weekday: d.weekday,
-    items: nsfwShow ? d.items : d.items.filter((item) => !(item as Record<string, unknown>).nsfw),
+    items: nsfwShow ? d.items : d.items.filter((item) => !(item as unknown as Record<string, unknown>).nsfw),
   }))
   return Response.json(filtered)
 }
