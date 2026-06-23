@@ -11,15 +11,25 @@
 - 给 `wrangler deploy` 加 `--no-triggers` 参数，实际该参数不存在，wrangler 静默忽略后仍尝试部署 trigger
 - 使用 `wrangler triggers deploy` 子命令，实际该命令只配合 `versions upload` 使用，不适用于 `deploy`
 
+### 可用验证渠道（按优先级）
+
+| 优先级 | 渠道 | 适用场景 |
+|--------|------|---------|
+| 1 | **本地命令** `--help` / `--version` | CLI flag、子命令、配置 key 是否存在 |
+| 2 | **Context7 MCP** (`mcp__context7__query-docs`) | 库/框架/SDK/CLI API 文档（Wrangler、Hono、Cloudflare Workers 等） |
+| 3 | **本地项目文档** | 搜索项目内 `docs/`、`*.md`、design docs 中的相关说明 |
+| 4 | **源代码类型定义** | `grep` 项目 `node_modules/` 或类型声明文件确认签名 |
+| 5 | **联网搜索** | 以上渠道均无法确认时，使用 WebSearch 或 WebFetch 查官方文档 |
+
 ### 必须执行的验证步骤
 
 | 场景 | 必须先执行的验证命令 |
 |------|---------------------|
-| 新增/修改 CLI 命令参数 | `<tool> <command> --help`（如 `wrangler deploy --help`） |
-| 新增/修改 wrangler 配置 | 查 Wrangler 官方文档确认 TOML key 有效 |
-| 使用 Cloudflare Workers API | 查 `@cloudflare/workers-types` 或官方 API 文档 |
-| 使用第三方库 API | `grep` 源码中的类型定义确认签名 |
-| 修改 CI/CD 流程 | 查 GitHub Actions 文档确认 step 语法和 action 参数 |
+| 新增/修改 CLI 命令参数 | `--help` → 无对应 flag 则不可使用 |
+| 新增/修改 wrangler 配置 | `--help` + Context7 查 Wrangler 文档确认 TOML key |
+| 使用 Cloudflare Workers API | Context7 查 Workers docs + `grep` `worker-configuration.d.ts` |
+| 使用第三方库 API | 本地 types + Context7 查对应库文档 |
+| 修改 CI/CD 流程 | Context7 查 GitHub Actions 文档 + 现有 workflow 参照 |
 
 ### 验证门禁
 
