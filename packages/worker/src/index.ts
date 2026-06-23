@@ -1,4 +1,4 @@
-/// <reference path="./worker-configuration.d.ts" />
+/// <reference path="../worker-configuration.d.ts" />
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { KVStorage } from './storage/kv'

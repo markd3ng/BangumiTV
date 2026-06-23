@@ -9,6 +9,9 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --test"
+    "test": "tsx --test"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0"
   }
 }

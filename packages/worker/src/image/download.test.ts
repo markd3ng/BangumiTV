@@ -10,10 +10,10 @@ function arrayBufferFrom(str: string): ArrayBuffer {
 
 function createMockImageStore(): ImageStore {
   return {
-    putOriginal: mock.fn(async () => {}),
-    getOriginal: mock.fn(async () => null),
-    getVariant: mock.fn(async () => null),
-    putVariant: mock.fn(async () => {}),
+    putOriginal: mock.fn(async (_hash: string, _data: ArrayBuffer, _contentType: string) => {}),
+    getOriginal: mock.fn(async (_hash: string) => null),
+    getVariant: mock.fn(async (_hash: string, _variant: string) => null),
+    putVariant: mock.fn(async (_hash: string, _variant: string, _data: ArrayBuffer, _contentType: string) => {}),
   }
 }
 
@@ -81,7 +81,7 @@ it('下载失败降级 — null 结果不中断其余', async () => {
   assert.ok(hashMap.has(1))
   assert.ok(!hashMap.has(2))
   assert.ok(hashMap.has(3))
-  assert.equal(store.putOriginal.mock.callCount(), 2)
+  assert.equal((store.putOriginal as any).mock.callCount(), 2)
 })
 
 // ── 场景 3: 空输入 ──
@@ -93,5 +93,5 @@ it('空输入 — 返回空 Map', async () => {
   const hashMap = await downloadImagesWithLimit([], store, mockClient, 2)
 
   assert.equal(hashMap.size, 0)
-  assert.equal(store.putOriginal.mock.callCount(), 0)
+  assert.equal((store.putOriginal as any).mock.callCount(), 0)
 })

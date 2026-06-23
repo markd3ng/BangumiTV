@@ -13,4 +13,5 @@ interface Env {
   CRON_SECRET: string
   MANAGE_SECRET?: string
   SYNC_MODE: "merge" | "primary"
+  NSFW_SHOW: "true" | "false"
 }
