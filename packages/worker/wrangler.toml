@@ -20,7 +20,7 @@ bucket_name = "bangumi-tv-images"
 # 允许将 HTML 作为文本模块导入（manage 页面模板）。
 [[rules]]
 type = "Text"
-globs = ["**/*.html", "**/*.css", "**/*.js"]
+globs = ["**/*.html", "**/*.css", "**/public/**/*.js"]
 fallthrough = true
 
 [[durable_objects.bindings]]
