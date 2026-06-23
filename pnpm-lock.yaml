@@ -31,8 +31,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       hono:
-        specifier: ^4.x
-        version: 4.12.25
+        specifier: ^4.12.27
+        version: 4.12.27
     devDependencies:
       '@types/node':
         specifier: ^26.0.0
@@ -832,8 +832,8 @@ packages:
     resolution: {integrity: sha512-AOIgSQCepiJYwP3ARnGx+5VnTu2HBYdzbGP45eLw1vr3zB3vZLeyed1sC9hnbcOc9/SrMyM5RPQrkGz4aS9Zow==}
     engines: {node: '>= 6'}
 
-  hono@4.12.25:
-    resolution: {integrity: sha512-2NFaIyNVgJmBs/ecmtGzlmluTFs5cHEWGTdu0t1HBwYzoGXOL5nUQBRMXsXWla5i4KkG//QMzVP88m1+I3fdAQ==}
+  hono@4.12.27:
+    resolution: {integrity: sha512-1yrb/+w6HWQJrUCLkJ2IF5jNIPvvFkblV5RNOYl6bV+OA6p9GLcMpHFFGTosSvHvcAUibuUukRqhlYI4z32C7Q==}
     engines: {node: '>=16.9.0'}
 
   iconv-lite@0.7.2:
@@ -1681,7 +1681,7 @@ snapshots:
     dependencies:
       is-glob: 4.0.3
 
-  hono@4.12.25: {}
+  hono@4.12.27: {}
 
   iconv-lite@0.7.2:
     dependencies:

@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@bangumi-tv/shared": "workspace:*",
-    "hono": "^4.x"
+    "hono": "^4.12.27"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",
