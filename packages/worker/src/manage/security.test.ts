@@ -365,12 +365,14 @@ test('worker sync logging calls never receive errors usernames or free text', as
 
   // cron.ts 新实现直接抛错，不再使用 createSyncFailureLog
   assert.doesNotMatch(cronSource, /createSyncFailureLog/)
-  assert.doesNotMatch(cronSource, /console\.(?:error|warn|log)\(/)
+  // cron.ts phase logging uses console.log with structured JSON only
+  assert.doesNotMatch(cronSource, /console\.(?:error|warn)\(/)
   assert.match(workerSource, /createSyncFailureLog\('manual', err\)/)
   assert.match(workerSource, /createSyncFailureLog\('scheduled', err\)/)
+  // 非结构化 console 调用不得泄露错误详情/用户名/自由文本
   assert.doesNotMatch(
     source,
-    /console\.(?:error|warn|log)\([^)]*(?:err|error|reason|user|BANGUMI_USERS)/,
+    /console\.(?:error|warn|log)\((?!JSON\.stringify)[^)]*(?:err|error|reason|user|BANGUMI_USERS)/,
   )
 })
 
@@ -429,7 +431,7 @@ test('worker source validates oauth-url body with parseOAuthPurposeBody and retu
   const oauthUrlBlock = oauthUrlBlockMatch[0]
 
   assert.match(oauthUrlBlock, /parseOAuthPurposeBody\(await c\.req\.json\(\)\.catch\(\(\) => null\)\)/)
-  assert.match(oauthUrlBlock, /if \(!purpose\) \{\s*return publicError\(400, 'INVALID_REQUEST'\)\s*\}/)
+  assert.match(oauthUrlBlock, /if \(!purpose\) \{[\s\S]*?return publicError\(400, 'INVALID_REQUEST'\)/)
   assert.match(oauthUrlBlock, /return publicError\(400, 'INVALID_REQUEST'\)/)
   assert.match(oauthUrlBlock, /return publicError\(503, 'OAUTH_NOT_CONFIGURED'\)/)
   assert.match(oauthUrlBlock, /createOAuthState\(c\.env\.MANAGE_SECRET!, purpose\)/)
@@ -443,10 +445,10 @@ test('worker source validates oauth exchange body before upstream and preserves 
   const exchangeBlock = exchangeBlockMatch[0]
 
   assert.match(exchangeBlock, /parseOAuthExchangeBody\(await c\.req\.json\(\)\.catch\(\(\) => null\)\)/)
-  assert.match(exchangeBlock, /if \(!body\) return publicError\(400, 'INVALID_REQUEST'\)/)
+  assert.match(exchangeBlock, /if \(!body\) \{[\s\S]*?return publicError\(400, 'INVALID_REQUEST'\)/)
   assert.match(exchangeBlock, /const state = await verifyOAuthState\(c\.env\.MANAGE_SECRET!, body\.state\)/)
-  assert.match(exchangeBlock, /if \(!state\) return publicError\(400, 'INVALID_OAUTH_STATE'\)/)
-  assert.match(exchangeBlock, /if \(!c\.env\.BANGUMI_CLIENT_ID \|\| !c\.env\.BANGUMI_CLIENT_SECRET\) \{\s*return publicError\(503, 'OAUTH_NOT_CONFIGURED'\)\s*\}/)
+  assert.match(exchangeBlock, /if \(!state\) \{[\s\S]*?return publicError\(400, 'INVALID_OAUTH_STATE'\)/)
+  assert.match(exchangeBlock, /if \(!c\.env\.BANGUMI_CLIENT_ID \|\| !c\.env\.BANGUMI_CLIENT_SECRET\) \{[\s\S]*?return publicError\(503, 'OAUTH_NOT_CONFIGURED'\)/)
   assert.ok(exchangeBlock.indexOf('verifyOAuthState') < exchangeBlock.indexOf('exchangeCode'))
   assert.match(exchangeBlock, /if \(state\.purpose === 'cron'\) \{/)
   assert.match(exchangeBlock, /await storage\.put\('bgm:tokens', \{/)
@@ -478,9 +480,9 @@ test('worker source verifies state before exchange and never returns refresh tok
   const exchangeBlock = exchangeBlockMatch[0]
 
   assert.match(exchangeBlock, /parseOAuthExchangeBody\(await c\.req\.json\(\)\.catch\(\(\) => null\)\)/)
-  assert.match(exchangeBlock, /if \(!body\) return publicError\(400, 'INVALID_REQUEST'\)/)
+  assert.match(exchangeBlock, /if \(!body\) \{[\s\S]*?return publicError\(400, 'INVALID_REQUEST'\)/)
   assert.match(exchangeBlock, /const state = await verifyOAuthState\(c\.env\.MANAGE_SECRET!, body\.state\)/)
-  assert.match(exchangeBlock, /if \(!state\) return publicError\(400, 'INVALID_OAUTH_STATE'\)/)
+  assert.match(exchangeBlock, /if \(!state\) \{[\s\S]*?return publicError\(400, 'INVALID_OAUTH_STATE'\)/)
   assert.match(exchangeBlock, /if \(!c\.env\.BANGUMI_CLIENT_ID \|\| !c\.env\.BANGUMI_CLIENT_SECRET\) \{[\s\S]*return publicError\(503, 'OAUTH_NOT_CONFIGURED'\)/)
   assert.match(exchangeBlock, /await exchangeCode\([\s\S]*body\.code/)
   assert.match(exchangeBlock, /if \(state\.purpose === 'cron'\) \{[\s\S]*await storage\.put\('bgm:tokens', \{[\s\S]*access_token: result\.access_token,[\s\S]*refresh_token: result\.refresh_token,[\s\S]*\}\)[\s\S]*return Response\.json\(\{ ok: true \}\)/)

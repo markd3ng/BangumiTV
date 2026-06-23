@@ -24,9 +24,11 @@ export async function handleImage(
   const store = new R2ImageStore(env.BANGUMI_R2)
   const original = await store.getOriginal(hash)
   if (!original) {
+    console.log(JSON.stringify({ event: 'image_proxy_miss', hash, at: new Date().toISOString() }))
     return new Response('Not found', { status: 404 })
   }
 
+  console.log(JSON.stringify({ event: 'image_proxy_hit', hash, content_type: original.contentType, at: new Date().toISOString() }))
   return new Response(original.data, {
     headers: { ...CACHE_HEADERS, 'Content-Type': original.contentType },
   })

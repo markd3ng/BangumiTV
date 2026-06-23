@@ -127,7 +127,9 @@ export async function runSync(
   },
 ): Promise<{ merged: MergedCollections; calendar: ReturnType<typeof transformCalendar>; generation: number }> {
   // 1. Token 刷新（三态适配）
+  console.log(JSON.stringify({ event: 'sync_phase', phase: 'token_refresh', at: new Date().toISOString() }))
   const token = await ensureFreshToken(storage, env)
+  console.log(JSON.stringify({ event: 'sync_phase', phase: 'token_ready', at: new Date().toISOString() }))
 
   if (env.BANGUMI_USERS.length === 0) {
     throw new Error('sync: BANGUMI_USERS is empty — nothing to sync')
@@ -137,6 +139,8 @@ export async function runSync(
 
   // 2. 拉取所有用户收藏
   const settled = await Promise.allSettled(env.BANGUMI_USERS.map((u) => fetchAllCollections(client, u)))
+  const succeeded = settled.filter((s) => s.status === 'fulfilled').length
+  console.log(JSON.stringify({ event: 'sync_phase', phase: 'fetched_collections', users_total: env.BANGUMI_USERS.length, users_succeeded: succeeded, at: new Date().toISOString() }))
 
   // 3. Primary 保护
   let merged: MergedCollections
@@ -187,6 +191,9 @@ export async function runSync(
   const imageHashMap = imageEntries.length > 0
     ? await downloadImagesWithLimit(imageEntries, imageStore, client)
     : undefined
+  if (imageEntries.length > 0) {
+    console.log(JSON.stringify({ event: 'sync_phase', phase: 'images_downloaded', candidates: imageEntries.length, hashes: imageHashMap?.size ?? 0, at: new Date().toISOString() }))
+  }
 
   // 3.6 带图片 hash 重新合并
   if (env.SYNC_MODE === 'primary' && env.BANGUMI_PRIMARY_USER) {
@@ -207,6 +214,7 @@ export async function runSync(
   }
 
   // 4. 拉取日历
+  console.log(JSON.stringify({ event: 'sync_phase', phase: 'fetch_calendar', at: new Date().toISOString() }))
   let calendar: ReturnType<typeof transformCalendar>
   try {
     calendar = transformCalendar(await client.getCalendar())
@@ -231,5 +239,6 @@ export async function runSync(
   await storage.put(LAST_SUCCESS_KEY, new Date().toISOString())
   await storage.delete(LAST_ERROR_KEY)
 
+  console.log(JSON.stringify({ event: 'sync_phase', phase: 'snapshot_written', generation, calendar_days: calendar.length, at: new Date().toISOString() }))
   return { merged, calendar, generation }
 }

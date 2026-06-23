@@ -43,8 +43,8 @@ export async function downloadImagesWithLimit(
         // 写入 R2
         await imageStore.putOriginal(hashHex, downloaded.data, downloaded.contentType)
         result.set(entry.subjectId, hashHex)
-      } catch {
-        // 失败静默跳过
+      } catch (err) {
+        console.warn(JSON.stringify({ event: 'image_download_failed', subject_id: entry.subjectId, url: entry.url, reason: err instanceof Error ? err.message : String(err), at: new Date().toISOString() }))
       }
     }
   }

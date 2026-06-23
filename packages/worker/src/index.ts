@@ -60,6 +60,20 @@ function errorToResponse(route: string, err: unknown): Response {
 
 const app = new Hono<{ Bindings: Env }>()
 
+// ── 请求级调试埋点：method path status duration ──
+app.use('*', async (c, next) => {
+  const start = Date.now()
+  await next()
+  const duration = Date.now() - start
+  console.log(JSON.stringify({
+    event: 'request',
+    method: c.req.method,
+    path: new URL(c.req.url).pathname,
+    status: c.res.status,
+    duration_ms: duration,
+  }))
+})
+
 const publicCors = cors({ origin: '*', allowMethods: ['GET', 'OPTIONS'] })
 app.use('/api/collections', publicCors)
 app.use('/api/calendar', publicCors)
@@ -94,14 +108,24 @@ app.get('/src/bangumi.css', () => {
 })
 
 // 公开 API
-app.get('/api/collections', (c) => {
+app.get('/api/collections', async (c) => {
   const storage = new KVStorage(c.env.BANGUMI_KV)
-  return handleCollections(storage, new URL(c.req.url), c.env.NSFW_SHOW !== 'false')
+  try {
+    return await handleCollections(storage, new URL(c.req.url), c.env.NSFW_SHOW !== 'false')
+  } catch (err) {
+    console.error(JSON.stringify({ event: 'api_error', route: '/api/collections', kind: err instanceof Error ? err.name : 'Unknown', at: new Date().toISOString() }))
+    return Response.json({ data: [], total: 0, page: 1, limit: 24, types: {} }, { status: 200 })
+  }
 })
 
-app.get('/api/calendar', (c) => {
+app.get('/api/calendar', async (c) => {
   const storage = new KVStorage(c.env.BANGUMI_KV)
-  return handleCalendar(storage, c.env.NSFW_SHOW !== 'false')
+  try {
+    return await handleCalendar(storage, c.env.NSFW_SHOW !== 'false')
+  } catch (err) {
+    console.error(JSON.stringify({ event: 'api_error', route: '/api/calendar', kind: err instanceof Error ? err.name : 'Unknown', at: new Date().toISOString() }))
+    return Response.json([], { status: 200 })
+  }
 })
 
 app.get('/api/config', (c) => {
@@ -114,6 +138,7 @@ app.get('/api/health', async (c) => {
   try {
     const snap = await getSnapshot(storage)
     const lastSuccess = await storage.get<string>('sync:last_success')
+      console.log(JSON.stringify({ event: 'health_ok', has_snapshot: !!snap, last_sync: lastSuccess || null, at: new Date().toISOString() }))
     return Response.json({
       ok: true,
       data: {
@@ -155,7 +180,16 @@ app.get('/manage/callback', () => {
 
 app.use('/api/manage/*', async (c, next) => {
   const denied = await authorizeManageRequest(c.req.raw, c.env.MANAGE_SECRET)
-  if (denied) return denied
+  if (denied) {
+    console.warn(JSON.stringify({
+      event: 'manage_auth_denied',
+      status: denied.status,
+      has_secret: !!c.req.header('X-Manage-Secret'),
+      origin: c.req.header('Origin') || null,
+      at: new Date().toISOString(),
+    }))
+    return denied
+  }
   await next()
   for (const [name, value] of Object.entries(manageHeaders())) {
     c.header(name, String(value))
@@ -165,11 +199,16 @@ app.use('/api/manage/*', async (c, next) => {
 app.post('/api/manage/oauth-url', async (c) => {
   const purpose: OAuthPurpose | null = parseOAuthPurposeBody(await c.req.json().catch(() => null))
   if (!purpose) {
+    console.warn(JSON.stringify({ event: 'manage_input_error', route: '/api/manage/oauth-url', reason: 'invalid_purpose', at: new Date().toISOString() }))
     return publicError(400, 'INVALID_REQUEST')
   }
-  if (!c.env.BANGUMI_CLIENT_ID) return publicError(503, 'OAUTH_NOT_CONFIGURED')
+  if (!c.env.BANGUMI_CLIENT_ID) {
+    console.warn(JSON.stringify({ event: 'manage_input_error', route: '/api/manage/oauth-url', reason: 'oauth_not_configured', at: new Date().toISOString() }))
+    return publicError(503, 'OAUTH_NOT_CONFIGURED')
+  }
   const created = await createOAuthState(c.env.MANAGE_SECRET!, purpose)
   const redirectUri = `${new URL(c.req.url).origin}/manage/callback`
+	  console.log(JSON.stringify({ event: 'manage_oauth_url', purpose, at: new Date().toISOString() }))
   return Response.json({
     url: getOAuthRedirectUrl(c.env.BANGUMI_CLIENT_ID, redirectUri, created.state),
     state: created.state,
@@ -179,10 +218,17 @@ app.post('/api/manage/oauth-url', async (c) => {
 
 app.post('/api/manage/exchange', async (c) => {
   const body = parseOAuthExchangeBody(await c.req.json().catch(() => null))
-  if (!body) return publicError(400, 'INVALID_REQUEST')
+  if (!body) {
+    console.warn(JSON.stringify({ event: 'manage_input_error', route: '/api/manage/exchange', reason: 'invalid_body', at: new Date().toISOString() }))
+    return publicError(400, 'INVALID_REQUEST')
+  }
   const state = await verifyOAuthState(c.env.MANAGE_SECRET!, body.state)
-  if (!state) return publicError(400, 'INVALID_OAUTH_STATE')
+  if (!state) {
+    console.warn(JSON.stringify({ event: 'manage_input_error', route: '/api/manage/exchange', reason: 'invalid_oauth_state', at: new Date().toISOString() }))
+    return publicError(400, 'INVALID_OAUTH_STATE')
+  }
   if (!c.env.BANGUMI_CLIENT_ID || !c.env.BANGUMI_CLIENT_SECRET) {
+    console.warn(JSON.stringify({ event: 'manage_input_error', route: '/api/manage/exchange', reason: 'oauth_not_configured', at: new Date().toISOString() }))
     return publicError(503, 'OAUTH_NOT_CONFIGURED')
   }
 
@@ -199,8 +245,10 @@ app.post('/api/manage/exchange', async (c) => {
         access_token: result.access_token,
         refresh_token: result.refresh_token,
       })
+	      console.log(JSON.stringify({ event: 'manage_oauth_exchange', purpose: 'cron', at: new Date().toISOString() }))
       return Response.json({ ok: true })
     }
+	    console.log(JSON.stringify({ event: 'manage_oauth_exchange', purpose: state.purpose, has_user_id: true, at: new Date().toISOString() }))
     return Response.json({ access_token: result.access_token, user_id: result.user_id })
   } catch (err) {
     return errorToResponse('/api/manage/exchange', err)
@@ -211,6 +259,7 @@ app.post('/api/manage/compare', async (c) => {
   try {
     const body = await c.req.json()
     const result = await compareAccounts(body.tokenA || '', body.userA || '', body.tokenB || '', body.userB || '')
+	    console.log(JSON.stringify({ event: 'manage_compare', user_a: body.userA || '', user_b: body.userB || '', total_a: result.userA.total, total_b: result.userB.total, common: result.common, diffs: result.differences.length, at: new Date().toISOString() }))
     return Response.json(result)
   } catch (err) {
     return errorToResponse('/api/manage/compare', err)
@@ -226,6 +275,9 @@ app.post('/api/manage/sync', async (c) => {
       to: body.to,
       subject_ids: body.subject_ids,
     }, c.env as { SYNCLOCK: DurableObjectNamespace })
+	    const syncOk = results.filter((r: any) => r.status === 'ok').length;
+	    const syncErr = results.filter((r: any) => r.status === 'error').length;
+	    console.log(JSON.stringify({ event: 'manage_sync', mode: body.mode, total: results.length, ok: syncOk, errors: syncErr, at: new Date().toISOString() }))
     return Response.json(results)
   } catch (err) {
     return errorToResponse('/api/manage/sync', err)
@@ -237,6 +289,7 @@ app.delete('/api/manage/cron-token', async (c) => {
   const storage = new KVStorage(c.env.BANGUMI_KV)
   try {
     await storage.delete('bgm:tokens')
+	    console.log(JSON.stringify({ event: 'manage_cron_token_deleted', at: new Date().toISOString() }))
     return Response.json({ ok: true })
   } catch (err) {
     return errorToResponse('/api/manage/cron-token', err)
@@ -272,6 +325,7 @@ app.post('/__cron/sync', async (c) => {
     })
     await storage.put('sync:last_success', new Date().toISOString())
     await storage.delete('sync:last_error')
+	    console.log(JSON.stringify({ event: 'cron_sync_manual_ok', users: users.length, at: new Date().toISOString() }))
     return new Response('OK', { status: 200 })
   } catch (err) {
     const log = createSyncFailureLog('manual', err)

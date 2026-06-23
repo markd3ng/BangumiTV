@@ -100,7 +100,8 @@ async function doSync(
         name: entry.subject?.name_cn || entry.subject?.name || String(entry.subject_id),
         status: 'ok',
       })
-    } catch {
+    } catch (err) {
+      console.warn(JSON.stringify({ event: 'sync_item_failed', subject_id: entry.subject_id, reason: err instanceof Error ? err.message : String(err), at: new Date().toISOString() }))
       results.push({
         subject_id: entry.subject_id,
         name: entry.subject?.name_cn || entry.subject?.name || String(entry.subject_id),
