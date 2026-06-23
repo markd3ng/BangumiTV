@@ -2,7 +2,9 @@
 
 > 在静态页面中渲染你的 Bangumi 追番进度
 
-基于 Cloudflare Workers，数据直接来源于 bgm.tv API。条目封面在同步时自动下载，计算哈希后存入 R2 bucket，通过 `/image/:hash` 路由提供（支持 webp 格式转换和尺寸调整）。
+基于 Cloudflare Workers，数据直接来源于 bgm.tv API。条目封面在同步时自动下载，计算哈希后存入 R2 bucket，通过 `/image/:hash` 路由提供。
+
+**架构：双 Worker 拆分** — 主 Worker (`bangumi-tv`) 处理公开 API、管理 API、图片代理；同步 Worker (`bangumi-tv-sync`) 独立处理定时同步和图片下载，各自独享 50 子请求配额，避免同步导致 API 响应超时或子请求超限。
 
 ## Demo
 
@@ -48,7 +50,7 @@
    |------|------|
    | `CF_API_TOKEN` | Cloudflare API Token（见上方「Cloudflare API Token 权限配置」） |
    | `CF_ACCOUNT_ID` | Cloudflare 账户 ID（Dashboard 右侧栏可见） |
-   | `CRON_SECRET` | 自定义随机字符串（手动触发 `POST /__cron/sync` 认证用） |
+   | `CRON_SECRET` | 自定义随机字符串（手动触发 sync worker `POST /__cron/sync` 认证用） |
    | `MANAGE_SECRET` | 必填。管理 API 的共享密码；未配置时管理 API 返回 503 |
 
    **Variables:**
@@ -107,7 +109,7 @@
 授权完成后可立即触发一次同步而不等 4 小时定时任务：
 
 ```bash
-curl -X POST -H "X-Cron-Secret: <CRON_SECRET>" https://bangumi-tv.<你的子域名>.workers.dev/__cron/sync
+curl -X POST -H "X-Cron-Secret: <CRON_SECRET>" https://bangumi-tv-sync.<你的子域名>.workers.dev/__cron/sync
 ```
 
 ## 前端接入
@@ -128,8 +130,9 @@ curl -X POST -H "X-Cron-Secret: <CRON_SECRET>" https://bangumi-tv.<你的子域�
 
 ## 图片策略
 
-Worker 在 cron 同步时自动下载条目封面（来源：bgm.tv），计算 SHA-256 哈希后存入 R2 bucket（`bangumi-tv-images`）。图片通过 `/image/:hash` 路由按需提供（预留了 webp 格式转换和尺寸调整的参数接口，待后续实现）。
+Sync Worker 在定时同步时自动下载条目封面（来源：bgm.tv），计算 SHA-256 哈希后存入 R2 bucket（`bangumi-tv-images`）。图片通过主 Worker 的 `/image/:hash` 路由按需提供。
 
+- 每次同步最多下载 **25 张**新图片（Free Plan 50 子请求限制），其余复用上次快照中的旧 hash，跨多次同步逐步补全
 - 下载限流至最多 2 个并行，单张超时 8 秒，失败不影响同步整体流程
 - 前端在 hash 为 null 时使用纯色占位 SVG，避免构造损坏 URL
 - 图片缓存头：`Cache-Control: public, max-age=31536000, immutable`
@@ -171,7 +174,7 @@ SYNC_MODE=merge
 NSFW_SHOW=true
 ```
 
-> `.dev.vars` 已被 `.gitignore` 忽略，不会提交。本地若需手动触发一次同步，可 `curl -X POST -H "X-Cron-Secret: 任意字符串" http://localhost:8787/__cron/sync`。
+> `.dev.vars` 已被 `.gitignore` 忽略，不会提交。本地若需手动触发一次同步，需先启动 sync worker（`npx wrangler dev --config wrangler.sync.toml --port 8788`），然后 `curl -X POST -H "X-Cron-Secret: 任意字符串" http://localhost:8788/__cron/sync`。
 
 ## 环境变量说明
 
@@ -185,7 +188,7 @@ NSFW_SHOW=true
 | `BANGUMI_PRIMARY_USER` | var | `primary` 模式下的主账户名 |
 | `BANGUMI_CLIENT_ID` | secret | OAuth App client_id |
 | `BANGUMI_CLIENT_SECRET` | secret | OAuth App client_secret |
-| `CRON_SECRET` | secret | 手动触发 `POST /__cron/sync` 的认证密钥（定时 cron 无需） |
+| `CRON_SECRET` | secret | 手动触发 sync worker `POST /__cron/sync` 的认证密钥（定时 cron 由 sync worker 自动执行） |
 | `MANAGE_SECRET` | secret | 必填。管理页写操作密码；未配置时管理 API 返回 503 |
 
 > GitHub 中：标 **var** 的配在 Settings → Secrets and variables → Actions → **Variables**；标 **secret** 的配在 **Secrets**。
