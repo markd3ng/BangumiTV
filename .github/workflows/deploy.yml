@@ -51,7 +51,7 @@ jobs:
 
       - name: Build Check (sync worker)
         working-directory: packages/worker
-        run: npx wrangler deploy --dry-run --outdir dist-sync --config wrangler.sync.toml --no-triggers
+        run: npx wrangler deploy --dry-run --outdir dist-sync --config wrangler.sync.toml
 
       # 幂等创建资源：已存在时忽略。
       - name: Provision Cloudflare resources
@@ -163,5 +163,13 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
         working-directory: packages/worker
         run: |
-          # --no-triggers: cron 首次部署后无需重复更新，避免 Cloudflare API schedule 瞬时故障阻塞 CI
-          npx wrangler deploy --config wrangler.sync.toml --no-triggers
+          set -o pipefail
+          npx wrangler deploy --config wrangler.sync.toml 2>&1 | tee /tmp/deploy-sync.log
+          DEPLOY_EXIT=${PIPESTATUS[0]}
+          if [ $DEPLOY_EXIT -ne 0 ]; then
+            if grep -q "schedules.*failed" /tmp/deploy-sync.log; then
+              echo "::warning::Cron trigger API call failed — worker code deployed, trigger may need manual setup"
+              exit 0
+            fi
+            exit $DEPLOY_EXIT
+          fi
