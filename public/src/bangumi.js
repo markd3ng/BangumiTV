@@ -28,9 +28,9 @@
   }
 
   function renderCard(entry) {
-    const imgUrl = entry.images && entry.images.hash
-      ? API + '/image/' + entry.images.hash + '?w=300&fmt=webp'
-      : 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" fill="#333"><rect width="300" height="400"/></svg>')
+    const hasHash = entry.images && entry.images.hash
+    const imgUrl = hasHash ? API + '/image/' + entry.images.hash + '?w=300&fmt=webp' : ''
+    const alt = entry.name_cn || entry.name
 
     const progress = entry.total_episodes > 0
       ? Math.round((entry.ep_status / entry.total_episodes) * 100)
@@ -39,8 +39,12 @@
     var html = '<a href="https://bgm.tv/subject/' + entry.subject_id + '" target="_blank" class="bgm-card';
     if (entry.nsfw) html += ' bgm-nsfw';
     html += '">' +
-      '<div class="bgm-card-cover">' +
-        '<img src="' + imgUrl + '" alt="' + (entry.name_cn || entry.name) + '" loading="lazy">';
+      '<div class="bgm-card-cover">';
+    if (hasHash) {
+      html += '<img src="' + imgUrl + '" alt="' + alt + '" width="300" height="400" loading="lazy">';
+    } else {
+      html += '<div class="bgm-placeholder"><span>Cover Caching</span></div>';
+    }
     if (entry.nsfw) html += '<div class="bgm-nsfw-overlay" onclick="event.preventDefault();this.parentElement.parentElement.classList.toggle(\'bgm-nsfw-reveal\')">R18</div>';
     html += '</div>' +
       '<div class="bgm-card-info">' +
