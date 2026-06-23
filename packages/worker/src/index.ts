@@ -128,7 +128,8 @@ app.get('/src/bangumi.css', () => {
 app.get('/api/collections', async (c) => {
   // Cache API: 避免每次从 KV 读 150KB+ 快照
   const cache = (caches as any).default as Cache
-  const cached = await cache.match(c.req.raw)
+  const cacheKey = new Request(c.req.url)
+  const cached = await cache.match(cacheKey)
   if (cached) return cached
 
   const storage = new KVStorage(c.env.BANGUMI_KV)
@@ -137,8 +138,10 @@ app.get('/api/collections', async (c) => {
   try {
     const res = await handleCollections(storage, url, c.env.NSFW_SHOW !== 'false')
     console.log(JSON.stringify({ event: 'api_collections', type, status: res.status, at: new Date().toISOString() }))
-    c.executionCtx.waitUntil(cache.put(c.req.raw, res.clone()))
-    return res
+    const resBody = await res.text()
+    const cachedRes = new Response(resBody, { status: res.status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } })
+    c.executionCtx.waitUntil(cache.put(cacheKey, cachedRes.clone()))
+    return cachedRes
   } catch (err) {
     const log = { event: 'api_error', route: '/api/collections', kind: err instanceof Error ? err.name : 'Unknown', message: errMsg(err), at: new Date().toISOString() }
     console.error(JSON.stringify(log))
@@ -149,15 +152,18 @@ app.get('/api/collections', async (c) => {
 
 app.get('/api/calendar', async (c) => {
   const calCache = (caches as any).default as Cache
-  const calCached = await calCache.match(c.req.raw)
+  const calCacheKey = new Request(c.req.url)
+  const calCached = await calCache.match(calCacheKey)
   if (calCached) return calCached
 
   const storage = new KVStorage(c.env.BANGUMI_KV)
   try {
     const calRes = await handleCalendar(storage, c.env.NSFW_SHOW !== 'false')
     console.log(JSON.stringify({ event: 'api_calendar', status: calRes.status, at: new Date().toISOString() }))
-    c.executionCtx.waitUntil(calCache.put(c.req.raw, calRes.clone()))
-    return calRes
+    const calBody = await calRes.text()
+    const calCachedRes = new Response(calBody, { status: calRes.status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } })
+    c.executionCtx.waitUntil(calCache.put(calCacheKey, calCachedRes.clone()))
+    return calCachedRes
   } catch (err) {
     const log = { event: 'api_error', route: '/api/calendar', kind: err instanceof Error ? err.name : 'Unknown', message: errMsg(err), at: new Date().toISOString() }
     console.error(JSON.stringify(log))
