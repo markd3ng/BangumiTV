@@ -267,7 +267,19 @@ export async function runSync(
   }
 
   const snapshot: SyncSnapshot = { collections: merged, calendar, meta }
+  // 主快照（供 health/排障）
   await storage.put(SNAPSHOT_KEY, snapshot)
+  // 按 type 拆分存储，避免每次 API 请求读 150KB+ 全量快照
+  const COLLECTION_KEYS = ['want', 'watched', 'watching', 'on_hold', 'dropped'] as const
+  const summary: Record<string, number> = {}
+  for (const key of COLLECTION_KEYS) {
+    const list = merged[key] || []
+    await storage.put(`collections:${key}`, list)
+    summary[key] = list.length
+  }
+  summary._total = Object.values(summary).reduce((a, b) => a + b, 0)
+  await storage.put('collections:summary', summary)
+  await storage.put('calendar:latest', calendar)
   await storage.put(LAST_SUCCESS_KEY, new Date().toISOString())
   await storage.delete(LAST_ERROR_KEY)
 

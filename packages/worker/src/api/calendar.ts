@@ -1,13 +1,12 @@
 import type { StorageAdapter } from '@bangumi-tv/shared'
-import { getSnapshot } from '../storage/snapshot.ts'
 
 export async function handleCalendar(storage: StorageAdapter, nsfwShow: boolean): Promise<Response> {
-  const snapshot = await getSnapshot(storage)
-  if (!snapshot) return Response.json([])
+  const calendar = await storage.get<any[]>('calendar:latest')
+  if (!calendar) return Response.json([])
 
-  const filtered = snapshot.calendar.map((d) => ({
+  const filtered = calendar.map((d: any) => ({
     weekday: d.weekday,
-    items: nsfwShow ? d.items : d.items.filter((item) => !(item as unknown as Record<string, unknown>).nsfw),
+    items: nsfwShow ? d.items : d.items.filter((item: any) => !(item as unknown as Record<string, unknown>).nsfw),
   }))
   return Response.json(filtered)
 }
