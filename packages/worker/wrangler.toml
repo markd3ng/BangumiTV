@@ -29,4 +29,4 @@ class_name = "SyncLock"
 
 [[migrations]]
 tag = "v1-sync-lock"
-new_classes = ["SyncLock"]
+new_sqlite_classes = ["SyncLock"]
