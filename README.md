@@ -112,6 +112,8 @@
 curl -X POST -H "X-Cron-Secret: <CRON_SECRET>" https://bangumi-tv-sync.<你的子域名>.workers.dev/__cron/sync
 ```
 
+> **⚠️ 首次部署后需手动创建 Cron Trigger：** 由于 Cloudflare API 对 cron schedule 的管理存在兼容性问题，sync worker 的定时触发器需手动配置一次。前往 [Cloudflare Dashboard → Workers & Pages → bangumi-tv-sync → Triggers](https://dash.cloudflare.com) → Add Cron Trigger，Cron 表达式填 `0 */4 * * *`。后续代码更新无需重新配置。
+
 ## 前端接入
 
 在任意页面中引入 Widget：

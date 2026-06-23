@@ -2,9 +2,6 @@ name = "bangumi-tv-sync"
 main = "src/sync-worker.ts"
 compatibility_date = "2026-06-17"
 
-[triggers]
-crons = ["0 */4 * * *"]
-
 [vars]
 SYNC_MODE = "merge"
 
