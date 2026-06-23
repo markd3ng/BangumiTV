@@ -122,3 +122,5 @@ package-lock.json
 # Reasonix agent internal state
 .reasonix/
 reasonix.toml
+
+packages/worker/dist-check/

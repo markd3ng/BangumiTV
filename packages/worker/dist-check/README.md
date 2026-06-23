@@ -1,1 +1,0 @@
-This folder contains the built output assets for the worker "bangumi-tv" generated at 2026-06-22T01:52:59.233Z.
