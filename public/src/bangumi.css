@@ -1,67 +1,95 @@
+/* ============================================================
+   BangumiTV — Neo-Brutalism theme
+   放置位置：public/src/bangumi.css （直接覆盖原文件即可）
+   只改样式，不改动任何 HTML/div 结构与 class 名称
+   ============================================================ */
+
+:root {
+  --nb-bg: #fde047;        /* 主背景：亮黄 */
+  --nb-surface: #ffffff;   /* 卡片表面：白 */
+  --nb-ink: #000000;       /* 边框/文字：纯黑 */
+  --nb-accent: #00a1d6;    /* 强调：青蓝 */
+  --nb-accent-2: #ff5470;  /* 次强调：粉红 */
+  --nb-shadow: 5px 5px 0 0 var(--nb-ink);
+  --nb-shadow-sm: 3px 3px 0 0 var(--nb-ink);
+  --nb-border: 3px solid var(--nb-ink);
+}
+
+/* 页面底色：Neo-Brutalism 标志性亮黄（仅设背景/文字色，不改 HTML 结构） */
+html,
+body {
+  background-color: var(--nb-bg);
+  color: var(--nb-ink);
+}
+
 .bgm-container {
   width: 100%;
   padding: 20px 0;
+  font-family: "Inter", "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
+/* ---------- 导航 ---------- */
 .bgm-nav {
   display: flex;
-  gap: 4px;
-  margin-bottom: 16px;
+  gap: 10px;
+  margin-bottom: 20px;
   flex-wrap: wrap;
 }
 .bgm-nav button {
-  padding: 6px 16px;
-  border: 1px solid #ddd;
-  border-radius: 16px;
-  background: #fff;
-  color: #555;
+  padding: 8px 18px;
+  border: var(--nb-border);
+  border-radius: 0;
+  background: var(--nb-surface);
+  color: var(--nb-ink);
   cursor: pointer;
   font-size: 14px;
-  transition: all 0.2s;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: var(--nb-shadow-sm);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.08s ease;
 }
-.bgm-nav button:hover,
+.bgm-nav button:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0 0 var(--nb-ink);
+}
+.bgm-nav button:active,
 .bgm-nav button.active {
-  background: #00a1d6;
-  color: #fff;
-  border-color: #00a1d6;
+  background: var(--nb-accent);
+  color: var(--nb-surface);
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 0 var(--nb-ink);
 }
 
+/* ---------- 网格 ---------- */
 .bgm-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 12px;
+  gap: 18px;
 }
 
+/* ---------- 卡片 ---------- */
 .bgm-card {
   display: block;
   text-decoration: none;
-  background: #fff;
-  border-radius: 8px;
+  background: var(--nb-surface);
+  border: var(--nb-border);
+  border-radius: 0;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  transition: box-shadow 0.2s;
+  box-shadow: var(--nb-shadow);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
 }
 .bgm-card:hover {
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  transform: translate(-3px, -3px);
+  box-shadow: 8px 8px 0 0 var(--nb-ink);
 }
 
 .bgm-card-cover {
   position: relative;
   overflow: hidden;
   aspect-ratio: 3/4;
-  background: #f0f0f0;
-}
-.bgm-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #2a2a3e;
-}
-.bgm-placeholder span {
-  color: #666;
-  font-size: 12px;
+  background: var(--nb-bg);
+  border-bottom: var(--nb-border);
 }
 .bgm-card-cover img {
   width: 100%;
@@ -71,62 +99,79 @@
 }
 
 .bgm-card-info {
-  padding: 8px 10px;
+  padding: 10px 12px;
 }
 .bgm-card-info h3 {
   font-size: 13px;
-  margin: 0 0 4px;
+  font-weight: 800;
+  margin: 0 0 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: #333;
+  color: var(--nb-ink);
 }
 
+/* ---------- 进度条 ---------- */
 .bgm-progress {
-  height: 4px;
-  background: #e0e0e0;
-  border-radius: 2px;
-  margin: 4px 0;
+  height: 10px;
+  background: var(--nb-surface);
+  border: 2px solid var(--nb-ink);
+  border-radius: 0;
+  margin: 6px 0;
+  overflow: hidden;
 }
 .bgm-progress span {
   display: block;
   height: 100%;
-  background: #00a1d6;
-  border-radius: 2px;
+  background: var(--nb-accent);
+  border-radius: 0;
 }
 
 .bgm-ep {
+  display: inline-block;
   font-size: 12px;
-  color: #999;
+  font-weight: 800;
+  color: var(--nb-ink);
+  background: var(--nb-bg);
+  border: 2px solid var(--nb-ink);
+  padding: 1px 6px;
 }
 
+/* ---------- 分页 ---------- */
 .bgm-pagination {
   text-align: center;
-  margin-top: 20px;
+  margin-top: 28px;
   display: flex;
   justify-content: center;
-  gap: 6px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 .bgm-pagination button {
-  width: 36px;
-  height: 36px;
-  border: 1px solid #ddd;
-  border-radius: 18px;
-  background: #fff;
-  color: #555;
+  width: 40px;
+  height: 40px;
+  border: var(--nb-border);
+  border-radius: 0;
+  background: var(--nb-surface);
+  color: var(--nb-ink);
   cursor: pointer;
   font-size: 14px;
-  transition: all 0.2s;
+  font-weight: 800;
+  box-shadow: var(--nb-shadow-sm);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.08s ease;
 }
-.bgm-pagination button:hover,
+.bgm-pagination button:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0 0 var(--nb-ink);
+}
+.bgm-pagination button:active,
 .bgm-pagination button.active {
-  background: #00a1d6;
-  color: #fff;
-  border-color: #00a1d6;
+  background: var(--nb-accent);
+  color: var(--nb-surface);
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 0 var(--nb-ink);
 }
 
-/* NSFW 模糊遮罩 */
+/* ---------- NSFW 模糊遮罩 ---------- */
 .bgm-card.bgm-nsfw .bgm-card-cover img {
   filter: blur(20px);
   transition: filter 0.3s;
@@ -140,13 +185,234 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0,0,0,0.5);
-  color: #e94560;
-  font-size: 18px;
-  font-weight: bold;
+  background: var(--nb-accent-2);
+  color: var(--nb-ink);
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border: 3px solid var(--nb-ink);
   cursor: pointer;
   z-index: 2;
 }
 .bgm-nsfw-reveal .bgm-nsfw-overlay {
   display: none;
+}
+
+/* ============================================================
+   放送日历（/api/calendar） — Neo-Brutalism
+   复用 .bgm-card 卡片结构，仅新增按星期分组的容器样式
+   ============================================================ */
+
+/* 顶部「在看 / 放送日历」视图切换 */
+.bgm-view-switch {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.bgm-view-switch button {
+  padding: 10px 22px;
+  border: var(--nb-border);
+  border-radius: 0;
+  background: var(--nb-surface);
+  color: var(--nb-ink);
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: var(--nb-shadow-sm);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.08s ease;
+}
+.bgm-view-switch button:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0 0 var(--nb-ink);
+}
+.bgm-view-switch button.active {
+  background: var(--nb-accent-2);
+  color: var(--nb-ink);
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 0 var(--nb-ink);
+}
+
+/* 日历整体容器 */
+.bgm-calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+/* 单个星期分组 */
+.bgm-weekday {
+  background: var(--nb-surface);
+  border: var(--nb-border);
+  border-radius: 0;
+  box-shadow: var(--nb-shadow);
+  padding: 0;
+  overflow: hidden;
+}
+
+/* 星期标题条 */
+.bgm-weekday-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  background: var(--nb-ink);
+  color: var(--nb-surface);
+  padding: 10px 16px;
+  border-bottom: var(--nb-border);
+}
+.bgm-weekday-head .cn {
+  font-size: 20px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.bgm-weekday-head .en {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--nb-bg);
+  text-transform: uppercase;
+}
+.bgm-weekday-head .count {
+  margin-left: auto;
+  background: var(--nb-bg);
+  color: var(--nb-ink);
+  border: 2px solid var(--nb-bg);
+  padding: 1px 10px;
+  font-size: 13px;
+  font-weight: 900;
+}
+/* 当天高亮 */
+.bgm-weekday.is-today .bgm-weekday-head {
+  background: var(--nb-accent);
+}
+.bgm-weekday.is-today .bgm-weekday-head .en {
+  color: var(--nb-ink);
+}
+
+/* 分组内的卡片网格（复用 grid 规则） */
+.bgm-weekday .bgm-grid {
+  padding: 18px 16px 20px;
+}
+
+/* 评分徽章（复用 .bgm-ep 视觉，强调色填充） */
+.bgm-score {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--nb-surface);
+  background: var(--nb-ink);
+  border: 2px solid var(--nb-ink);
+  padding: 1px 6px;
+}
+
+/* 状态/空/错误提示条 — Neo-Brutalism */
+.bgm-status {
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: var(--nb-surface);
+  border: var(--nb-border);
+  box-shadow: var(--nb-shadow-sm);
+  font-weight: 800;
+  text-align: center;
+  transition: opacity 0.4s ease;
+}
+.bgm-status p,
+.bgm-status span {
+  margin: 0;
+  font-weight: 800;
+}
+.bgm-status-warn {
+  color: var(--nb-ink);
+  background: var(--nb-accent-2);
+  display: inline-block;
+  padding: 2px 8px;
+}
+.bgm-empty,
+.bgm-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 28px 18px;
+  text-align: center;
+  font-weight: 800;
+  background: var(--nb-surface);
+  border: var(--nb-border);
+  box-shadow: var(--nb-shadow-sm);
+}
+.bgm-error {
+  background: var(--nb-accent);
+  color: var(--nb-surface);
+}
+.bgm-empty small,
+.bgm-error small {
+  font-weight: 700;
+  opacity: 0.75;
+}
+
+/* ============================================================
+   年龄确认弹窗 (#bgm-age-modal) — Neo-Brutalism
+   弹窗用的是内联样式，这里用结构选择器 + !important 覆盖，
+   无需改动 index.html 的任何 div / 内联结构。
+   ============================================================ */
+
+/* 遮罩层（内层第一个 div） */
+#bgm-age-modal > div {
+  background: rgba(0, 0, 0, 0.6) !important;
+}
+
+/* 弹窗卡片（内层第二个 div） */
+#bgm-age-modal > div > div {
+  background: var(--nb-surface) !important;
+  border: var(--nb-border) !important;
+  border-radius: 0 !important;
+  box-shadow: var(--nb-shadow) !important;
+  padding: 32px !important;
+}
+
+/* 标题 */
+#bgm-age-modal h2 {
+  color: var(--nb-ink) !important;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 4px;
+}
+
+/* 说明文字 */
+#bgm-age-modal p {
+  color: var(--nb-ink) !important;
+  font-weight: 700;
+}
+
+/* 通用按钮样式：粗边框 + 硬阴影 + 按压位移 */
+#bgm-age-modal button {
+  border: var(--nb-border) !important;
+  border-radius: 0 !important;
+  font-weight: 900 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: var(--nb-shadow-sm) !important;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+#bgm-age-modal button:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0 0 var(--nb-ink) !important;
+}
+#bgm-age-modal button:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 0 var(--nb-ink) !important;
+}
+
+/* 主操作（进入）：强调红，第一个按钮 */
+#bgm-age-modal button:first-of-type {
+  background: var(--nb-accent) !important;
+  color: var(--nb-surface) !important;
+}
+
+/* 次要操作（离开）：白底黑字，最后一个按钮 */
+#bgm-age-modal button:last-of-type {
+  background: var(--nb-surface) !important;
+  color: var(--nb-ink) !important;
 }
