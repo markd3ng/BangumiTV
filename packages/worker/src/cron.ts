@@ -178,7 +178,10 @@ export async function runSync(
     merged = merge(allCollections)
   }
 
-  // 3.5 图片下载：收集所有有封面的条目，限流下载并写入 R2
+  // 3.5 图片下载：收集所有有封面的条目，限流下载并写入 R2。
+  // Free Plan 限制 50 个子请求，所以每次最多下载 MAX_IMAGES 张新图；
+  // 其余图片复用上次快照中的旧 hash，避免因子请求超限导致整个同步失败。
+  const MAX_IMAGES = 25
   const imageEntries: DownloadEntry[] = []
   for (const collections of settled) {
     if (collections.status !== 'fulfilled') continue
@@ -188,12 +191,41 @@ export async function runSync(
       }
     }
   }
-  const imageHashMap = imageEntries.length > 0
-    ? await downloadImagesWithLimit(imageEntries, imageStore, client)
-    : undefined
-  if (imageEntries.length > 0) {
-    console.log(JSON.stringify({ event: 'sync_phase', phase: 'images_downloaded', candidates: imageEntries.length, hashes: imageHashMap?.size ?? 0, at: new Date().toISOString() }))
+
+  // 从旧快照恢复已有 hash，避免每次同步都全量重下
+  const imageHashMap = new Map<number, string>()
+  const prevSnap = await storage.get<SyncSnapshot>(SNAPSHOT_KEY)
+  if (prevSnap) {
+    for (const key of ['want', 'watched', 'watching', 'on_hold', 'dropped'] as const) {
+      for (const entry of (prevSnap.collections[key] || []) as any[]) {
+        if (entry.images?.hash) {
+          imageHashMap.set(entry.subject_id as number, entry.images.hash)
+        }
+      }
+    }
   }
+  const oldHashCount = imageHashMap.size
+
+  // 只下载新条目（无旧 hash）或旧 hash 为 null 的条目，上限 MAX_IMAGES
+  const newEntries = imageEntries
+    .filter((e) => !imageHashMap.has(e.subjectId))
+    .slice(0, MAX_IMAGES)
+  if (newEntries.length > 0) {
+    const newHashes = await downloadImagesWithLimit(newEntries, imageStore, client)
+    for (const [id, hash] of newHashes) {
+      imageHashMap.set(id, hash)
+    }
+  }
+  console.log(JSON.stringify({
+    event: 'sync_phase',
+    phase: 'images_downloaded',
+    candidates: imageEntries.length,
+    old_hashes: oldHashCount,
+    new_downloads: newEntries.length,
+    new_hashes: imageHashMap.size - oldHashCount,
+    total_hashes: imageHashMap.size,
+    at: new Date().toISOString(),
+  }))
 
   // 3.6 带图片 hash 重新合并
   if (env.SYNC_MODE === 'primary' && env.BANGUMI_PRIMARY_USER) {
