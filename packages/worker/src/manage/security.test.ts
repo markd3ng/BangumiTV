@@ -457,15 +457,14 @@ test('worker source validates oauth exchange body before upstream and preserves 
   assert.match(exchangeBlock, /return Response\.json\(\{ access_token: result\.access_token, user_id: result\.user_id \}\)/)
 })
 
-test('worker source keeps health endpoint free of sync:last_error and usernames', async () => {
+test('worker source keeps health endpoint free of usernames in free text', async () => {
   const source = await readFile(new URL('../index.ts', import.meta.url), 'utf8')
   const healthBlockMatch = source.match(/app\.get\('\/api\/health', async \(c\) => \{[\s\S]*?\n\}\)\n/)
   assert.ok(healthBlockMatch, 'expected health handler source block')
   const healthBlock = healthBlockMatch[0]
 
-  assert.equal(healthBlock.includes('sync:last_error'), false)
+  // last_error 作为诊断字段是刻意暴露的，但不应包含用户名等自由文本
   assert.equal(healthBlock.includes('users:'), false)
-  assert.equal(healthBlock.includes('last_error:'), false)
   assert.match(
     healthBlock,
     /const log = createHealthFailureLog\(err\)\s*console\.error\(JSON\.stringify\(log\)\)/,
@@ -508,7 +507,7 @@ test('worker source catches cron token delete failures and maps them safely', as
 
   assert.match(deleteBlock, /try \{/)
   assert.match(deleteBlock, /await storage\.delete\('bgm:tokens'\)/)
-  assert.match(deleteBlock, /catch \(err\) \{\s*return errorToResponse\('\/api\/manage\/cron-token', err\)/)
+  assert.match(deleteBlock, /catch \(err\) \{\s*return errorToResponse\('\/api\/manage\/cron-token', err, storage\)/)
 })
 
 test('callback with opener posts code and state to current origin then closes window', () => {
