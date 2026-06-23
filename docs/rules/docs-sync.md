@@ -3,6 +3,38 @@
 > 规则入口：`CLAUDE.md` / `AGENTS.md`
 > 此文件是完整规则正文。
 
+## 零、修改前验证（最高优先级）
+
+**修改任何 CLI 命令、配置参数、API 调用、第三方库用法之前，必须先查文档验证有效性，禁止凭记忆或猜测。**
+
+违反此规则的典型案例：
+- 给 `wrangler deploy` 加 `--no-triggers` 参数，实际该参数不存在，wrangler 静默忽略后仍尝试部署 trigger
+- 使用 `wrangler triggers deploy` 子命令，实际该命令只配合 `versions upload` 使用，不适用于 `deploy`
+
+### 必须执行的验证步骤
+
+| 场景 | 必须先执行的验证命令 |
+|------|---------------------|
+| 新增/修改 CLI 命令参数 | `<tool> <command> --help`（如 `wrangler deploy --help`） |
+| 新增/修改 wrangler 配置 | 查 Wrangler 官方文档确认 TOML key 有效 |
+| 使用 Cloudflare Workers API | 查 `@cloudflare/workers-types` 或官方 API 文档 |
+| 使用第三方库 API | `grep` 源码中的类型定义确认签名 |
+| 修改 CI/CD 流程 | 查 GitHub Actions 文档确认 step 语法和 action 参数 |
+
+### 验证门禁
+
+**每当你打算写下以下内容时必须停止，先验证再写：**
+
+1. 一个你没见过的 CLI flag（如 `--no-triggers`、`--some-flag`）
+2. 一个你不确定存在性的 API 方法（如 `caches.default`）
+3. 一个你不确定语法对的配置项（如 `[triggers]` 的 `crons` 字段格式）
+4. 一个你不确定类型的函数参数
+
+**验证通过标准：**
+- CLI flag → `--help` 输出中有该 flag
+- API 方法 → 类型定义文件中有对应签名
+- 配置项 → 官方文档中有对应章节
+
 ## 一、提交纪律
 
 **每次完成一个原子动作（fix / refactor / feat / chore）之后必须立即 commit 并 push，不得积攒。**
