@@ -357,18 +357,20 @@ test('sync failure logs keep only fixed structured fields', () => {
 })
 
 test('worker sync logging calls never receive errors usernames or free text', async () => {
-  const [workerSource, cronSource] = await Promise.all([
+  const [workerSource, syncWorkerSource, cronSource] = await Promise.all([
     readFile(new URL('../index.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../sync-worker.ts', import.meta.url), 'utf8'),
     readFile(new URL('../cron.ts', import.meta.url), 'utf8'),
   ])
-  const source = `${workerSource}\n${cronSource}`
+  const source = `${workerSource}\n${syncWorkerSource}\n${cronSource}`
 
   // cron.ts 新实现直接抛错，不再使用 createSyncFailureLog
   assert.doesNotMatch(cronSource, /createSyncFailureLog/)
   // cron.ts phase logging uses console.log with structured JSON only
   assert.doesNotMatch(cronSource, /console\.(?:error|warn)\(/)
-  assert.match(workerSource, /createSyncFailureLog\('manual', err\)/)
-  assert.match(workerSource, /createSyncFailureLog\('scheduled', err\)/)
+  // sync-worker.ts 负责同步失败日志
+  assert.match(syncWorkerSource, /createSyncFailureLog\('manual', err\)/)
+  assert.match(syncWorkerSource, /createSyncFailureLog\('scheduled', err\)/)
   // 非结构化 console 调用不得泄露错误详情/用户名/自由文本
   assert.doesNotMatch(
     source,

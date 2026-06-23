@@ -1,9 +1,12 @@
-name = "bangumi-tv"
-main = "src/index.ts"
+name = "bangumi-tv-sync"
+main = "src/sync-worker.ts"
 compatibility_date = "2026-06-17"
 
+[triggers]
+crons = ["0 */4 * * *"]
+
 [vars]
-NSFW_SHOW = "true"
+SYNC_MODE = "merge"
 
 [[kv_namespaces]]
 binding = "BANGUMI_KV"
@@ -12,12 +15,6 @@ id = "bangumi-tv-kv"
 [[r2_buckets]]
 binding = "BANGUMI_R2"
 bucket_name = "bangumi-tv-images"
-
-# 允许将 HTML 作为文本模块导入（manage 页面模板）。
-[[rules]]
-type = "Text"
-globs = ["**/*.html", "**/*.css", "**/public/**/*.js"]
-fallthrough = true
 
 [[durable_objects.bindings]]
 name = "SYNCLOCK"
