@@ -195,6 +195,77 @@ NSFW_SHOW=true
 - 迁移顺序：先在部署环境配置 `MANAGE_SECRET`，再部署代码，最后验证 `/manage` 的 cron OAuth 授权与首次同步。
 - 回滚代码时：保留 `MANAGE_SECRET`，并继续保留 `bgm:tokens` 里的 token；不要在回滚里删除 secret 或清空 KV token，否则后续 cron 需要重新授权。
 
+## 调试与日志
+
+所有请求和内部操作均输出结构化 JSON 日志（`console.log` / `console.warn` / `console.error`），每条带 `event` 字段区分事件类型与 `at` 时间戳。
+
+### 实时日志
+
+```bash
+# 开发环境
+cd packages/worker && npx wrangler tail
+
+# 生产环境
+npx wrangler tail --env production
+```
+
+```bash
+# 只看错误
+wrangler tail | grep '"event":"api_error"'
+# 只看同步阶段
+wrangler tail | grep '"event":"sync_phase"'
+# 慢请求（>500ms）
+wrangler tail | grep '"duration_ms":[5-9][0-9][0-9]'
+```
+
+### API 端点查错
+
+**健康检查（公开，无需认证）**
+
+```bash
+curl https://your-worker.workers.dev/api/health
+# → {"ok":true,"data":{"collections":{...},"calendar":"7 days","last_sync":"...","last_error":null}}
+```
+
+`last_error` 为最近一次同步失败的错误消息（仅存最近一条）。
+
+**持久化错误日志（需管理密钥）**
+
+```bash
+curl -H 'X-Manage-Secret: <MANAGE_SECRET>' \
+  https://your-worker.workers.dev/api/manage/errors?n=20
+# → {"count":50,"errors":[{...}, ...]}
+```
+
+KV 环形缓冲区保留最近 **50 条**错误/warn 事件（`api_error`、`manage_auth_denied`、`manage_input_error`、`sync_failed`、`manage_request_failed` 等），查询参数 `n` 控制返回条数（默认 20，上限 100），按时间倒序。
+
+### 日志事件速查
+
+| event | 级别 | 含义 |
+|-------|------|------|
+| `request` | info | 每条 HTTP 请求，含 method / path / status / duration_ms |
+| `api_collections` | info | 公开 API 收藏查询 |
+| `api_calendar` | info | 公开 API 日历查询 |
+| `api_config` | info | 公开 API 配置查询 |
+| `api_error` | error | 公开 API 内部异常，含 `message` |
+| `health_ok` | info | 健康检查成功，含 `has_snapshot` / `last_sync` / `has_error` |
+| `health_failed` | error | 健康检查异常 |
+| `image_proxy_hit` | info | 图片缓存命中，含 `hash` / `content_type` |
+| `image_proxy_miss` | info | 图片缓存未命中，含 `hash` |
+| `image_download_failed` | warn | 单图下载失败，含 `subject_id` / `url` / `reason` |
+| `manage_auth_denied` | warn | 管理 API 认证被拒，含 `status` / `has_secret` / `origin` |
+| `manage_input_error` | warn | 管理 API 输入校验失败，含 `route` / `reason` |
+| `manage_oauth_url` | info | OAuth 授权 URL 生成，含 `purpose` |
+| `manage_oauth_exchange` | info | OAuth code 换 token 成功，含 `purpose` |
+| `manage_compare` | info | 账户对比结果，含双方条目数 / 共同数 / 差异数 |
+| `manage_sync` | info | 管理端同步写入，含 `mode` / `total` / `ok` / `errors` |
+| `manage_cron_token_deleted` | info | cron token 已清除 |
+| `manage_request_failed` | error | 管理 API 上游/内部错误，含 `route` / `kind` / `upstream_status` |
+| `sync_phase` | info | 定时同步阶段（token_refresh → token_ready → fetched_collections → images_downloaded → fetch_calendar → snapshot_written），每阶段含计数 |
+| `sync_failed` | error | 定时同步失败，含 `phase` / `kind` / `upstream_status` |
+| `sync_item_failed` | warn | 单条目 PATCH 失败，含 `subject_id` / `reason` |
+| `cron_sync_manual_ok` | info | 手动 cron 同步成功 |
+
 ## 感谢
 
 - [bangumi/api](https://github.com/bangumi/api) 提供 API
