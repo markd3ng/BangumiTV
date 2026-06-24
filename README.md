@@ -13,7 +13,7 @@
 ## 前置条件
 
 - [Cloudflare](https://cloudflare.com) 账号
-- [bgm.tv](https://bgm.tv) 账号及 [OAuth App](https://bgm.tv/dev/app)（用于管理页面的多账户同步）
+- [bgm.tv](https://bgm.tv) 账号及 [开发者 Access Token](https://bgm.tv/dev/token)
 - GitHub 账号
 
 ### Cloudflare API Token 权限配置
@@ -69,44 +69,23 @@
 
 4. 部署完成后，你的 Worker 访问域名为 `https://bangumi-tv.<你的子域名>.workers.dev`。此时公开 widget 已可访问，但 cron 同步尚未生效（token 未配置）。
 
-### 阶段二：注册 OAuth App、换取 cron token、回填并重新部署
+### 阶段二：生成 Access Token、配置 cron、触发首次同步
 
-#### 1. 注册 bgm.tv OAuth App
+#### 1. 生成 bgm.tv Access Token
 
-登录 [bgm.tv](https://bgm.tv)，前往 [https://bgm.tv/dev/app](https://bgm.tv/dev/app) 创建应用：
+登录 [bgm.tv](https://bgm.tv)，前往 [开发者设置](https://bgm.tv/dev/token) 生成一个永久 access token（用于 cron 定时同步抓取收藏数据）。
 
-- **应用名称**：自定义，如 `BangumiTV`
-- **回调地址 (redirect_uri)**：填 `https://bangumi-tv.<你的子域名>.workers.dev/manage/callback`
-- **应用描述**：可选
+#### 2. 在管理页面配置 Cron Token
 
-创建后记录 **App ID**（= `BANGUMI_CLIENT_ID`）和 **App Secret**（= `BANGUMI_CLIENT_SECRET`）。
+部署完成后，浏览器访问 `https://bangumi-tv.<你的子域名>.workers.dev/manage`：
 
-> 回调地址必须与创建时一致。本地调试可额外用 `http://localhost:8787/manage/callback`（bgm.tv 支持多个回调地址时；若只允许一个，请以线上域名为准）。
+1. 输入管理密码（`MANAGE_SECRET`）进入管理页；
+2. 在「Cron 同步 Token」区域粘贴上一步生成的 access token，点击保存；
+3. 页面提示「✓ Cron token 已保存」即成功。
 
-#### 2. 配置 OAuth 凭证并重新部署
+#### 3. 触发首次同步
 
-在 GitHub Repo → Settings → Secrets and variables → Actions → **Secrets** 中补加：
-
-| 名称 | 说明 |
-|------|------|
-| `BANGUMI_CLIENT_ID` | 上一步 OAuth App 的 App ID |
-| `BANGUMI_CLIENT_SECRET` | 上一步 OAuth App 的 App Secret |
-
-然后在 GitHub Actions 页面手动重新运行一次 Deploy 工作流（或向 `dev` 推一个空提交）。
-
-#### 3. 在管理页面授权 cron 同步账号（一次性）
-
-部署完成后，浏览器访问 `https://bangumi-tv.<你的子域名>.workers.dev/manage`，在顶部「Cron 同步账号授权」区域点击「授权 cron 同步账号」：
-
-1. 弹出 bgm.tv 授权页，登录并用你要展示其追番的账号授权；
-2. 授权后跳转回 `/manage/callback`，把浏览器地址栏完整的回调 URL 复制粘贴到输入框，点「确认」；
-3. 页面提示「✓ 已授权并保存」即成功。浏览器只看到成功状态；`access_token` / `refresh_token` 由 Worker 直接写入 `bgm:tokens`，Worker 会自动续期，**无需每 7 天人工操作**。
-
-> **为什么不用手动配 `BANGUMI_TOKEN`？** Workers 的 secret 运行时只读，无法写回刷新后的 token；把 token 存进 KV 后，cron 在 token 过期时会自动用 refresh_token 续期并把新的一对写回 KV，形成闭环。
-
-#### 4. 触发首次同步
-
-授权完成后可立即触发一次同步而不等 4 小时定时任务：
+Token 配置完成后可立即触发一次同步：
 
 ```bash
 curl -X POST -H "X-Cron-Secret: <CRON_SECRET>" https://bangumi-tv-sync.<你的子域名>.workers.dev/__cron/sync
@@ -143,12 +122,11 @@ Sync Worker 在定时同步时自动下载条目封面（来源：bgm.tv），�
 
 访问 `https://bangumi-tv.<你的子域名>.workers.dev/manage`：
 
-- **Cron 同步账号授权**（顶部）：一键授权 cron 同步用的账号，浏览器只显示成功状态，token 由 Worker 写入 KV 的 `bgm:tokens` 并自动续期；可点「清除已存 token」重新授权。你在当前页面输入的管理密码只保存在内存里，刷新后需要重新输入。
-- **多账户同步**：输入两个 bgm.tv 用户名 → 依次 OAuth 授权 → 选择完整同步或部分同步 → 执行。
+- **Cron 同步 Token**（顶部）：粘贴 bgm.tv 开发者 access token，点击保存即写入 KV。可随时清除重新配置。
+- **多账户同步**：输入两个 bgm.tv 用户名和对应的 access token → 点击对比 → 选择完整同步或部分同步 → 执行。Token 在 [bgm.tv 开发者设置](https://bgm.tv/dev/token) 生成，永久有效。
+- 管理密码只保存在浏览器内存中，刷新后重新输入。
 
-OAuth 授权后回调页会自动把 code 回填到管理页（弹窗模式）；若浏览器拦截了弹窗或自动回填失败，也可手动复制回调 URL 粘贴。
-
-> **管理页密码保护：** `MANAGE_SECRET` 是管理 API 的必填共享密码。管理页的写操作（授权、比对、同步、清除 token）都会要求输入该密码；未配置时管理 API 返回 503。
+> **管理页密码保护：** `MANAGE_SECRET` 是管理 API 的必填共享密码。管理页的写操作都会要求输入该密码；未配置时管理 API 返回 503。
 
 ## 本地开发
 
@@ -172,6 +150,7 @@ BANGUMI_CLIENT_ID=你的_client_id
 BANGUMI_CLIENT_SECRET=你的_client_secret
 CRON_SECRET=任意字符串
 MANAGE_SECRET=本地管理密码
+# BANGUMI_TOKEN / BANGUMI_REFRESH_TOKEN 可选，cron 同步通过 /manage 页面配置 token 替代
 SYNC_MODE=merge
 NSFW_SHOW=true
 ```
@@ -184,12 +163,12 @@ NSFW_SHOW=true
 |------|------|------|
 | `SYNC_MODE` | var | `merge`（多账号取并集，相同条目以最新为准）或 `primary`（以主账号为准） |
 | `NSFW_SHOW` | var | 是否展示 R18 条目（`true`/`false`）。为 `true` 时前端首次访问会弹 age-18 确认窗，R18 卡片默认模糊、点击可查看；为 `false` 时 API 直接不返回 R18 条目 |
-| `BANGUMI_TOKEN` | secret | 可选。bgm.tv access token，仅作 cron 冷启动种子；推荐改用 `/manage` 页面授权（token 存 KV 自动续期） |
+| `BANGUMI_TOKEN` | secret | 可选。bgm.tv access token，仅作 cron 冷启动种子；可通过 `/manage` 页面配置 cron token 替代 |
 | `BANGUMI_REFRESH_TOKEN` | secret | 可选。bgm.tv refresh token，同上 |
 | `BANGUMI_USERS` | var | bgm 用户名列表（逗号分隔，如 `user1,user2`） |
 | `BANGUMI_PRIMARY_USER` | var | `primary` 模式下的主账户名 |
-| `BANGUMI_CLIENT_ID` | secret | OAuth App client_id |
-| `BANGUMI_CLIENT_SECRET` | secret | OAuth App client_secret |
+| `BANGUMI_CLIENT_ID` | secret | bgm.tv API 应用的 App ID（sync worker 内部 API 调用用） |
+| `BANGUMI_CLIENT_SECRET` | secret | bgm.tv API 应用的 App Secret（sync worker 内部 API 调用用） |
 | `CRON_SECRET` | secret | 手动触发 sync worker `POST /__cron/sync` 的认证密钥（定时 cron 由 sync worker 自动执行） |
 | `MANAGE_SECRET` | secret | 必填。管理页写操作密码；未配置时管理 API 返回 503 |
 
