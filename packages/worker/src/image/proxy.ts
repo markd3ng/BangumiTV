@@ -29,7 +29,8 @@ export async function handleImage(
   }
 
   console.log(JSON.stringify({ event: 'image_proxy_hit', hash, content_type: original.contentType, at: new Date().toISOString() }))
-  return new Response(original.data, {
-    headers: { ...CACHE_HEADERS, 'Content-Type': original.contentType },
-  })
+  const headers: Record<string, string> = { ...CACHE_HEADERS, 'Content-Type': original.contentType }
+  if (original.size) headers['X-Image-Size'] = original.size
+  if ((original as any).bytes) headers['X-Image-Bytes'] = String((original as any).bytes)
+  return new Response(original.data, { headers })
 }

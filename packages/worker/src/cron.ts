@@ -196,10 +196,10 @@ export async function runSync(
     for (const c of collections.value) {
       collSubjectIds.add(c.subject_id)
       if (c.subject?.images?.common) {
-        commonEntries.push({ url: c.subject.images.common, subjectId: c.subject_id })
+        commonEntries.push({ url: c.subject.images.common, subjectId: c.subject_id, size: 'common' })
       }
       if (c.subject?.images?.large) {
-        largeEntries.push({ url: c.subject.images.large, subjectId: c.subject_id })
+        largeEntries.push({ url: c.subject.images.large, subjectId: c.subject_id, size: 'large' })
       }
     }
   }
@@ -212,10 +212,10 @@ export async function runSync(
       for (const item of day.items) {
         const calItem = item as any
         if (calItem.images?.common && calItem.id) {
-          commonEntries.push({ url: calItem.images.common, subjectId: calItem.id })
+          commonEntries.push({ url: calItem.images.common, subjectId: calItem.id, size: 'common' })
         }
         if (calItem.images?.large && calItem.id) {
-          largeEntries.push({ url: calItem.images.large, subjectId: calItem.id })
+          largeEntries.push({ url: calItem.images.large, subjectId: calItem.id, size: 'large' })
         }
       }
     }

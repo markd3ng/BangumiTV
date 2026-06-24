@@ -4,6 +4,7 @@ import type { ImageStore } from './store'
 export interface DownloadEntry {
   url: string
   subjectId: number
+  size?: string  // 'common' | 'large', 写入 R2 custom metadata
 }
 
 /**
@@ -41,7 +42,7 @@ export async function downloadImagesWithLimit(
         const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
 
         // 写入 R2
-        await imageStore.putOriginal(hashHex, downloaded.data, downloaded.contentType)
+        await imageStore.putOriginal(hashHex, downloaded.data, downloaded.contentType, entry.size)
         result.set(entry.subjectId, hashHex)
       } catch (err) {
         console.warn(JSON.stringify({ event: 'image_download_failed', subject_id: entry.subjectId, url: entry.url, reason: err instanceof Error ? err.message : String(err), at: new Date().toISOString() }))
