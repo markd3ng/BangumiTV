@@ -35,10 +35,11 @@ test('token inputs are marked as requiring management secret', () => {
 })
 
 test('compare flow uses manual tokens, not OAuth', () => {
-  assert.ok(script.includes('tokenA: ta, userA: ua, tokenB: tb, userB: ub'), 'compare body includes manual tokens')
+  assert.ok(script.includes('tokenA: ta, userA:'), 'compare body includes Account tokens')
   assert.ok(script.includes('/api/manage/compare'), 'calls compare endpoint')
   assert.ok(script.includes("state.tokenA = ta"), 'stores tokenA from input')
   assert.ok(script.includes("state.tokenB = tb"), 'stores tokenB from input')
+  assert.ok(!script.includes("state.userA"), 'no username state variables')
 })
 
 test('sync flow passes tokens from state', () => {
