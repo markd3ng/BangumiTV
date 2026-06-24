@@ -297,12 +297,23 @@ function renderComparison(data) {
     })
     h += '</tbody></table>'
 
-    // Pagination
+    // Pagination with ellipsis
     if (totalPages > 1) {
-      h += '<div style="display:flex;justify-content:center;gap:6px;margin-top:12px;flex-wrap:wrap;">'
-      for (var p = 1; p <= totalPages; p++) {
-        h += '<button class="page-btn' + (p === currentPage ? ' active' : '') + '" style="padding:4px 10px;font-size:12px;border:1px solid #2a2a4a;border-radius:4px;background:' + (p === currentPage ? '#e94560' : '#0f3460') + ';color:#fff;cursor:pointer;" data-page="' + p + '">' + p + '</button>'
+      h += '<div style="display:flex;justify-content:center;gap:4px;margin-top:12px;flex-wrap:wrap;">'
+      var pages = []
+      pages.push(1)
+      for (var p = Math.max(2, currentPage - 2); p <= Math.min(totalPages - 1, currentPage + 2); p++) {
+        pages.push(p)
       }
+      pages.push(totalPages)
+      // dedupe and add ellipsis
+      var seen = {}, prev = 0
+      pages.forEach(function(p) {
+        if (seen[p]) return; seen[p] = true
+        if (prev && p > prev + 1) h += '<span style="padding:4px 4px;color:#a0a0b0;">...</span>'
+        h += '<button class="page-btn' + (p === currentPage ? ' active' : '') + '" style="padding:4px 10px;font-size:12px;border:1px solid #2a2a4a;border-radius:4px;background:' + (p === currentPage ? '#e94560' : '#0f3460') + ';color:#fff;cursor:pointer;" data-page="' + p + '">' + p + '</button>'
+        prev = p
+      })
       h += '</div>'
     }
     tableWrap.innerHTML = h
