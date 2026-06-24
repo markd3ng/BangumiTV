@@ -103,7 +103,8 @@
     var keys = Object.keys(TYPE_NAMES)
     var navHtml = ''
     for (var i = 0; i < keys.length; i++) {
-      navHtml += '<button data-type="' + keys[i] + '">' + TYPE_NAMES[keys[i]] + '</button>'
+      var navActive = keys[i] === 'watching' ? ' class="active"' : ''
+      navHtml += '<button data-type="' + keys[i] + '"' + navActive + '>' + TYPE_NAMES[keys[i]] + '</button>'
     }
     nav.innerHTML = navHtml
     view.appendChild(nav)
@@ -152,6 +153,10 @@
 
     nav.addEventListener('click', function(e) {
       if (e.target.tagName === 'BUTTON') {
+        var navBtns = nav.querySelectorAll('button')
+        for (var n = 0; n < navBtns.length; n++) {
+          navBtns[n].classList.toggle('active', navBtns[n] === e.target)
+        }
         currentType = e.target.dataset.type
         currentPage = 1
         load(currentType, 1)

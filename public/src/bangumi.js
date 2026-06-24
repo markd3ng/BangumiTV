@@ -70,9 +70,10 @@
   // 字段与收藏不同：用 id、images.common（bgm.tv 原图）、rating.score
   // ---------------------------------------------------------------
   function renderCalendarCard(entry) {
-    const img = entry.images || {}
-    const imgUrl = img.common || img.large || img.medium || img.grid
-      || 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" fill="#333"><rect width="300" height="400"/></svg>')
+    const hasHash = entry.images && entry.images.hash
+    const imgUrl = hasHash
+      ? API + '/image/' + entry.images.hash + '?w=300&fmt=webp'
+      : 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" fill="#333"><rect width="300" height="400"/></svg>')
     const name = entry.name_cn || entry.name || ''
     const score = entry.rating && entry.rating.score
 
@@ -80,7 +81,7 @@
     if (entry.nsfw) html += ' bgm-nsfw';
     html += '">' +
       '<div class="bgm-card-cover">' +
-        '<img src="' + imgUrl + '" alt="' + name + '" loading="lazy" referrerpolicy="no-referrer">';
+        '<img src="' + imgUrl + '" alt="' + name + '" width="300" height="400" loading="lazy">';
     if (entry.nsfw) html += '<div class="bgm-nsfw-overlay" onclick="event.preventDefault();this.parentElement.parentElement.classList.toggle(\'bgm-nsfw-reveal\')">R18</div>';
     html += '</div>' +
       '<div class="bgm-card-info">' +

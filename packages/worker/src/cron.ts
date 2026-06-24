@@ -99,14 +99,19 @@ async function refreshAndPersist(
 
 // ── 日历精简 ──
 
-function transformCalendar(raw: Awaited<ReturnType<BgmClient['getCalendar']>>) {
+function transformCalendar(
+  raw: Awaited<ReturnType<BgmClient['getCalendar']>>,
+  imageHashMap?: Map<number, string>,
+) {
   return raw.map((d) => ({
     weekday: d.weekday,
     items: d.items
       .filter((item) => item.name_cn !== '' || item.name !== '')
       .map((item) => {
         const { collection, rating, rank: _rank, ...rest } = item as unknown as Record<string, unknown>
-        return rest as unknown as typeof item
+        const entry = rest as any
+        const hash = imageHashMap?.get(entry.id) ?? null
+        return { ...entry, images: { ...entry.images, hash } }
       }),
   })) as typeof raw
 }
@@ -178,21 +183,20 @@ export async function runSync(
     merged = merge(allCollections)
   }
 
-  // 3.5 图片下载：收集所有有封面的条目，限流下载并写入 R2。
-  // Free Plan 限制 50 个子请求，所以每次最多下载 MAX_IMAGES 张新图；
-  // 其余图片复用上次快照中的旧 hash，避免因子请求超限导致整个同步失败。
+  // 3.5 图片下载：收集收藏 + 日历的封面，共享 25 张限额。
+  // 图片分两个池：收藏（subject_id）和日历（id），统一去重 + 限流。
   const MAX_IMAGES = 25
-  const imageEntries: DownloadEntry[] = []
+  const collEntries: DownloadEntry[] = []
   for (const collections of settled) {
     if (collections.status !== 'fulfilled') continue
     for (const c of collections.value) {
       if (c.subject?.images?.large) {
-        imageEntries.push({ url: c.subject.images.large, subjectId: c.subject_id })
+        collEntries.push({ url: c.subject.images.large, subjectId: c.subject_id })
       }
     }
   }
 
-  // 从旧快照恢复已有 hash，避免每次同步都全量重下
+  // 从旧快照恢复已有 hash（收藏 + 日历都恢复）
   const imageHashMap = new Map<number, string>()
   const prevSnap = await storage.get<SyncSnapshot>(SNAPSHOT_KEY)
   if (prevSnap) {
@@ -203,11 +207,36 @@ export async function runSync(
         }
       }
     }
+    // 恢复日历 hash
+    for (const day of (prevSnap.calendar || [])) {
+      for (const item of (day.items || [])) {
+        const calItem = item as any
+        if (calItem.images?.hash) {
+          imageHashMap.set(calItem.id as number, calItem.images.hash)
+        }
+      }
+    }
   }
   const oldHashCount = imageHashMap.size
 
-  // 只下载新条目（无旧 hash）或旧 hash 为 null 的条目，上限 MAX_IMAGES
-  const newEntries = imageEntries
+  // 合并收藏 + 日历图片候选，统一按 收藏优先 → 日历次之 排序下载
+  const allEntries = [...collEntries]
+  // 提前拉取日历（同时用于图片候选和后续 transform，避免重复 fetch）
+  console.log(JSON.stringify({ event: 'sync_phase', phase: 'fetch_calendar', at: new Date().toISOString() }))
+  const rawCalendar = await client.getCalendar().catch(() => null)
+  if (rawCalendar) {
+    for (const day of rawCalendar) {
+      for (const item of day.items) {
+        const calItem = item as any
+        const imgUrl = calItem.images?.common || calItem.images?.large
+        if (imgUrl && calItem.id) {
+          allEntries.push({ url: imgUrl, subjectId: calItem.id })
+        }
+      }
+    }
+  }
+
+  const newEntries = allEntries
     .filter((e) => !imageHashMap.has(e.subjectId))
     .slice(0, MAX_IMAGES)
   if (newEntries.length > 0) {
@@ -219,10 +248,10 @@ export async function runSync(
   console.log(JSON.stringify({
     event: 'sync_phase',
     phase: 'images_downloaded',
-    candidates: imageEntries.length,
+    candidates_coll: collEntries.length,
+    candidates_total: allEntries.length,
     old_hashes: oldHashCount,
     new_downloads: newEntries.length,
-    new_hashes: imageHashMap.size - oldHashCount,
     total_hashes: imageHashMap.size,
     at: new Date().toISOString(),
   }))
@@ -245,14 +274,9 @@ export async function runSync(
     }
   }
 
-  // 4. 拉取日历
-  console.log(JSON.stringify({ event: 'sync_phase', phase: 'fetch_calendar', at: new Date().toISOString() }))
-  let calendar: ReturnType<typeof transformCalendar>
-  try {
-    calendar = transformCalendar(await client.getCalendar())
-  } catch (err) {
-    throw new Error(`Calendar fetch failed; aborting sync: ${err instanceof Error ? err.message : String(err)}`)
-  }
+  // 4. 日历 transform（rawCalendar 已在图片下载阶段 fetch）
+  if (!rawCalendar) throw new Error('Calendar fetch failed; aborting sync')
+  const calendar = transformCalendar(rawCalendar, imageHashMap)
 
   // 5. 写快照（仅完整成功才写）
   // 读取当前 generation
