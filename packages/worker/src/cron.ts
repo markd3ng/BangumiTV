@@ -188,12 +188,13 @@ export async function runSync(
 
   // 3.5 图片下载：common（优先，卡片用）+ large（原图保留，背景下载）。
   // 两版共享 25 张限额。恢复旧 hash，common 优先 → 剩余预算下载 large。
-  const MAX_IMAGES = 25
   const commonEntries: DownloadEntry[] = []
   const largeEntries: DownloadEntry[] = []
+  const collSubjectIds = new Set<number>()
   for (const collections of settled) {
     if (collections.status !== 'fulfilled') continue
     for (const c of collections.value) {
+      collSubjectIds.add(c.subject_id)
       if (c.subject?.images?.common) {
         commonEntries.push({ url: c.subject.images.common, subjectId: c.subject_id })
       }
@@ -240,20 +241,21 @@ export async function runSync(
     }
   }
 
-  // common 优先下载（卡片显示）
-  const newCommon = commonEntries
-    .filter((e) => !hashCommon.has(e.subjectId))
-    .slice(0, MAX_IMAGES)
+  // common 下载：收藏 15 张 + 日历 3 张（避免日历被收藏挤掉）
+  const collCommon = commonEntries.filter((e) => !hashCommon.has(e.subjectId))
+  const newCollCommon = collCommon.filter((e: DownloadEntry) => collSubjectIds.has(e.subjectId)).slice(0, 15)
+  const newCalCommon = collCommon.filter((e: DownloadEntry) => !collSubjectIds.has(e.subjectId)).slice(0, 3)
+  const newCommon = [...newCollCommon, ...newCalCommon]
   if (newCommon.length > 0) {
     const newHashes = await downloadImagesWithLimit(newCommon, imageStore, client)
     for (const [id, hash] of newHashes) hashCommon.set(id, hash)
   }
 
-  // large 用剩余预算下载（原图保留）
-  const budgetLarge = MAX_IMAGES - newCommon.length
-  const newLarge = largeEntries
-    .filter((e) => !hashLarge.has(e.subjectId))
-    .slice(0, budgetLarge)
+  // large 下载（原图保留），收藏 12 + 日历 2
+  const collLarge = largeEntries.filter((e: DownloadEntry) => !hashLarge.has(e.subjectId))
+  const newCollLarge = collLarge.filter((e: DownloadEntry) => collSubjectIds.has(e.subjectId)).slice(0, 12)
+  const newCalLarge = collLarge.filter((e: DownloadEntry) => !collSubjectIds.has(e.subjectId)).slice(0, 2)
+  const newLarge = [...newCollLarge, ...newCalLarge]
   if (newLarge.length > 0) {
     const newHashes = await downloadImagesWithLimit(newLarge, imageStore, client)
     for (const [id, hash] of newHashes) hashLarge.set(id, hash)
