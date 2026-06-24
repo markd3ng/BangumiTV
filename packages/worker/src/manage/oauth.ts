@@ -6,6 +6,9 @@ export function getOAuthRedirectUrl(clientId: string, redirectUri: string, state
     response_type: 'code',
     redirect_uri: redirectUri,
     state,
+    // 强制 bgm.tv 显示登录页（避免前一账号的登录态复用）
+    // 若 bgm.tv 不支持此参数则被忽略，无副作用
+    prompt: 'login',
   })
   return `https://bgm.tv/oauth/authorize?${params.toString()}`
 }
