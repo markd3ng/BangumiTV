@@ -6,6 +6,8 @@
 
 Before writing any CLI flag, config key, or API call: run `--help`, check types, or grep source. Never guess. If you can't verify it exists, don't write it.
 
+**bgm.tv API calls:** Check [`docs/example/api/bgm-api.json`](docs/example/api/bgm-api.json) before touching any bgm.tv API interaction.
+
 ## Documentation Sync
 
 **Rule §一～四:** [`docs/rules/docs-sync.md`](docs/rules/docs-sync.md)

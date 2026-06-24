@@ -16,10 +16,19 @@
 | 优先级 | 渠道 | 适用场景 |
 |--------|------|---------|
 | 1 | **本地命令** `--help` / `--version` | CLI flag、子命令、配置 key 是否存在 |
-| 2 | **Context7 MCP** (`mcp__context7__query-docs`) | 库/框架/SDK/CLI API 文档（Wrangler、Hono、Cloudflare Workers 等） |
-| 3 | **本地项目文档** | 搜索项目内 `docs/`、`*.md`、design docs 中的相关说明 |
-| 4 | **源代码类型定义** | `grep` 项目 `node_modules/` 或类型声明文件确认签名 |
-| 5 | **联网搜索** | 以上渠道均无法确认时，使用 WebSearch 或 WebFetch 查官方文档 |
+| 2 | **本地 API 参考** `docs/example/api/bgm-api.json` | bgm.tv API 接口（端路径、请求方法、参数、响应 schema）。**修改任何与 bgm.tv API 交互的代码前必须先查此文件** |
+| 3 | **Context7 MCP** (`mcp__context7__query-docs`) | 库/框架/SDK/CLI API 文档（Wrangler、Hono、Cloudflare Workers 等） |
+| 4 | **本地项目文档** | 搜索项目内 `docs/`、`*.md`、design docs 中的相关说明 |
+| 5 | **源代码类型定义** | `grep` 项目 `node_modules/` 或类型声明文件确认签名 |
+| 6 | **联网搜索** | 以上渠道均无法确认时，使用 WebSearch 或 WebFetch 查官方文档 |
+
+### bgm.tv API 约束（强制）
+
+**任何涉及 bgm.tv API 调用的新增/修改，必须先查阅 `docs/example/api/bgm-api.json`（bgm.tv OpenAPI 规范），确认：**
+1. 端点路径和方法是否存在
+2. 请求参数和响应 schema 是否正确
+3. 认证方式（Bearer / OptionalBearer）是否匹配
+4. 禁止凭记忆编造不存在的 API 端点（如 `/v0/user/me` 写成 `/v0/me2`）
 
 ### 必须执行的验证步骤
 
