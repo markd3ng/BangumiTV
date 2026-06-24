@@ -46,17 +46,17 @@
   <h1>BangumiTV 多账户同步</h1>
 
   <div class="step active" id="step1">
-    <h2>步骤 1: 输入 bgm.tv 用户名和 Access Token</h2>
-    <p class="muted" style="margin-bottom:12px;">在 <a href="https://bgm.tv/dev/token" target="_blank" style="color:#e94560;">bgm.tv 开发者设置</a> 分别生成两个账号的 access token（永久有效），粘贴到下方。</p>
+    <h2>步骤 1: 输入 bgm.tv Access Token</h2>
+    <p class="muted" style="margin-bottom:12px;">在 <a href="https://bgm.tv/dev" target="_blank" style="color:#e94560;">bgm.tv 开发者设置</a> 分别生成两个账号的 access token（永久有效），粘贴到下方。用户名可选，留空则显示「账号 A」「账号 B」。</p>
 
-    <label>账号 A 用户名</label>
-    <input type="text" id="userA" placeholder="输入 bgm.tv 用户名">
-    <label>账号 A Access Token</label>
+    <label>账号 A 用户名（可选）</label>
+    <input type="text" id="userA" placeholder="留空则显示「账号 A」">
+    <label>账号 A Access Token <span style="color:#e94560;">*</span></label>
     <input type="password" id="tokenA" placeholder="粘贴账号 A 的 Access Token">
 
-    <label>账号 B 用户名</label>
-    <input type="text" id="userB" placeholder="输入 bgm.tv 用户名">
-    <label>账号 B Access Token</label>
+    <label>账号 B 用户名（可选）</label>
+    <input type="text" id="userB" placeholder="留空则显示「账号 B」">
+    <label>账号 B Access Token <span style="color:#e94560;">*</span></label>
     <input type="password" id="tokenB" placeholder="粘贴账号 B 的 Access Token">
 
     <button id="start-compare">下一步：对比收藏</button>
@@ -129,9 +129,9 @@ document.getElementById('start-compare').addEventListener('click', async () => {
   const ub = document.getElementById('userB').value.trim()
   const ta = document.getElementById('tokenA').value.trim()
   const tb = document.getElementById('tokenB').value.trim()
-  if (!ua || !ub || !ta || !tb) return showText(step1Status, '请填写所有字段')
+  if (!ta || !tb) return showText(step1Status, '请填写两个账号的 Access Token')
 
-  state.userA = ua; state.userB = ub
+  state.userA = ua || '账号 A'; state.userB = ub || '账号 B'
   state.tokenA = ta; state.tokenB = tb
 
   showText(step1Status, '正在加载双方收藏数据...')

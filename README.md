@@ -13,7 +13,7 @@
 ## 前置条件
 
 - [Cloudflare](https://cloudflare.com) 账号
-- [bgm.tv](https://bgm.tv) 账号及 [开发者 Access Token](https://bgm.tv/dev/token)
+- [bgm.tv](https://bgm.tv) 账号及 [开发者 Access Token](https://bgm.tv/dev)
 - GitHub 账号
 
 ### Cloudflare API Token 权限配置
@@ -73,7 +73,7 @@
 
 #### 1. 生成 bgm.tv Access Token
 
-登录 [bgm.tv](https://bgm.tv)，前往 [开发者设置](https://bgm.tv/dev/token) 生成一个永久 access token（用于 cron 定时同步抓取收藏数据）。
+登录 [bgm.tv](https://bgm.tv)，前往 [开发者设置](https://bgm.tv/dev) 生成一个永久 access token（用于 cron 定时同步抓取收藏数据）。
 
 #### 2. 配置 Cron Token
 
@@ -121,7 +121,7 @@ Sync Worker 在定时同步时自动下载条目封面（来源：bgm.tv），�
 
 访问 `https://bangumi-tv.<你的子域名>.workers.dev/manage`：
 
-- **多账户同步**：输入两个 bgm.tv 用户名和对应的 access token → 点击对比 → 选择完整同步或部分同步 → 执行。Token 在 [bgm.tv 开发者设置](https://bgm.tv/dev/token) 生成，永久有效。
+- **多账户同步**：粘贴两个 bgm.tv access token（用户名可选）→ 点击对比 → 选择完整同步或部分同步 → 执行。Token 在 [bgm.tv 开发者设置](https://bgm.tv/dev) 生成，永久有效。
 - 管理密码只保存在浏览器内存中，刷新后重新输入。
 - **Cron token** 通过 Cloudflare Dashboard 环境变量 `BANGUMI_TOKEN` 配置，不在管理页操作。
 
@@ -162,7 +162,7 @@ NSFW_SHOW=true
 |------|------|------|
 | `SYNC_MODE` | var | `merge`（多账号取并集，相同条目以最新为准）或 `primary`（以主账号为准） |
 | `NSFW_SHOW` | var | 是否展示 R18 条目（`true`/`false`）。为 `true` 时前端首次访问会弹 age-18 确认窗，R18 卡片默认模糊、点击可查看；为 `false` 时 API 直接不返回 R18 条目 |
-| `BANGUMI_TOKEN` | secret | cron 同步用的 bgm.tv access token（在 [bgm.tv 开发者设置](https://bgm.tv/dev/token) 生成，永久有效） |
+| `BANGUMI_TOKEN` | secret | cron 同步用的 bgm.tv access token（在 [bgm.tv 开发者页面](https://bgm.tv/dev) 生成，永久有效） |
 | `BANGUMI_REFRESH_TOKEN` | secret | 可选。bgm.tv refresh token（developer token 无需此字段） |
 | `BANGUMI_USERS` | var | bgm 用户名列表（逗号分隔，如 `user1,user2`） |
 | `BANGUMI_PRIMARY_USER` | var | `primary` 模式下的主账户名 |
