@@ -35,7 +35,7 @@
 
 ## 快速部署
 
-> **关于 OAuth 回调地址的鸡生蛋问题**：注册 bgm.tv OAuth App 和换取 cron token 都需要 `redirect_uri`（= Worker 域名），但 Worker 域名要部署后才有。因此部署分两个阶段：**阶段一只需 Cloudflare 凭证**即可让 Worker 上线并拿到域名，**阶段二**再注册 OAuth App、换取 token、回填剩余 secrets 后重新部署。
+部署分两个阶段：**阶段一只需 Cloudflare 凭证**即可让 Worker 上线并拿到域名，**阶段二**再生成 token、配置 secrets 后重新部署。
 
 ### 阶段一：部署 Worker（仅需 Cloudflare 凭证）
 
@@ -67,7 +67,7 @@
 
    GitHub Actions 将自动：检查并创建 Cloudflare KV / R2 资源 → 构建前端 → 注入环境变量 → 部署 Worker。
 
-4. 部署完成后，你的 Worker 访问域名为 `https://bangumi-tv.<你的子域名>.workers.dev`。此时公开 widget 已可访问，但 cron 同步尚未生效（token 未配置）。
+4. 部署完成后，你的 Worker 访问域名为 `https://bangumi-tv.<你的子域名>.workers.dev`。此时公开 widget 已可访问，但 cron 同步尚未生效（`BANGUMI_TOKEN` 未配置）。
 
 ### 阶段二：生成 Access Token、配置 cron、触发首次同步
 
@@ -75,13 +75,12 @@
 
 登录 [bgm.tv](https://bgm.tv)，前往 [开发者设置](https://bgm.tv/dev/token) 生成一个永久 access token（用于 cron 定时同步抓取收藏数据）。
 
-#### 2. 在管理页面配置 Cron Token
+#### 2. 配置 Cron Token
 
-部署完成后，浏览器访问 `https://bangumi-tv.<你的子域名>.workers.dev/manage`：
+将上一步生成的 access token 配置为 sync worker 的环境变量 `BANGUMI_TOKEN`：
 
-1. 输入管理密码（`MANAGE_SECRET`）进入管理页；
-2. 在「Cron 同步 Token」区域粘贴上一步生成的 access token，点击保存；
-3. 页面提示「✓ Cron token 已保存」即成功。
+- **Cloudflare Dashboard**：Workers → `bangumi-tv-sync` → Settings → Secrets → 添加 `BANGUMI_TOKEN`
+- **或 GitHub Secrets**：Repo → Settings → Secrets → Actions → 添加 `BANGUMI_TOKEN`（CI 自动注入）
 
 #### 3. 触发首次同步
 
@@ -122,9 +121,9 @@ Sync Worker 在定时同步时自动下载条目封面（来源：bgm.tv），�
 
 访问 `https://bangumi-tv.<你的子域名>.workers.dev/manage`：
 
-- **Cron 同步 Token**（顶部）：粘贴 bgm.tv 开发者 access token，点击保存即写入 KV。可随时清除重新配置。
 - **多账户同步**：输入两个 bgm.tv 用户名和对应的 access token → 点击对比 → 选择完整同步或部分同步 → 执行。Token 在 [bgm.tv 开发者设置](https://bgm.tv/dev/token) 生成，永久有效。
 - 管理密码只保存在浏览器内存中，刷新后重新输入。
+- **Cron token** 通过 Cloudflare Dashboard 环境变量 `BANGUMI_TOKEN` 配置，不在管理页操作。
 
 > **管理页密码保护：** `MANAGE_SECRET` 是管理 API 的必填共享密码。管理页的写操作都会要求输入该密码；未配置时管理 API 返回 503。
 
@@ -150,7 +149,7 @@ BANGUMI_CLIENT_ID=你的_client_id
 BANGUMI_CLIENT_SECRET=你的_client_secret
 CRON_SECRET=任意字符串
 MANAGE_SECRET=本地管理密码
-# BANGUMI_TOKEN / BANGUMI_REFRESH_TOKEN 可选，cron 同步通过 /manage 页面配置 token 替代
+# BANGUMI_TOKEN 用于 cron 同步，通过 Cloudflare Dashboard 或 GitHub Secrets 配置
 SYNC_MODE=merge
 NSFW_SHOW=true
 ```
@@ -163,8 +162,8 @@ NSFW_SHOW=true
 |------|------|------|
 | `SYNC_MODE` | var | `merge`（多账号取并集，相同条目以最新为准）或 `primary`（以主账号为准） |
 | `NSFW_SHOW` | var | 是否展示 R18 条目（`true`/`false`）。为 `true` 时前端首次访问会弹 age-18 确认窗，R18 卡片默认模糊、点击可查看；为 `false` 时 API 直接不返回 R18 条目 |
-| `BANGUMI_TOKEN` | secret | 可选。bgm.tv access token，仅作 cron 冷启动种子；可通过 `/manage` 页面配置 cron token 替代 |
-| `BANGUMI_REFRESH_TOKEN` | secret | 可选。bgm.tv refresh token，同上 |
+| `BANGUMI_TOKEN` | secret | cron 同步用的 bgm.tv access token（在 [bgm.tv 开发者设置](https://bgm.tv/dev/token) 生成，永久有效） |
+| `BANGUMI_REFRESH_TOKEN` | secret | 可选。bgm.tv refresh token（developer token 无需此字段） |
 | `BANGUMI_USERS` | var | bgm 用户名列表（逗号分隔，如 `user1,user2`） |
 | `BANGUMI_PRIMARY_USER` | var | `primary` 模式下的主账户名 |
 | `BANGUMI_CLIENT_ID` | secret | bgm.tv API 应用的 App ID（sync worker 内部 API 调用用） |

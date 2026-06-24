@@ -52,17 +52,6 @@
     <button id="gate-submit">进入</button>
   </div>
 
-  <div class="panel">
-    <h2>Cron 同步 Token（定时同步用）</h2>
-    <p class="muted" style="margin-bottom:12px;">在 <a href="https://bgm.tv/dev/token" target="_blank" style="color:#e94560;">bgm.tv 开发者设置</a> 生成一个永久 access token，粘贴到下方保存。用于 cron 定时同步抓取收藏数据。</p>
-    <div class="token-row">
-      <input type="password" id="cron-token-input" placeholder="粘贴 bgm.tv Access Token" data-requires-secret="true">
-      <button id="cron-token-save" data-requires-secret="true">保存</button>
-      <button id="cron-token-clear" class="secondary" data-requires-secret="true">清除已存 token</button>
-    </div>
-    <div id="cron-status" class="muted"></div>
-  </div>
-
   <div class="step active" id="step1">
     <h2>步骤 1: 输入 bgm.tv 用户名和 Access Token</h2>
     <p class="muted" style="margin-bottom:12px;">在 <a href="https://bgm.tv/dev/token" target="_blank" style="color:#e94560;">bgm.tv 开发者设置</a> 分别生成两个账号的 access token（永久有效），粘贴到下方。</p>
@@ -120,8 +109,6 @@ const step2Diffs = document.getElementById('step2-diffs')
 const syncProgress = document.getElementById('sync-progress')
 const syncProgressFill = document.getElementById('sync-progress-fill')
 const syncProgressText = document.getElementById('sync-progress-text')
-const cronInput = document.getElementById('cron-token-input')
-const cronStatus = document.getElementById('cron-status')
 
 // ── Helpers ──
 function clear(node) { while (node.firstChild) node.removeChild(node.firstChild) }
@@ -172,31 +159,6 @@ document.getElementById('gate-submit').addEventListener('click', () => {
 })
 gateInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('gate-submit').click()
-})
-
-// ── Cron token ──
-document.getElementById('cron-token-save').addEventListener('click', async () => {
-  const token = cronInput.value.trim()
-  if (!token) return alert('请粘贴 token')
-  if (!manageSecret) return document.getElementById('gate').style.display = 'block'
-  showText(cronStatus, '正在保存...')
-  const res = await apiFetch('/api/manage/cron-token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token }),
-  })
-  if (!res) return showManageAuthFailure(cronStatus)
-  const data = await res.json().catch(() => null)
-  if (!res.ok) return showError(cronStatus, data, 'Token 保存失败')
-  showText(cronStatus, '✓ Cron token 已保存', 'status-ok')
-  cronInput.value = ''
-})
-
-document.getElementById('cron-token-clear').addEventListener('click', async () => {
-  if (!confirm('确认清除 cron 同步 token？清除后定时同步将无法执行。')) return
-  const res = await apiFetch('/api/manage/cron-token', { method: 'DELETE' })
-  if (!res) return showManageAuthFailure(cronStatus)
-  showText(cronStatus, 'Token 已清除', 'muted')
 })
 
 // ── Compare ──
