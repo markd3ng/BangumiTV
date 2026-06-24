@@ -38,7 +38,9 @@ export async function compareAccounts(
     if (settled.status === 'fulfilled') {
       return { name, collections: settled.value, total: settled.value.length }
     }
-    return { name, collections: [] as BgmCollection[], total: 0, error: '获取收藏失败，请稍后重试' }
+    const reason = settled.reason instanceof Error ? settled.reason.message : String(settled.reason)
+    console.error(JSON.stringify({ event: 'manage_compare_fetch_failed', user: name, reason, at: new Date().toISOString() }))
+    return { name, collections: [] as BgmCollection[], total: 0, error: reason }
   }
 
   const colA = unwrap(settledA, userA)
