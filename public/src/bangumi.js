@@ -45,8 +45,8 @@
       : 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" fill="#333"><rect width="300" height="400"/></svg>')
 
     const total = entry.eps || entry.total_episodes || 0
-    const progress = total > 0 ? Math.round((entry.ep_status / total) * 100) : 0
-      : 0
+    const progress = total > 0
+      ? Math.round((entry.ep_status / total) * 100)
 
     var html = '<a href="https://bgm.tv/subject/' + entry.subject_id + '" target="_blank" class="bgm-card';
     if (entry.nsfw) html += ' bgm-nsfw';
@@ -58,7 +58,7 @@
       '<div class="bgm-card-info">' +
         '<h3>' + (entry.name_cn || entry.name) + '</h3>';
     if (progress > 0) html += '<div class="bgm-progress"><span style="width:' + progress + '%"></span></div>';
-    html += '<span class="bgm-ep">' + entry.ep_status + '/' + (total || '??') + '</span>' +
+    html += '<span class="bgm-ep">' + entry.ep_status + '/' + ((entry.eps || entry.total_episodes || '??')) + '</span>' +
       '</div>' +
     '</a>';
     return html;
@@ -103,7 +103,8 @@
     var keys = Object.keys(TYPE_NAMES)
     var navHtml = ''
     for (var i = 0; i < keys.length; i++) {
-      navHtml += '<button data-type="' + keys[i] + '">' + TYPE_NAMES[keys[i]] + '</button>'
+      var navActive = keys[i] === 'watching' ? ' class="active"' : ''
+      navHtml += '<button data-type="' + keys[i] + '"' + navActive + '>' + TYPE_NAMES[keys[i]] + '</button>'
     }
     nav.innerHTML = navHtml
     view.appendChild(nav)
@@ -152,6 +153,10 @@
 
     nav.addEventListener('click', function(e) {
       if (e.target.tagName === 'BUTTON') {
+        var navBtns = nav.querySelectorAll('button')
+        for (var n = 0; n < navBtns.length; n++) {
+          navBtns[n].classList.toggle('active', navBtns[n] === e.target)
+        }
         currentType = e.target.dataset.type
         currentPage = 1
         load(currentType, 1)
