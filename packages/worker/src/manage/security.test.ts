@@ -262,12 +262,14 @@ test('public errors never echo upstream text', async () => {
   assert.equal(response.headers.get('Cache-Control'), 'no-store')
 })
 
-test('compare source uses a fixed safe account error message', async () => {
+test('compare source logs real error to ring buffer, returns safe reason', async () => {
   const source = await readFile(new URL('./compare.ts', import.meta.url), 'utf8')
 
-  assert.match(source, /error: '获取收藏失败，请稍后重试'/)
-  assert.equal(source.includes('err.message'), false)
-  assert.equal(source.includes('String(err)'), false)
+  // 真实错误写入 console.error（结构化 JSON），前端拿到 reason 字符串
+  assert.match(source, /console\.error\(JSON\.stringify\(\{ event: 'manage_compare_fetch_failed'/)
+  assert.match(source, /error: reason/)
+  assert.equal(source.includes('err.message'), false, 'no raw err.message in response')
+  assert.equal(source.includes('settled.reason.message'), true, 'reason extracted safely')
 })
 
 test('sync-write source uses a fixed safe item error message', async () => {
