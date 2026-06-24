@@ -220,30 +220,21 @@ export async function runSync(
     }
   }
 
-  // 恢复旧 hash：
-  // - hashCommon：fallback 用旧 images.hash（保证首轮同步不丢图）
-  // - hashLarge：恢复旧 images.hash + images.hash_large（都不丢原图）
-  // common 下载会覆盖 hashCommon 中的旧值（降级为 300px 版）
+  // hashLarge 从旧快照恢复（包括旧的 images.hash 原是 large + images.hash_large）
   const hashCommon = new Map<number, string>()
   const hashLarge = new Map<number, string>()
   const prevSnap = await storage.get<SyncSnapshot>(SNAPSHOT_KEY)
   if (prevSnap) {
     for (const key of ['want', 'watched', 'watching', 'on_hold', 'dropped'] as const) {
       for (const entry of (prevSnap.collections[key] || []) as any[]) {
-        if (entry.images?.hash) {
-          hashCommon.set(entry.subject_id as number, entry.images.hash) // fallback
-          hashLarge.set(entry.subject_id as number, entry.images.hash)  // 原图
-        }
+        if (entry.images?.hash) hashLarge.set(entry.subject_id as number, entry.images.hash)
         if (entry.images?.hash_large) hashLarge.set(entry.subject_id as number, entry.images.hash_large)
       }
     }
     for (const day of (prevSnap.calendar || [])) {
       for (const item of (day.items || [])) {
         const ci = item as any
-        if (ci.images?.hash) {
-          hashCommon.set(ci.id as number, ci.images.hash) // fallback
-          hashLarge.set(ci.id as number, ci.images.hash)  // 原图
-        }
+        if (ci.images?.hash) hashLarge.set(ci.id as number, ci.images.hash)
         if (ci.images?.hash_large) hashLarge.set(ci.id as number, ci.images.hash_large)
       }
     }
@@ -280,7 +271,12 @@ export async function runSync(
     at: new Date().toISOString(),
   }))
 
-  // imageHashMap（传给 merge，作为 images.hash 用 common）
+  // hashCommon 用旧 hashLarge 兜底（没下到 common 的条目暂时用旧值，逐步过渡）
+  for (const [id, hash] of hashLarge) {
+    if (!hashCommon.has(id)) hashCommon.set(id, hash)
+  }
+
+  // imageHashMap（传给 merge，作为 images.hash）
   const imageHashMap = hashCommon
 
   // 3.6 带图片 hash 重新合并
