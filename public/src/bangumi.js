@@ -44,8 +44,8 @@
       ? API + '/image/' + entry.images.hash + '?w=300&fmt=webp'
       : 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" fill="#333"><rect width="300" height="400"/></svg>')
 
-    const progress = entry.total_episodes > 0
-      ? Math.round((entry.ep_status / entry.total_episodes) * 100)
+    const total = entry.eps || entry.total_episodes || 0
+    const progress = total > 0 ? Math.round((entry.ep_status / total) * 100) : 0
       : 0
 
     var html = '<a href="https://bgm.tv/subject/' + entry.subject_id + '" target="_blank" class="bgm-card';
@@ -58,7 +58,7 @@
       '<div class="bgm-card-info">' +
         '<h3>' + (entry.name_cn || entry.name) + '</h3>';
     if (progress > 0) html += '<div class="bgm-progress"><span style="width:' + progress + '%"></span></div>';
-    html += '<span class="bgm-ep">' + entry.ep_status + '/' + (entry.total_episodes || '??') + '</span>' +
+    html += '<span class="bgm-ep">' + entry.ep_status + '/' + (total || '??') + '</span>' +
       '</div>' +
     '</a>';
     return html;
@@ -85,7 +85,7 @@
       '<div class="bgm-card-info">' +
         '<h3>' + name + '</h3>';
     if (score) html += '<span class="bgm-score">★ ' + Number(score).toFixed(1) + '</span>';
-    html += '<span class="bgm-ep">' + (entry.total_episodes || entry.eps || '??') + ' 话</span>' +
+    html += '<span class="bgm-ep">' + ((entry.eps || entry.total_episodes) || '??') + ' 话</span>' +
       '</div>' +
     '</a>';
     return html;
