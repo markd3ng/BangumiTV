@@ -25,10 +25,19 @@ export interface Difference {
 
 export async function compareAccounts(
   tokenA: string,
-  userA: string,
+  _userA: string,
   tokenB: string,
-  userB: string,
+  _userB: string,
 ): Promise<CompareResult> {
+  // 从 token 解析真实用户名（bgm.tv GET /v0/me）
+  const client = new BgmClient()
+  const [meA, meB] = await Promise.allSettled([
+    client.getMe(tokenA),
+    client.getMe(tokenB),
+  ])
+  const userA = meA.status === 'fulfilled' ? meA.value.username : (_userA || 'Account A')
+  const userB = meB.status === 'fulfilled' ? meB.value.username : (_userB || 'Account B')
+
   const [settledA, settledB] = await Promise.allSettled([
     fetchAllCollections(new BgmClient(tokenA), userA),
     fetchAllCollections(new BgmClient(tokenB), userB),

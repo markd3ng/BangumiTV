@@ -204,4 +204,16 @@ export class BgmClient {
       signal: AbortSignal.timeout(30000),
     })
   }
+
+  /** 用 access token 换取当前用户信息（username, id 等）。 */
+  async getMe(token: string): Promise<{ username: string; id: number }> {
+    const res = await fetch('https://api.bgm.tv/v0/me', {
+      headers: { Authorization: `Bearer ${token}`, 'User-Agent': UA },
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!res.ok) {
+      throw new BgmHttpError(res.status, `bgm.tv getMe: ${res.status}`)
+    }
+    return res.json()
+  }
 }
