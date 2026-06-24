@@ -47,15 +47,11 @@
 
   <div class="step active" id="step1">
     <h2>步骤 1: 输入 bgm.tv Access Token</h2>
-    <p class="muted" style="margin-bottom:12px;">在 <a href="https://bgm.tv/dev" target="_blank" style="color:#e94560;">bgm.tv 开发者设置</a> 分别生成两个账号的 access token（永久有效），粘贴到下方。用户名可选，留空则显示「账号 A」「账号 B」。</p>
+    <p class="muted" style="margin-bottom:12px;">在 <a href="https://bgm.tv/dev" target="_blank" style="color:#e94560;">bgm.tv 开发者设置</a> 分别生成两个账号的 access token（永久有效），粘贴到下方。</p>
 
-    <label>账号 A 用户名（可选）</label>
-    <input type="text" id="userA" placeholder="留空则显示「账号 A」">
     <label>账号 A Access Token <span style="color:#e94560;">*</span></label>
     <input type="password" id="tokenA" placeholder="粘贴账号 A 的 Access Token">
 
-    <label>账号 B 用户名（可选）</label>
-    <input type="text" id="userB" placeholder="留空则显示「账号 B」">
     <label>账号 B Access Token <span style="color:#e94560;">*</span></label>
     <input type="password" id="tokenB" placeholder="粘贴账号 B 的 Access Token">
 
@@ -88,7 +84,7 @@
 </div>
 
 <script>
-let state = { userA: '', userB: '', tokenA: '', tokenB: '', differences: [] }
+let state = { tokenA: '', tokenB: '', differences: [] }
 
 // ── DOM refs ──
 const step1 = document.getElementById('step1')
@@ -125,13 +121,10 @@ async function apiFetch(url, opts = {}) {
 
 // ── Compare ──
 document.getElementById('start-compare').addEventListener('click', async () => {
-  const ua = document.getElementById('userA').value.trim()
-  const ub = document.getElementById('userB').value.trim()
   const ta = document.getElementById('tokenA').value.trim()
   const tb = document.getElementById('tokenB').value.trim()
   if (!ta || !tb) return showText(step1Status, '请填写两个账号的 Access Token')
 
-  state.userA = ua || '账号 A'; state.userB = ub || '账号 B'
   state.tokenA = ta; state.tokenB = tb
 
   showText(step1Status, '正在加载双方收藏数据...')
@@ -139,7 +132,7 @@ document.getElementById('start-compare').addEventListener('click', async () => {
   const res = await apiFetch('/api/manage/compare', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tokenA: ta, userA: ua, tokenB: tb, userB: ub }),
+    body: JSON.stringify({ tokenA: ta, userA: 'Account A', tokenB: tb, userB: 'Account B' }),
   })
   if (!res) return showText(step1Status, "请求失败，请检查 token 是否有效")
   const data = await res.json().catch(() => null)
@@ -154,8 +147,8 @@ document.getElementById('start-compare').addEventListener('click', async () => {
 function renderComparison(data) {
   clear(step2Summary)
   ;[
-    { key: 'userA', label: state.userA },
-    { key: 'userB', label: state.userB },
+    { key: 'userA', label: (data?.userA?.name || 'Account A') },
+    { key: 'userB', label: (data?.userB?.name || 'Account B') },
   ].forEach(({ key, label }) => {
     const card = document.createElement('div')
     card.className = 'summary-card'
@@ -173,8 +166,8 @@ function renderComparison(data) {
   })
 
   const dir = document.getElementById('sync-direction')
-  dir.innerHTML = `<option value="A->B">${state.userA} → ${state.userB}（A 覆盖 B）</option>
-                   <option value="B->A">${state.userB} → ${state.userA}（B 覆盖 A）</option>`
+  dir.innerHTML = `<option value="A->B">Account A → Account B</option>
+                   <option value="B->A">Account B → Account A</option>`
 
   clear(step2Diffs)
   if (state.differences.length === 0) {
@@ -230,8 +223,8 @@ document.getElementById('partial-sync-start').addEventListener('click', () => {
 
 async function doSync(mode, subjectIds) {
   const direction = document.getElementById('sync-direction').value
-  const fromUser = direction === 'A->B' ? state.userA : state.userB
-  const toUser = direction === 'A->B' ? state.userB : state.userA
+  const fromUser = direction === 'A->B' ? 'Account A' : 'Account B'
+  const toUser = direction === 'A->B' ? 'Account B' : 'Account A'
   const fromToken = direction === 'A->B' ? state.tokenA : state.tokenB
   const toToken = direction === 'A->B' ? state.tokenB : state.tokenA
 
