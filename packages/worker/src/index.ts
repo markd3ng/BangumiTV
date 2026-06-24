@@ -349,6 +349,21 @@ app.post('/api/manage/sync', async (c) => {
   }
 })
 
+// 手动存储 cron access token（developer token，无 refresh）
+app.post('/api/manage/cron-token', async (c) => {
+  const storage = new KVStorage(c.env.BANGUMI_KV)
+  try {
+    const body = await c.req.json()
+    const token = (body as any)?.token?.trim()
+    if (!token) return publicError(400, 'INVALID_REQUEST')
+    await storage.put('bgm:tokens', { access_token: token, refresh_token: '' })
+    console.log(JSON.stringify({ event: 'manage_cron_token_saved', at: new Date().toISOString() }))
+    return Response.json({ ok: true })
+  } catch (err) {
+    return errorToResponse('/api/manage/cron-token', err, storage)
+  }
+})
+
 // 清除 KV 中持久化的 cron token
 app.delete('/api/manage/cron-token', async (c) => {
   const storage = new KVStorage(c.env.BANGUMI_KV)

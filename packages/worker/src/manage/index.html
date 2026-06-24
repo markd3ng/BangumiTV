@@ -37,6 +37,8 @@
     .status-ok { color: #4caf50; }
     .button-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
     .button-row button { margin-right: 0; }
+    .token-row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 16px; }
+    .token-row input { flex: 1; min-width: 200px; margin-bottom: 0; }
   </style>
 </head>
 <body>
@@ -51,641 +53,285 @@
   </div>
 
   <div class="panel">
-    <h2>Cron 同步账号授权（一次性）</h2>
-    <p class="muted" style="margin-bottom:12px;">定时同步需要一个有收藏读取权限的账号。点击下方按钮授权一次，token 会自动保存并由 Worker 自动续期，无需在 GitHub 配置 token。</p>
-    <div class="button-row">
-      <button id="cron-authorize" data-requires-secret="true">授权 cron 同步账号</button>
-      <button id="cron-clear" class="secondary" data-requires-secret="true">清除已存 token</button>
+    <h2>Cron 同步 Token（定时同步用）</h2>
+    <p class="muted" style="margin-bottom:12px;">在 <a href="https://bgm.tv/dev/token" target="_blank" style="color:#e94560;">bgm.tv 开发者设置</a> 生成一个永久 access token，粘贴到下方保存。用于 cron 定时同步抓取收藏数据。</p>
+    <div class="token-row">
+      <input type="password" id="cron-token-input" placeholder="粘贴 bgm.tv Access Token" data-requires-secret="true">
+      <button id="cron-token-save" data-requires-secret="true">保存</button>
+      <button id="cron-token-clear" class="secondary" data-requires-secret="true">清除已存 token</button>
     </div>
-    <div id="cron-status" style="display:block;margin-top:12px;" class="muted"></div>
-    <div id="cron-manual" style="display:none;margin-top:12px;">
-      <p class="muted">若弹窗未自动回填，请手动粘贴回调 URL：</p>
-      <input type="text" id="cron-callback-input" placeholder="粘贴回调 URL" data-requires-secret="true">
-      <button id="cron-callback-submit" data-requires-secret="true">确认</button>
-    </div>
+    <div id="cron-status" class="muted"></div>
   </div>
 
   <div class="step active" id="step1">
-    <h2>步骤 1: 输入 bgm.tv 用户名</h2>
-    <label>账号 A</label>
+    <h2>步骤 1: 输入 bgm.tv 用户名和 Access Token</h2>
+    <p class="muted" style="margin-bottom:12px;">在 <a href="https://bgm.tv/dev/token" target="_blank" style="color:#e94560;">bgm.tv 开发者设置</a> 分别生成两个账号的 access token（永久有效），粘贴到下方。</p>
+
+    <label>账号 A 用户名</label>
     <input type="text" id="userA" placeholder="输入 bgm.tv 用户名" data-requires-secret="true">
-    <label>账号 B</label>
+    <label>账号 A Access Token</label>
+    <input type="password" id="tokenA" placeholder="粘贴账号 A 的 Access Token" data-requires-secret="true">
+
+    <label>账号 B 用户名</label>
     <input type="text" id="userB" placeholder="输入 bgm.tv 用户名" data-requires-secret="true">
-    <button id="start-oauth" data-requires-secret="true">下一步：OAuth 授权</button>
+    <label>账号 B Access Token</label>
+    <input type="password" id="tokenB" placeholder="粘贴账号 B 的 Access Token" data-requires-secret="true">
+
+    <button id="start-compare" data-requires-secret="true">下一步：对比收藏</button>
+    <div id="step1-status" class="muted" style="margin-top:12px;"></div>
   </div>
 
   <div class="step" id="step2">
-    <h2>步骤 2: OAuth 授权</h2>
-    <div id="oauth-status" class="muted">等待授权...</div>
-    <div id="oauth-buttons"></div>
-    <details style="margin-top:12px;">
-      <summary style="cursor:pointer;color:#a0a0b0;font-size:13px;">或直接粘贴 Access Token（跳过 OAuth 弹窗）</summary>
-      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
-        <input type="password" id="manual-token-input" placeholder="粘贴 bgm.tv Access Token" style="flex:1;min-width:200px;padding:6px 10px;border:1px solid #a0a0b0;border-radius:6px;background:#fff;color:#333;">
-        <select id="manual-token-target" style="padding:6px 10px;border:1px solid #a0a0b0;border-radius:6px;background:#fff;color:#333;">
-          <option value="account-a">账号 A</option>
-          <option value="account-b">账号 B</option>
-        </select>
-        <button id="manual-token-confirm" data-requires-secret="true" class="secondary">确认</button>
-      </div>
-      <p class="muted" style="margin-top:4px;">在 bgm.tv <a href="https://bgm.tv/dev/token" target="_blank">开发者设置</a> 生成 token，粘贴后点击确认即可跳过弹窗授权。两个账号各自粘贴一次。</p>
-    </details>
-  </div>
-
-  <div class="step" id="step3">
-    <h2>步骤 3: 选择同步模式</h2>
-    <div class="summary" id="step3-summary"></div>
-    <div style="margin-bottom:20px">
+    <h2>步骤 2: 对比结果 & 同步</h2>
+    <div class="summary" id="step2-summary"></div>
+    <div id="step2-diffs"></div>
+    <div id="step2-sync" style="display:none;margin-top:20px;">
       <label>同步方向</label>
-      <select id="sync-direction" data-requires-secret="true">
-        <option value="A->B">A → B</option>
-        <option value="B->A">B → A</option>
-      </select>
-    </div>
-    <div class="button-row">
-      <button id="full-sync" data-requires-secret="true">全部复制</button>
-      <button id="partial-sync-toggle" data-requires-secret="true">选择复制</button>
-    </div>
-    <div id="partial-list" style="display:none; margin-top:16px;">
-      <label><input type="checkbox" id="select-all" data-requires-secret="true"> 全选</label>
-      <div id="diff-list"></div>
-      <button id="partial-sync-start" style="margin-top:16px;" data-requires-secret="true">同步选中条目</button>
+      <select id="sync-direction" data-requires-secret="true"></select>
+      <div class="button-row" style="margin-top:12px;">
+        <button id="full-sync" data-requires-secret="true">完整同步</button>
+        <button id="partial-sync-toggle" class="secondary" data-requires-secret="true">按选中条目同步</button>
+        <button id="partial-sync-start" data-requires-secret="true" style="display:none;">执行选中条目同步</button>
+      </div>
+      <div class="progress" id="sync-progress" style="display:none;">
+        <div class="progress-bar"><div class="progress-fill" id="sync-progress-fill"></div></div>
+        <p id="sync-progress-text" class="muted" style="margin-top:8px;"></p>
+      </div>
     </div>
   </div>
 
-  <div class="step" id="step4">
-    <h2>步骤 4: 同步中...</h2>
-    <div class="progress">
-      <div class="progress-bar">
-        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
-      </div>
-      <p id="progress-text" style="margin-top:8px;">准备中...</p>
-    </div>
-    <div id="sync-results" style="margin-top:16px;"></div>
-    <button id="reset-button" style="margin-top:16px;">返回</button>
+  <div style="text-align:center;margin-top:24px;">
+    <button id="reset-button" class="secondary">重新开始</button>
   </div>
 </div>
+
 <script>
-let state = { userA: '', userB: '', tokenA: '', tokenB: '', differences: [] }
+const MANAGE_AUTH_FAILURE_MESSAGE = '管理 API 认证失败。请刷新页面后重新输入管理密码。'
+
 let manageSecret = ''
-let pendingOAuth = null
-let manageLocked = true
-let oauthLaunchGeneration = 0
-let currentOAuthLaunch = null
-const MANAGE_AUTH_FAILURE_MESSAGE = '管理验证失败，请重新输入密码'
-const OAUTH_POPUP_FAILURE_MESSAGE = '授权弹窗打开失败，请稍后重试'
+let state = { userA: '', userB: '', tokenA: '', tokenB: '', differences: [] }
 
-const gate = document.getElementById('gate')
-const gateHelp = document.getElementById('gate-help')
-const gateInput = document.getElementById('gate-input')
+// ── DOM refs ──
+const step1 = document.getElementById('step1')
+const step2 = document.getElementById('step2')
+const step1Status = document.getElementById('step1-status')
+const step2Summary = document.getElementById('step2-summary')
+const step2Diffs = document.getElementById('step2-diffs')
+const syncProgress = document.getElementById('sync-progress')
+const syncProgressFill = document.getElementById('sync-progress-fill')
+const syncProgressText = document.getElementById('sync-progress-text')
+const cronInput = document.getElementById('cron-token-input')
 const cronStatus = document.getElementById('cron-status')
-const cronManual = document.getElementById('cron-manual')
-const cronCallbackInput = document.getElementById('cron-callback-input')
-const oauthStatus = document.getElementById('oauth-status')
-const oauthButtons = document.getElementById('oauth-buttons')
-const step3Summary = document.getElementById('step3-summary')
-const partialList = document.getElementById('partial-list')
-const diffList = document.getElementById('diff-list')
-const syncResults = document.getElementById('sync-results')
-const progressFill = document.getElementById('progress-fill')
-const progressText = document.getElementById('progress-text')
 
-function showStep(n) {
-  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'))
-  document.getElementById('step' + n).classList.add('active')
-}
-
-function clear(node) {
-  node.replaceChildren()
-}
-
+// ── Helpers ──
+function clear(node) { while (node.firstChild) node.removeChild(node.firstChild) }
 function textElement(tag, text, className) {
-  const node = document.createElement(tag)
-  node.textContent = String(text ?? '')
-  if (className) node.className = className
-  return node
+  const el = document.createElement(tag)
+  el.textContent = text
+  if (className) el.className = className
+  return el
 }
-
 function showError(target, data, fallback) {
+  const msg = data?.error?.message || fallback
   clear(target)
-  const box = document.createElement('div')
-  box.className = 'error-box'
-  box.append(textElement('strong', data?.error?.code || 'ERROR'))
-  box.append(textElement('p', data?.error?.message || fallback || '请求失败'))
-  target.append(box)
+  target.appendChild(textElement('p', msg, 'error-box'))
 }
-
 function showText(target, text, className = 'muted') {
   clear(target)
-  target.append(textElement('p', text, className))
+  target.appendChild(textElement('p', text, className))
 }
-
 function showManageAuthFailure(target) {
   showText(target, MANAGE_AUTH_FAILURE_MESSAGE)
 }
-
-function purposeTarget(purpose) {
-  return purpose === 'cron' ? cronStatus : oauthStatus
-}
-
-function purposeUserName(purpose) {
-  if (purpose === 'account-a') return state.userA
-  if (purpose === 'account-b') return state.userB
-  return 'cron 同步账号'
-}
-
-function closePendingPopup() {
-  if (pendingOAuth?.popup && !pendingOAuth.popup.closed) {
-    pendingOAuth.popup.close()
-  }
-}
-
-function resetPendingOAuth() {
-  closePendingPopup()
-  pendingOAuth = null
-}
-
-function setManageLocked(locked, message) {
-  manageLocked = locked
-  gate.style.display = locked ? 'block' : 'none'
-  gateHelp.textContent = message || '本管理页受密码保护，请输入 MANAGE_SECRET：'
-  document.querySelectorAll('[data-requires-secret]').forEach(node => {
-    node.disabled = locked
-  })
-}
-
 function handleManageDenied() {
   manageSecret = ''
-  gateInput.value = ''
-  setManageLocked(true, '管理操作需要密码，请重新输入。')
+  document.querySelectorAll('[data-requires-secret]').forEach(el => el.disabled = true)
 }
 
-async function apiFetch(url, options = {}, control = {}) {
-  const headers = new Headers(options.headers || {})
+async function apiFetch(url, opts = {}, { deferManageDenied } = {}) {
+  const headers = new Headers(opts.headers || {})
   if (manageSecret) headers.set('X-Manage-Secret', manageSecret)
-  const response = await fetch(url, { ...options, headers })
-  if (response.status === 401 || response.status === 503) {
-    if (control.deferManageDenied === true) {
-      return response
-    }
-    document.getElementById('gate').style.display = 'block'
-    handleManageDenied()
-    return null
-  }
-  return response
-}
-
-function parseStatePayload(signedState) {
-  if (typeof signedState !== 'string') return null
-  const [encodedPayload] = signedState.split('.')
-  if (!encodedPayload) return null
   try {
-    const padded = encodedPayload
-      .replaceAll('-', '+')
-      .replaceAll('_', '/')
-      .padEnd(Math.ceil(encodedPayload.length / 4) * 4, '=')
-    return JSON.parse(atob(padded))
-  } catch {
-    return null
-  }
+    const res = await fetch(url, { ...opts, headers })
+    if (!deferManageDenied && (res.status === 401 || res.status === 503)) {
+      document.getElementById('gate').style.display = 'block'
+      handleManageDenied()
+      return null
+    }
+    return res
+  } catch { return null }
 }
 
-function renderAccountManualInput(purpose) {
-  clear(oauthButtons)
-  const note = textElement('p', '若弹窗未自动回填，请手动粘贴回调 URL：', 'muted')
-  const input = document.createElement('input')
-  input.type = 'text'
-  input.placeholder = '粘贴回调 URL'
-  input.id = 'oauth-callback-input'
-  input.setAttribute('data-requires-secret', 'true')
-  input.disabled = manageLocked
-  const button = document.createElement('button')
-  button.textContent = '确认'
-  button.setAttribute('data-requires-secret', 'true')
-  button.disabled = manageLocked
-  button.addEventListener('click', () => {
-    submitAccountCallback(input.value.trim(), purpose)
+// ── Gate ──
+const gateInput = document.getElementById('gate-input')
+document.getElementById('gate-submit').addEventListener('click', () => {
+  manageSecret = gateInput.value
+  if (!manageSecret) return showText(document.getElementById('gate-help'), '请输入管理密码。')
+  document.getElementById('gate').style.display = 'none'
+  document.querySelectorAll('[data-requires-secret]').forEach(el => el.disabled = false)
+})
+gateInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('gate-submit').click()
+})
+
+// ── Cron token ──
+document.getElementById('cron-token-save').addEventListener('click', async () => {
+  const token = cronInput.value.trim()
+  if (!token) return alert('请粘贴 token')
+  if (!manageSecret) return document.getElementById('gate').style.display = 'block'
+  showText(cronStatus, '正在保存...')
+  const res = await apiFetch('/api/manage/cron-token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
   })
-  oauthButtons.append(note, input, button)
-}
+  if (!res) return showManageAuthFailure(cronStatus)
+  const data = await res.json().catch(() => null)
+  if (!res.ok) return showError(cronStatus, data, 'Token 保存失败')
+  showText(cronStatus, '✓ Cron token 已保存', 'status-ok')
+  cronInput.value = ''
+})
 
-async function consumeOAuthFlow(flow, code, signedState) {
-  if (!flow || flow.consuming) return
-  flow.consuming = true
-  return exchangeOAuth(code, signedState, flow)
-}
+document.getElementById('cron-token-clear').addEventListener('click', async () => {
+  if (!confirm('确认清除 cron 同步 token？清除后定时同步将无法执行。')) return
+  const res = await apiFetch('/api/manage/cron-token', { method: 'DELETE' })
+  if (!res) return showManageAuthFailure(cronStatus)
+  showText(cronStatus, 'Token 已清除', 'muted')
+})
 
-async function beginOAuth(purpose) {
-  const target = purposeTarget(purpose)
-  const label = purposeUserName(purpose)
-  resetPendingOAuth()
-  const launch = { id: ++oauthLaunchGeneration, purpose }
-  currentOAuthLaunch = launch
-  showText(target, '正在发起授权...')
+// ── Compare ──
+document.getElementById('start-compare').addEventListener('click', async () => {
+  const ua = document.getElementById('userA').value.trim()
+  const ub = document.getElementById('userB').value.trim()
+  const ta = document.getElementById('tokenA').value.trim()
+  const tb = document.getElementById('tokenB').value.trim()
+  if (!ua || !ub || !ta || !tb) return showText(step1Status, '请填写所有字段')
 
-  try {
-    const headers = new Headers({ 'Content-Type': 'application/json' })
-    if (manageSecret) headers.set('X-Manage-Secret', manageSecret)
-    const response = await fetch('/api/manage/oauth-url', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ purpose }),
-    })
-    if (currentOAuthLaunch !== launch) return
-    if (response.status === 401 || response.status === 503) {
-      document.getElementById('gate').style.display = 'block'
-      handleManageDenied()
-      return showManageAuthFailure(target)
-    }
+  state.userA = ua; state.userB = ub
+  state.tokenA = ta; state.tokenB = tb
 
-    const data = await response.json().catch(() => null)
-    if (currentOAuthLaunch !== launch) return
-    if (!response.ok || !data?.url || !data?.state || !data?.nonce) {
-      return showError(target, data, 'OAuth URL 获取失败')
-    }
+  showText(step1Status, '正在加载双方收藏数据...')
 
-    const flow = { purpose, state: data.state, nonce: data.nonce, popup: null, consuming: false }
-    pendingOAuth = flow
-    const popup = window.open(data.url, 'bgm-oauth')
-    if (!popup) {
-      resetPendingOAuth()
-      return showText(target, OAUTH_POPUP_FAILURE_MESSAGE)
-    }
+  const res = await apiFetch('/api/manage/compare', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tokenA: ta, userA: ua, tokenB: tb, userB: ub }),
+  })
+  if (!res) return showManageAuthFailure(step1Status)
+  const data = await res.json().catch(() => null)
+  if (!res.ok) return showError(step1Status, data, '加载收藏数据失败')
 
-    flow.popup = popup
-    if (purpose === 'cron') {
-      cronCallbackInput.value = ''
-      cronManual.style.display = 'block'
-    } else {
-      renderAccountManualInput(purpose)
-    }
-    showText(target, `请在弹出窗口完成 ${label} 授权。若未自动回填，请手动粘贴回调 URL：`)
-  } catch {
-    if (currentOAuthLaunch !== launch) return
-    showError(target, null, 'OAuth URL 获取失败')
-  }
-}
+  state.differences = data.differences || []
+  renderComparison(data)
+  step1.classList.remove('active')
+  step2.classList.add('active')
+})
 
-async function exchangeOAuth(code, signedState, flow) {
-  const target = purposeTarget(flow.purpose)
-  let nextAction = null
-  let flowIsCurrent = false
-  try {
-    const response = await apiFetch('/api/manage/exchange', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, state: signedState }),
-    }, { deferManageDenied: true })
-    if (!response) {
-      return showManageAuthFailure(target)
-    }
-    flowIsCurrent = pendingOAuth === flow
-    if (!flowIsCurrent) {
-      return
-    }
-    if (response.status === 401 || response.status === 503) {
-      document.getElementById('gate').style.display = 'block'
-      handleManageDenied()
-      return showManageAuthFailure(target)
-    }
-    const data = await response.json().catch(() => null)
-    if (pendingOAuth !== flow) {
-      return
-    }
-
-    if (!response.ok) {
-      return showError(target, data, 'OAuth 授权失败')
-    }
-
-    if (flow.purpose === 'cron') {
-      if (data.ok === true) {
-        cronManual.style.display = 'none'
-        cronCallbackInput.value = ''
-        return showText(target, '✓ 已授权并保存，cron 同步将自动使用该账号（token 会自动续期）', 'status-ok')
-      }
-      return showError(target, data, 'cron 账号授权失败')
-    }
-
-    if (!data.access_token) {
-      return showError(target, data, `账号 ${flow.purpose === 'account-a' ? 'A' : 'B'} OAuth 授权失败`)
-    }
-
-    if (flow.purpose === 'account-a') {
-      state.tokenA = data.access_token
-      showText(target, `✓ 账号 A (${state.userA}) 已授权`, 'status-ok')
-      nextAction = () => beginOAuth('account-b')
-    } else {
-      state.tokenB = data.access_token
-      clear(oauthButtons)
-      showText(target, `✓ 账号 B (${state.userB}) 已授权`, 'status-ok')
-      nextAction = () => loadComparison()
-    }
-  } finally {
-    if (pendingOAuth === flow) {
-      resetPendingOAuth()
-    }
-  }
-  if (!flowIsCurrent) return
-  return nextAction ? nextAction() : undefined
-}
-
-function renderComparisonSummary(data) {
-  clear(step3Summary)
+function renderComparison(data) {
+  clear(step2Summary)
   ;[
     { key: 'userA', label: state.userA },
     { key: 'userB', label: state.userB },
   ].forEach(({ key, label }) => {
-    const summaryCard = document.createElement('div')
-    summaryCard.className = 'summary-card'
-    const summary = data?.[key]
-    if (summary && summary.error) {
-      summaryCard.style.border = '1px solid #e94560'
-      summaryCard.append(textElement('div', '✗', 'count'))
-      summaryCard.append(textElement('div', label, 'label'))
-      const error = textElement('div', summary.error)
-      error.style.fontSize = '11px'
-      error.style.color = '#ffaaaa'
-      error.style.marginTop = '4px'
-      summaryCard.append(error)
+    const card = document.createElement('div')
+    card.className = 'summary-card'
+    const s = data?.[key]
+    if (s?.error) {
+      card.style.border = '1px solid #e94560'
+      card.append(textElement('div', '✗', 'count'))
+      card.append(textElement('div', label, 'label'))
+      card.append(textElement('div', s.error, 'muted'))
     } else {
-      summaryCard.append(textElement('div', (summary && summary.total) || 0, 'count'))
-      summaryCard.append(textElement('div', label, 'label'))
+      card.append(textElement('div', String(s?.total || '?'), 'count'))
+      card.append(textElement('div', label, 'label'))
     }
-    step3Summary.append(summaryCard)
+    step2Summary.append(card)
   })
+
+  const dir = document.getElementById('sync-direction')
+  dir.innerHTML = `<option value="A->B">${state.userA} → ${state.userB}（A 覆盖 B）</option>
+                   <option value="B->A">${state.userB} → ${state.userA}（B 覆盖 A）</option>`
+
+  clear(step2Diffs)
+  if (state.differences.length === 0) {
+    step2Diffs.append(textElement('p', '双方收藏完全一致，无需同步。', 'muted'))
+    document.getElementById('step2-sync').style.display = 'none'
+  } else {
+    document.getElementById('step2-sync').style.display = ''
+    const list = document.createElement('div')
+    list.style.cssText = 'max-height:500px;overflow-y:auto;margin-top:12px;'
+    state.differences.forEach(d => {
+      const item = document.createElement('div')
+      item.className = 'diff-item'
+      item.innerHTML = `<div class="diff-info">
+        <h3>${d.name_cn || d.name || '#' + d.subject_id}</h3>
+        <p>A: ${diffStr(d.typeA, d.epStatusA, d.rateA)} | B: ${diffStr(d.typeB, d.epStatusB, d.rateB)}</p>
+      </div>`
+      const cb = document.createElement('input')
+      cb.type = 'checkbox'; cb.checked = true; cb.dataset.id = d.subject_id
+      cb.style.cssText = 'margin-top:4px;'
+      if (document.getElementById('partial-sync-toggle').style.display === 'none') cb.style.display = 'none'
+      item.prepend(cb)
+      list.appendChild(item)
+    })
+    step2Diffs.appendChild(list)
+  }
 }
 
-function renderDiffList() {
-  clear(diffList)
-  const differences = Array.isArray(state.differences) ? state.differences : []
-  if (differences.length === 0) {
-    diffList.append(textElement('p', '当前没有需要选择的差异条目。', 'muted'))
-    return
-  }
-
-  differences.forEach(item => {
-    const row = document.createElement('div')
-    row.className = 'diff-item'
-
-    const checkbox = document.createElement('input')
-    checkbox.type = 'checkbox'
-    checkbox.value = String(item.subject_id ?? '')
-    checkbox.setAttribute('data-requires-secret', 'true')
-    checkbox.disabled = manageLocked
-
-    const info = document.createElement('div')
-    info.className = 'diff-info'
-    info.append(textElement('h3', item.name_cn || item.name || `条目 ${item.subject_id || ''}`))
-    info.append(textElement('p', `A: ${item.epStatusA || 0}ep | B: ${item.epStatusB || 0}ep`))
-
-    row.append(checkbox, info)
-    diffList.append(row)
-  })
+function diffStr(type, ep, rate) {
+  const types = { 1: '想看', 2: '看过', 3: '在看', 4: '搁置', 5: '抛弃' }
+  return `${types[type] || type} | ${ep} 话 | ${rate} 分`
 }
 
-async function loadComparison() {
-  showStep(3)
-  partialList.style.display = 'none'
-  clear(syncResults)
-  const response = await apiFetch('/api/manage/compare', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      tokenA: state.tokenA,
-      tokenB: state.tokenB,
-      userA: state.userA,
-      userB: state.userB,
-    }),
-  })
-  if (!response) {
-    return showManageAuthFailure(step3Summary)
+// ── Sync ──
+document.getElementById('partial-sync-toggle').addEventListener('click', () => {
+  const toggle = document.getElementById('partial-sync-toggle')
+  const start = document.getElementById('partial-sync-start')
+  const cbs = step2Diffs.querySelectorAll('input[type=checkbox]')
+  if (start.style.display === 'none') {
+    start.style.display = ''; toggle.textContent = '取消选择'
+    cbs.forEach(c => c.style.display = '')
+  } else {
+    start.style.display = 'none'; toggle.textContent = '按选中条目同步'
+    cbs.forEach(c => c.style.display = 'none')
   }
-  const data = await response.json().catch(() => null)
-  if (!response.ok || (data?.error && !data?.userA && !data?.userB)) {
-    return showError(step3Summary, data, '加载收藏数据失败')
-  }
+})
 
-  renderComparisonSummary(data)
-  state.differences = Array.isArray(data?.differences) ? data.differences : []
-  renderDiffList()
-}
-
-function renderSyncResultsList(results) {
-  clear(syncResults)
-  if (!Array.isArray(results) || results.length === 0) {
-    syncResults.append(textElement('p', '没有返回同步结果。', 'muted'))
-    return
-  }
-
-  results.forEach(item => {
-    const row = document.createElement('div')
-    row.className = 'diff-item'
-    row.append(textElement('span', item.status === 'ok' ? '✓' : '✗'))
-
-    const info = document.createElement('div')
-    info.className = 'diff-info'
-    info.append(textElement('h3', item.name || `条目 ${item.subject_id || ''}`))
-    if (item.error) {
-      info.append(textElement('p', item.error))
-    }
-    row.append(info)
-    syncResults.append(row)
-  })
-}
+document.getElementById('full-sync').addEventListener('click', () => doSync('full', []))
+document.getElementById('partial-sync-start').addEventListener('click', () => {
+  const ids = Array.from(step2Diffs.querySelectorAll('input[type=checkbox]:checked')).map(c => Number(c.dataset.id))
+  if (!ids.length) return alert('请至少选中一个条目')
+  doSync('partial', ids)
+})
 
 async function doSync(mode, subjectIds) {
-  showStep(4)
-  progressFill.style.width = '0%'
-  progressText.textContent = '同步中...'
-  clear(syncResults)
-
   const direction = document.getElementById('sync-direction').value
-  const from = direction === 'A->B' ? state.userA : state.userB
-  const to = direction === 'A->B' ? state.userB : state.userA
+  const fromUser = direction === 'A->B' ? state.userA : state.userB
+  const toUser = direction === 'A->B' ? state.userB : state.userA
   const fromToken = direction === 'A->B' ? state.tokenA : state.tokenB
   const toToken = direction === 'A->B' ? state.tokenB : state.tokenA
 
-  const response = await apiFetch('/api/manage/sync', {
+  syncProgress.style.display = ''
+  syncProgressFill.style.width = '0%'
+  syncProgressText.textContent = '正在同步...'
+
+  const res = await apiFetch('/api/manage/sync', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      mode,
-      from,
-      to,
-      tokenA: fromToken,
-      tokenB: toToken,
-      subject_ids: subjectIds || [],
-    }),
+    body: JSON.stringify({ tokenA: fromToken, from: fromUser, tokenB: toToken, to: toUser, mode, subject_ids: subjectIds }),
   })
-  if (!response) {
-    return showManageAuthFailure(syncResults)
-  }
-  const data = await response.json().catch(() => null)
-  if (!response.ok || !Array.isArray(data)) {
-    progressText.textContent = '同步失败'
-    return showError(syncResults, data, '同步失败，请稍后重试')
-  }
+  if (!res) return showManageAuthFailure(syncProgressText)
+  const results = await res.json().catch(() => null)
+  if (!res.ok) return showError(syncProgressText, results, '同步失败')
 
-  const ok = data.filter(item => item.status === 'ok').length
-  progressFill.style.width = '100%'
-  progressText.textContent = `完成: ${ok}/${data.length}`
-  renderSyncResultsList(data)
+  const ok = results.filter(r => r.status === 'ok').length
+  const err = results.filter(r => r.status === 'error').length
+  syncProgressFill.style.width = '100%'
+  syncProgressText.textContent = `同步完成：${ok} 成功，${err} 失败`
 }
 
-function selectedDiffIds() {
-  return Array.from(diffList.querySelectorAll('input[type="checkbox"]:checked'))
-    .map(node => parseInt(node.value, 10))
-    .filter(Number.isFinite)
-}
-
-async function submitManualCallback(rawUrl, purpose) {
-  const target = purposeTarget(purpose)
-  const flow = pendingOAuth
-  if (!flow || flow.purpose !== purpose) {
-    return showError(target, null, '当前没有待完成的授权流程')
-  }
-  if (flow.consuming) return
-
-  try {
-    const url = new URL(rawUrl)
-    if (url.origin !== location.origin) {
-      return showError(target, null, '回调 URL 无效')
-    }
-    const code = url.searchParams.get('code')
-    if (!code || url.searchParams.get('state') !== flow.state) {
-      return showError(target, null, '回调 URL 无效')
-    }
-    const payload = parseStatePayload(flow.state)
-    if (!payload) {
-      return showError(target, null, '回调 URL 无效')
-    }
-    if (payload.nonce !== flow.nonce) {
-      return showError(target, null, '回调 URL 无效')
-    }
-    if (payload.purpose !== flow.purpose) {
-      return showError(target, null, '回调 URL 无效')
-    }
-    return consumeOAuthFlow(flow, code, flow.state)
-  } catch {
-    showError(target, null, '回调 URL 无效')
-  }
-}
-
-async function submitAccountCallback(rawUrl, purpose) {
-  return submitManualCallback(rawUrl, purpose)
-}
-
-window.addEventListener('message', async (ev) => {
-  const d = ev.data
-  const flow = pendingOAuth
-  if (!flow || ev.origin !== location.origin) return
-  if (ev.source !== flow.popup) return
-  if (flow.consuming) return
-  if (!d || d.type !== 'bgm-oauth' || !d.code || d.state !== flow.state) return
-  const payload = parseStatePayload(d.state)
-  if (!payload) return
-  if (payload.nonce !== flow.nonce) return
-  if (payload.purpose !== flow.purpose) return
-  await consumeOAuthFlow(flow, d.code, d.state)
-})
-
-document.getElementById('gate-submit').addEventListener('click', () => {
-  manageSecret = gateInput.value
-  if (!manageSecret) {
-    return setManageLocked(true, '请输入管理密码。')
-  }
-  setManageLocked(false)
-})
-
-gateInput.addEventListener('keydown', (event) => {
-  if (event.key === 'Enter') {
-    document.getElementById('gate-submit').click()
-  }
-})
-
-document.getElementById('cron-authorize').addEventListener('click', () => beginOAuth('cron'))
-document.getElementById('cron-clear').addEventListener('click', async () => {
-  if (!confirm('确认清除已存的 cron token？清除后需重新授权。')) return
-  const response = await apiFetch('/api/manage/cron-token', { method: 'DELETE' })
-  if (!response) {
-    return showManageAuthFailure(cronStatus)
-  }
-  const data = await response.json().catch(() => null)
-  if (!response.ok || data?.ok !== true) {
-    return showError(cronStatus, data, '清除失败')
-  }
-  cronManual.style.display = 'none'
-  cronCallbackInput.value = ''
-  showText(cronStatus, '已清除，请重新授权')
-})
-document.getElementById('cron-callback-submit').addEventListener('click', () => {
-  submitManualCallback(cronCallbackInput.value.trim(), 'cron')
-})
-
-document.getElementById('start-oauth').addEventListener('click', async () => {
-  state.userA = document.getElementById('userA').value.trim()
-  state.userB = document.getElementById('userB').value.trim()
-  if (!state.userA || !state.userB) {
-    showStep(2)
-    clear(oauthButtons)
-    return showError(oauthStatus, null, '请输入两个用户名')
-  }
-  state.tokenA = ''
-  state.tokenB = ''
-  showStep(2)
-  clear(oauthButtons)
-  await beginOAuth('account-a')
-})
-
-document.getElementById('partial-sync-toggle').addEventListener('click', () => {
-  partialList.style.display = 'block'
-  renderDiffList()
-})
-document.getElementById('full-sync').addEventListener('click', () => doSync('full', []))
-document.getElementById('partial-sync-start').addEventListener('click', () => {
-  const ids = selectedDiffIds()
-  if (ids.length === 0) {
-    return showError(diffList, null, '请至少选择一个条目')
-  }
-  doSync('partial', ids)
-})
-document.getElementById('select-all').addEventListener('change', (event) => {
-  diffList.querySelectorAll('input[type="checkbox"]').forEach(node => {
-    node.checked = event.currentTarget.checked
-  })
-})
-// 手动输入 access token（跳过 OAuth 弹窗）
-document.getElementById('manual-token-confirm').addEventListener('click', () => {
-  const token = document.getElementById('manual-token-input').value.trim()
-  const target = document.getElementById('manual-token-target').value
-  if (!token) return alert('请粘贴 Access Token')
-  if (!manageSecret) return document.getElementById('gate').style.display = 'block'
-
-  // 直接存储 token，有效性由后续 compare/sync 步骤验证
-  const statusEl = purposeTarget(target)
-  if (target === 'account-a') {
-    state.tokenA = token
-    state.userA = '账号 A'
-    showText(statusEl, '✓ 账号 A token 已存储（手动输入）', 'status-ok')
-  } else {
-    state.tokenB = token
-    state.userB = '账号 B'
-    showText(statusEl, '✓ 账号 B token 已存储（手动输入）', 'status-ok')
-  }
-  document.getElementById('manual-token-input').value = ''
-
-  if (state.tokenA && state.tokenB) {
-    clear(oauthButtons)
-    showText(oauthStatus, '✓ 双方账号已授权（手动 token 输入）', 'status-ok')
-    loadComparison()
-  }
-})
-
-document.getElementById('reset-button').addEventListener('click', () => {
-  location.reload()
-})
-
-setManageLocked(true)
+document.getElementById('reset-button').addEventListener('click', () => { location.reload() })
+document.querySelectorAll('[data-requires-secret]').forEach(el => el.disabled = true)
 </script>
 </body>
 </html>

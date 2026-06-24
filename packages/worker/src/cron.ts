@@ -68,12 +68,15 @@ async function ensureFreshToken(
     return refreshAndPersist(storage, probe, env, current)
   }
 
+  // Developer token（无 refresh_token，永不过期）→ 直接使用
+  if (!current.refresh_token) return current.access_token
+
   // valid → 检查是否临近过期
   const needsRefresh = typeof status.expires === 'number' && status.expires - nowSec < REFRESH_GRACE_SECONDS
   if (!needsRefresh) return current.access_token
 
   // 临近过期 → 尝试提前刷新
-  if (!env.BANGUMI_CLIENT_ID || !env.BANGUMI_CLIENT_SECRET || !current.refresh_token) {
+  if (!env.BANGUMI_CLIENT_ID || !env.BANGUMI_CLIENT_SECRET) {
     return current.access_token // 有效但无法刷新，凑合用
   }
   return refreshAndPersist(storage, probe, env, current)
