@@ -191,7 +191,7 @@ export async function runSync(
     if (collections.status !== 'fulfilled') continue
     for (const c of collections.value) {
       if (c.subject?.images?.large) {
-        collEntries.push({ url: c.subject.images.large, subjectId: c.subject_id })
+        collEntries.push({ url: c.subject.images.common || c.subject.images.large, subjectId: c.subject_id })
       }
     }
   }
