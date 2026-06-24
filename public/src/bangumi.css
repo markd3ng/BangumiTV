@@ -416,3 +416,12 @@ body {
   background: var(--nb-surface) !important;
   color: var(--nb-ink) !important;
 }
+
+/* 条目同步面板 */
+.bgm-view-sync input[type="password"] { width:100%;padding:8px;border:1px solid #2a2a4a;border-radius:4px;background:#0f3460;color:#fff;margin-bottom:8px;font-size:13px; }
+.bgm-view-sync input[type="password"]:focus { outline:none;border-color:#e94560; }
+.bgm-view-sync label { display:block;margin-bottom:4px;color:#a0a0b0;font-size:12px; }
+.bgm-nav-button { padding:8px 16px;border:2px solid #000;border-radius:0;background:#fff;color:#000;cursor:pointer;font-size:13px;font-weight:800;box-shadow:3px 3px 0 0 #000; }
+.bgm-nav-button:hover { transform:translate(-2px,-2px);box-shadow:5px 5px 0 0 #000; }
+.bgm-nav-button:active { transform:translate(1px,1px);box-shadow:1px 1px 0 0 #000; }
+
