@@ -42,7 +42,7 @@
   // ---------------------------------------------------------------
   function renderCard(entry) {
     const imgUrl = entry.images && entry.images.hash
-      ? API + '/image/' + entry.images.hash + '?w=300&fmt=webp'
+      ? API + '/image/' + entry.images.hash + '?w=300&fmt=webp&size=common'
       : 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" fill="#333"><rect width="300" height="400"/></svg>')
 
     const total = entry.eps || entry.total_episodes || 0
@@ -73,7 +73,7 @@
   function renderCalendarCard(entry) {
     const hasHash = entry.images && entry.images.hash
     const imgUrl = hasHash
-      ? API + '/image/' + entry.images.hash + '?w=300&fmt=webp'
+      ? API + '/image/' + entry.images.hash + '?w=300&fmt=webp&size=common'
       : 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" fill="#333"><rect width="300" height="400"/></svg>')
     const name = entry.name_cn || entry.name || ''
     const score = entry.rating && entry.rating.score
