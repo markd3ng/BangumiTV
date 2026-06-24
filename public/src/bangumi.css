@@ -424,4 +424,3 @@ body {
 .bgm-nav-button { padding:8px 16px;border:2px solid #000;border-radius:0;background:#fff;color:#000;cursor:pointer;font-size:13px;font-weight:800;box-shadow:3px 3px 0 0 #000; }
 .bgm-nav-button:hover { transform:translate(-2px,-2px);box-shadow:5px 5px 0 0 #000; }
 .bgm-nav-button:active { transform:translate(1px,1px);box-shadow:1px 1px 0 0 #000; }
-
