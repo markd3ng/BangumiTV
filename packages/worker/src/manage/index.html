@@ -211,6 +211,10 @@ function renderComparison(data) {
   filterHtml += '<button id="select-all" class="secondary" style="font-size:12px;padding:6px 12px;">全选</button>'
   filterHtml += '<button id="select-none" class="secondary" style="font-size:12px;padding:6px 12px;">全不选</button>'
   filterHtml += '<button id="select-reverse" class="secondary" style="font-size:12px;padding:6px 12px;">反选</button>'
+  filterHtml += '<span style="margin-left:auto;"></span>'
+  filterHtml += '<select id="page-size" style="padding:6px 8px;font-size:12px;">'
+  filterHtml += '<option value="10">10条/页</option><option value="20" selected>20条/页</option><option value="50">50条/页</option><option value="100">100条/页</option><option value="200">200条/页</option>'
+  filterHtml += '</select>'
   filterHtml += '</div>'
   step2Diffs.innerHTML = filterHtml
 
@@ -229,6 +233,8 @@ function renderComparison(data) {
   var tableWrap = document.createElement('div')
   tableWrap.id = 'compare-table'
   step2Diffs.appendChild(tableWrap)
+
+  var currentPage = 1
 
   function renderFilteredTable(filter) {
     var rows = []
@@ -270,13 +276,18 @@ function renderComparison(data) {
       })
     }
 
+    var pageSize = parseInt(document.getElementById('page-size').value) || 20
+    var totalPages = Math.ceil(rows.length / pageSize) || 1
+    var start = (currentPage - 1) * pageSize
+    var pageRows = rows.slice(start, start + pageSize)
+
     var h = '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
     h += '<thead><tr style="background:#0f3460;color:#a0a0b0;">'
-    h += '<th style="padding:8px;text-align:left;width:35%;">条目</th>'
+    h += '<th style="padding:8px;text-align:left;width:35%;">条目 (' + rows.length + ')</th>'
     h += '<th style="padding:8px;text-align:center;width:30%;background:#1a2744;">' + nameA + '</th>'
     h += '<th style="padding:8px;text-align:center;width:30%;background:#1a2744;">' + nameB + '</th>'
     h += '<th style="padding:8px;text-align:center;width:5%;">✓</th></tr></thead><tbody>'
-    rows.forEach(function(r) {
+    pageRows.forEach(function(r) {
       var bg = r.color ? 'border-left:3px solid ' + r.color + ';' : ''
       h += '<tr style="border-bottom:1px solid #2a2a4a;' + bg + '">'
       h += '<td style="padding:8px;">' + r.name + '</td>'
@@ -285,11 +296,33 @@ function renderComparison(data) {
       h += '<td style="padding:8px;text-align:center;">' + (r.checkbox ? '<input type="checkbox" checked data-id="' + r.sid + '">' : '') + '</td></tr>'
     })
     h += '</tbody></table>'
+
+    // Pagination
+    if (totalPages > 1) {
+      h += '<div style="display:flex;justify-content:center;gap:6px;margin-top:12px;flex-wrap:wrap;">'
+      for (var p = 1; p <= totalPages; p++) {
+        h += '<button class="page-btn' + (p === currentPage ? ' active' : '') + '" style="padding:4px 10px;font-size:12px;border:1px solid #2a2a4a;border-radius:4px;background:' + (p === currentPage ? '#e94560' : '#0f3460') + ';color:#fff;cursor:pointer;" data-page="' + p + '">' + p + '</button>'
+      }
+      h += '</div>'
+    }
     tableWrap.innerHTML = h
+
+    // Wire page buttons
+    tableWrap.querySelectorAll('.page-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        currentPage = parseInt(this.dataset.page)
+        renderFilteredTable(document.getElementById('compare-filter').value)
+      })
+    })
   }
 
   document.getElementById('compare-filter').addEventListener('change', function(e) {
+    currentPage = 1
     renderFilteredTable(e.target.value)
+  })
+  document.getElementById('page-size').addEventListener('change', function() {
+    currentPage = 1
+    renderFilteredTable(document.getElementById('compare-filter').value)
   })
 
   renderFilteredTable('all')
