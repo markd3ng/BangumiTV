@@ -47,6 +47,7 @@
     const total = entry.eps || entry.total_episodes || 0
     const progress = total > 0
       ? Math.round((entry.ep_status / total) * 100)
+      : 0
 
     var html = '<a href="https://bgm.tv/subject/' + entry.subject_id + '" target="_blank" class="bgm-card';
     if (entry.nsfw) html += ' bgm-nsfw';
