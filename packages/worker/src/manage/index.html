@@ -78,6 +78,18 @@
     <h2>步骤 2: OAuth 授权</h2>
     <div id="oauth-status" class="muted">等待授权...</div>
     <div id="oauth-buttons"></div>
+    <details style="margin-top:12px;">
+      <summary style="cursor:pointer;color:#a0a0b0;font-size:13px;">或直接粘贴 Access Token（跳过 OAuth 弹窗）</summary>
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+        <input type="password" id="manual-token-input" placeholder="粘贴 bgm.tv Access Token" style="flex:1;min-width:200px;padding:6px 10px;border:1px solid #a0a0b0;border-radius:6px;background:#fff;color:#333;">
+        <select id="manual-token-target" style="padding:6px 10px;border:1px solid #a0a0b0;border-radius:6px;background:#fff;color:#333;">
+          <option value="account-a">账号 A</option>
+          <option value="account-b">账号 B</option>
+        </select>
+        <button id="manual-token-confirm" data-requires-secret="true" class="secondary">确认</button>
+      </div>
+      <p class="muted" style="margin-top:4px;">在 bgm.tv <a href="https://bgm.tv/dev/token" target="_blank">开发者设置</a> 生成 token，粘贴后点击确认即可跳过弹窗授权。两个账号各自粘贴一次。</p>
+    </details>
   </div>
 
   <div class="step" id="step3">
@@ -642,6 +654,33 @@ document.getElementById('select-all').addEventListener('change', (event) => {
     node.checked = event.currentTarget.checked
   })
 })
+// 手动输入 access token（跳过 OAuth 弹窗）
+document.getElementById('manual-token-confirm').addEventListener('click', () => {
+  const token = document.getElementById('manual-token-input').value.trim()
+  const target = document.getElementById('manual-token-target').value
+  if (!token) return alert('请粘贴 Access Token')
+  if (!manageSecret) return document.getElementById('gate').style.display = 'block'
+
+  // 直接存储 token，有效性由后续 compare/sync 步骤验证
+  const statusEl = purposeTarget(target)
+  if (target === 'account-a') {
+    state.tokenA = token
+    state.userA = '账号 A'
+    showText(statusEl, '✓ 账号 A token 已存储（手动输入）', 'status-ok')
+  } else {
+    state.tokenB = token
+    state.userB = '账号 B'
+    showText(statusEl, '✓ 账号 B token 已存储（手动输入）', 'status-ok')
+  }
+  document.getElementById('manual-token-input').value = ''
+
+  if (state.tokenA && state.tokenB) {
+    clear(oauthButtons)
+    showText(oauthStatus, '✓ 双方账号已授权（手动 token 输入）', 'status-ok')
+    loadComparison()
+  }
+})
+
 document.getElementById('reset-button').addEventListener('click', () => {
   location.reload()
 })
