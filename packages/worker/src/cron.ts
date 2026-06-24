@@ -183,44 +183,23 @@ export async function runSync(
     merged = merge(allCollections)
   }
 
-  // 3.5 图片下载：收集收藏 + 日历的封面，共享 25 张限额。
-  // 图片分两个池：收藏（subject_id）和日历（id），统一去重 + 限流。
+  // 3.5 图片下载：common（优先，卡片用）+ large（原图保留，背景下载）。
+  // 两版共享 25 张限额。恢复旧 hash，common 优先 → 剩余预算下载 large。
   const MAX_IMAGES = 25
-  const collEntries: DownloadEntry[] = []
+  const commonEntries: DownloadEntry[] = []
+  const largeEntries: DownloadEntry[] = []
   for (const collections of settled) {
     if (collections.status !== 'fulfilled') continue
     for (const c of collections.value) {
+      if (c.subject?.images?.common) {
+        commonEntries.push({ url: c.subject.images.common, subjectId: c.subject_id })
+      }
       if (c.subject?.images?.large) {
-        collEntries.push({ url: c.subject.images.common || c.subject.images.large, subjectId: c.subject_id })
+        largeEntries.push({ url: c.subject.images.large, subjectId: c.subject_id })
       }
     }
   }
 
-  // 从旧快照恢复已有 hash（收藏 + 日历都恢复）
-  const imageHashMap = new Map<number, string>()
-  const prevSnap = await storage.get<SyncSnapshot>(SNAPSHOT_KEY)
-  if (prevSnap) {
-    for (const key of ['want', 'watched', 'watching', 'on_hold', 'dropped'] as const) {
-      for (const entry of (prevSnap.collections[key] || []) as any[]) {
-        if (entry.images?.hash) {
-          imageHashMap.set(entry.subject_id as number, entry.images.hash)
-        }
-      }
-    }
-    // 恢复日历 hash
-    for (const day of (prevSnap.calendar || [])) {
-      for (const item of (day.items || [])) {
-        const calItem = item as any
-        if (calItem.images?.hash) {
-          imageHashMap.set(calItem.id as number, calItem.images.hash)
-        }
-      }
-    }
-  }
-  const oldHashCount = imageHashMap.size
-
-  // 合并收藏 + 日历图片候选，统一按 收藏优先 → 日历次之 排序下载
-  const allEntries = [...collEntries]
   // 提前拉取日历（同时用于图片候选和后续 transform，避免重复 fetch）
   console.log(JSON.stringify({ event: 'sync_phase', phase: 'fetch_calendar', at: new Date().toISOString() }))
   const rawCalendar = await client.getCalendar().catch(() => null)
@@ -228,33 +207,69 @@ export async function runSync(
     for (const day of rawCalendar) {
       for (const item of day.items) {
         const calItem = item as any
-        const imgUrl = calItem.images?.common || calItem.images?.large
-        if (imgUrl && calItem.id) {
-          allEntries.push({ url: imgUrl, subjectId: calItem.id })
+        if (calItem.images?.common && calItem.id) {
+          commonEntries.push({ url: calItem.images.common, subjectId: calItem.id })
+        }
+        if (calItem.images?.large && calItem.id) {
+          largeEntries.push({ url: calItem.images.large, subjectId: calItem.id })
         }
       }
     }
   }
 
-  const newEntries = allEntries
-    .filter((e) => !imageHashMap.has(e.subjectId))
-    .slice(0, MAX_IMAGES)
-  if (newEntries.length > 0) {
-    const newHashes = await downloadImagesWithLimit(newEntries, imageStore, client)
-    for (const [id, hash] of newHashes) {
-      imageHashMap.set(id, hash)
+  // 从旧快照恢复已有 hash（common + large 各自恢复）
+  const hashCommon = new Map<number, string>()
+  const hashLarge = new Map<number, string>()
+  const prevSnap = await storage.get<SyncSnapshot>(SNAPSHOT_KEY)
+  if (prevSnap) {
+    for (const key of ['want', 'watched', 'watching', 'on_hold', 'dropped'] as const) {
+      for (const entry of (prevSnap.collections[key] || []) as any[]) {
+        if (entry.images?.hash) hashCommon.set(entry.subject_id as number, entry.images.hash)
+        if (entry.images?.hash_large) hashLarge.set(entry.subject_id as number, entry.images.hash_large)
+      }
+    }
+    for (const day of (prevSnap.calendar || [])) {
+      for (const item of (day.items || [])) {
+        const ci = item as any
+        if (ci.images?.hash) hashCommon.set(ci.id as number, ci.images.hash)
+        if (ci.images?.hash_large) hashLarge.set(ci.id as number, ci.images.hash_large)
+      }
     }
   }
+
+  // common 优先下载（卡片显示）
+  const newCommon = commonEntries
+    .filter((e) => !hashCommon.has(e.subjectId))
+    .slice(0, MAX_IMAGES)
+  if (newCommon.length > 0) {
+    const newHashes = await downloadImagesWithLimit(newCommon, imageStore, client)
+    for (const [id, hash] of newHashes) hashCommon.set(id, hash)
+  }
+
+  // large 用剩余预算下载（原图保留）
+  const budgetLarge = MAX_IMAGES - newCommon.length
+  const newLarge = largeEntries
+    .filter((e) => !hashLarge.has(e.subjectId))
+    .slice(0, budgetLarge)
+  if (newLarge.length > 0) {
+    const newHashes = await downloadImagesWithLimit(newLarge, imageStore, client)
+    for (const [id, hash] of newHashes) hashLarge.set(id, hash)
+  }
+
   console.log(JSON.stringify({
     event: 'sync_phase',
     phase: 'images_downloaded',
-    candidates_coll: collEntries.length,
-    candidates_total: allEntries.length,
-    old_hashes: oldHashCount,
-    new_downloads: newEntries.length,
-    total_hashes: imageHashMap.size,
+    common_candidates: commonEntries.length,
+    large_candidates: largeEntries.length,
+    old_common: hashCommon.size - newCommon.length,
+    old_large: hashLarge.size - newLarge.length,
+    new_common: newCommon.length,
+    new_large: newLarge.length,
     at: new Date().toISOString(),
   }))
+
+  // imageHashMap（传给 merge，作为 images.hash 用 common）
+  const imageHashMap = hashCommon
 
   // 3.6 带图片 hash 重新合并
   if (env.SYNC_MODE === 'primary' && env.BANGUMI_PRIMARY_USER) {
@@ -288,6 +303,18 @@ export async function runSync(
     mode: env.SYNC_MODE === 'primary' ? 'primary' : 'merge',
     ...(env.SYNC_MODE === 'primary' && env.BANGUMI_PRIMARY_USER ? { primary_user: env.BANGUMI_PRIMARY_USER } : {}),
     generation,
+  }
+
+  // 注入 images.hash_large（common 的 hash 已由 merge 写入 images.hash）
+  for (const key of ['want', 'watched', 'watching', 'on_hold', 'dropped'] as const) {
+    for (const entry of (merged[key] || []) as any[]) {
+      entry.images.hash_large = hashLarge.get(entry.subject_id as number) ?? null
+    }
+  }
+  for (const day of calendar) {
+    for (const item of (day.items || []) as any[]) {
+      item.images.hash_large = hashLarge.get(item.id as number) ?? null
+    }
   }
 
   const snapshot: SyncSnapshot = { collections: merged, calendar, meta }
