@@ -19,16 +19,16 @@
     try {
       const res = await fetch(API + '/api/config?key=nsfw')
       const data = await res.json()
-      if (data.nsfw && !localStorage.getItem('bgm-age-confirmed')) {
+      if (data.nsfw && !sessionStorage.getItem('bgm-age-confirmed')) {
         document.getElementById('bgm-age-modal').style.display = 'block'
       } else if (!data.nsfw) {
-        localStorage.removeItem('bgm-age-confirmed')
+        sessionStorage.removeItem('bgm-age-confirmed')
       }
     } catch (e) {}
   }
 
   window.bgmConfirmAge = function () {
-    localStorage.setItem('bgm-age-confirmed', '1')
+    sessionStorage.setItem('bgm-age-confirmed', '1')
     document.getElementById('bgm-age-modal').style.display = 'none'
   }
 
