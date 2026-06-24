@@ -99,10 +99,9 @@ jobs:
           BANGUMI_CLIENT_ID: ${{ secrets.BANGUMI_CLIENT_ID }}
           BANGUMI_CLIENT_SECRET: ${{ secrets.BANGUMI_CLIENT_SECRET }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          MANAGE_SECRET: ${{ secrets.MANAGE_SECRET }}
         run: |
           for name in BANGUMI_TOKEN BANGUMI_REFRESH_TOKEN BANGUMI_USERS BANGUMI_PRIMARY_USER \
-                      BANGUMI_CLIENT_ID BANGUMI_CLIENT_SECRET CRON_SECRET MANAGE_SECRET; do
+                      BANGUMI_CLIENT_ID BANGUMI_CLIENT_SECRET CRON_SECRET; do
             val="${!name}"
             if [ -n "${val}" ]; then
               echo "${val}" | npx wrangler secret put "$name"

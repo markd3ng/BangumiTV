@@ -11,7 +11,6 @@ interface Env {
   BANGUMI_CLIENT_ID?: string
   BANGUMI_CLIENT_SECRET?: string
   CRON_SECRET: string
-  MANAGE_SECRET?: string
   SYNC_MODE: "merge" | "primary"
   NSFW_SHOW: "true" | "false"
 }

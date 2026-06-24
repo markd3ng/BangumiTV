@@ -45,28 +45,21 @@
 <div class="container">
   <h1>BangumiTV 多账户同步</h1>
 
-  <div id="gate" class="panel" style="display:block;">
-    <h2>管理密码</h2>
-    <p id="gate-help" class="muted" style="margin-bottom:12px;">本管理页受密码保护，请输入 MANAGE_SECRET：</p>
-    <input type="password" id="gate-input" placeholder="管理密码">
-    <button id="gate-submit">进入</button>
-  </div>
-
   <div class="step active" id="step1">
     <h2>步骤 1: 输入 bgm.tv 用户名和 Access Token</h2>
     <p class="muted" style="margin-bottom:12px;">在 <a href="https://bgm.tv/dev/token" target="_blank" style="color:#e94560;">bgm.tv 开发者设置</a> 分别生成两个账号的 access token（永久有效），粘贴到下方。</p>
 
     <label>账号 A 用户名</label>
-    <input type="text" id="userA" placeholder="输入 bgm.tv 用户名" data-requires-secret="true">
+    <input type="text" id="userA" placeholder="输入 bgm.tv 用户名">
     <label>账号 A Access Token</label>
-    <input type="password" id="tokenA" placeholder="粘贴账号 A 的 Access Token" data-requires-secret="true">
+    <input type="password" id="tokenA" placeholder="粘贴账号 A 的 Access Token">
 
     <label>账号 B 用户名</label>
-    <input type="text" id="userB" placeholder="输入 bgm.tv 用户名" data-requires-secret="true">
+    <input type="text" id="userB" placeholder="输入 bgm.tv 用户名">
     <label>账号 B Access Token</label>
-    <input type="password" id="tokenB" placeholder="粘贴账号 B 的 Access Token" data-requires-secret="true">
+    <input type="password" id="tokenB" placeholder="粘贴账号 B 的 Access Token">
 
-    <button id="start-compare" data-requires-secret="true">下一步：对比收藏</button>
+    <button id="start-compare">下一步：对比收藏</button>
     <div id="step1-status" class="muted" style="margin-top:12px;"></div>
   </div>
 
@@ -76,11 +69,11 @@
     <div id="step2-diffs"></div>
     <div id="step2-sync" style="display:none;margin-top:20px;">
       <label>同步方向</label>
-      <select id="sync-direction" data-requires-secret="true"></select>
+      <select id="sync-direction"></select>
       <div class="button-row" style="margin-top:12px;">
-        <button id="full-sync" data-requires-secret="true">完整同步</button>
-        <button id="partial-sync-toggle" class="secondary" data-requires-secret="true">按选中条目同步</button>
-        <button id="partial-sync-start" data-requires-secret="true" style="display:none;">执行选中条目同步</button>
+        <button id="full-sync">完整同步</button>
+        <button id="partial-sync-toggle" class="secondary">按选中条目同步</button>
+        <button id="partial-sync-start" style="display:none;">执行选中条目同步</button>
       </div>
       <div class="progress" id="sync-progress" style="display:none;">
         <div class="progress-bar"><div class="progress-fill" id="sync-progress-fill"></div></div>
@@ -95,9 +88,6 @@
 </div>
 
 <script>
-const MANAGE_AUTH_FAILURE_MESSAGE = '管理 API 认证失败。请刷新页面后重新输入管理密码。'
-
-let manageSecret = ''
 let state = { userA: '', userB: '', tokenA: '', tokenB: '', differences: [] }
 
 // ── DOM refs ──
@@ -127,39 +117,11 @@ function showText(target, text, className = 'muted') {
   clear(target)
   target.appendChild(textElement('p', text, className))
 }
-function showManageAuthFailure(target) {
-  showText(target, MANAGE_AUTH_FAILURE_MESSAGE)
-}
-function handleManageDenied() {
-  manageSecret = ''
-  document.querySelectorAll('[data-requires-secret]').forEach(el => el.disabled = true)
-}
-
-async function apiFetch(url, opts = {}, { deferManageDenied } = {}) {
-  const headers = new Headers(opts.headers || {})
-  if (manageSecret) headers.set('X-Manage-Secret', manageSecret)
+async function apiFetch(url, opts = {}) {
   try {
-    const res = await fetch(url, { ...opts, headers })
-    if (!deferManageDenied && (res.status === 401 || res.status === 503)) {
-      document.getElementById('gate').style.display = 'block'
-      handleManageDenied()
-      return null
-    }
-    return res
+    return await fetch(url, opts)
   } catch { return null }
 }
-
-// ── Gate ──
-const gateInput = document.getElementById('gate-input')
-document.getElementById('gate-submit').addEventListener('click', () => {
-  manageSecret = gateInput.value
-  if (!manageSecret) return showText(document.getElementById('gate-help'), '请输入管理密码。')
-  document.getElementById('gate').style.display = 'none'
-  document.querySelectorAll('[data-requires-secret]').forEach(el => el.disabled = false)
-})
-gateInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') document.getElementById('gate-submit').click()
-})
 
 // ── Compare ──
 document.getElementById('start-compare').addEventListener('click', async () => {
@@ -179,7 +141,7 @@ document.getElementById('start-compare').addEventListener('click', async () => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ tokenA: ta, userA: ua, tokenB: tb, userB: ub }),
   })
-  if (!res) return showManageAuthFailure(step1Status)
+  if (!res) return showText(step1Status, "请求失败，请检查 token 是否有效")
   const data = await res.json().catch(() => null)
   if (!res.ok) return showError(step1Status, data, '加载收藏数据失败')
 
@@ -282,7 +244,7 @@ async function doSync(mode, subjectIds) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ tokenA: fromToken, from: fromUser, tokenB: toToken, to: toUser, mode, subject_ids: subjectIds }),
   })
-  if (!res) return showManageAuthFailure(syncProgressText)
+  if (!res) return showText(syncProgressText, "请求失败")
   const results = await res.json().catch(() => null)
   if (!res.ok) return showError(syncProgressText, results, '同步失败')
 

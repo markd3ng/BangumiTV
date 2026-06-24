@@ -17,7 +17,6 @@ import bangumiCss from './css'
 import { BgmHttpError, BgmTimeoutError, BgmNetworkError } from '@bangumi-tv/shared'
 import type { OAuthPurpose } from './manage/security'
 import {
-  authorizeManageRequest,
   callbackPageCsp,
   createOAuthState,
   createHealthFailureLog,
@@ -227,27 +226,6 @@ app.get('/manage/callback', () => {
   })
 })
 
-// ── 管理 API 认证中间件 ──
-app.use('/api/manage/*', async (c, next) => {
-  const denied = await authorizeManageRequest(c.req.raw, c.env.MANAGE_SECRET)
-  if (denied) {
-    const log = {
-      event: 'manage_auth_denied',
-      status: denied.status,
-      has_secret: !!c.req.header('X-Manage-Secret'),
-      origin: c.req.header('Origin') || null,
-      at: new Date().toISOString(),
-    }
-    console.warn(JSON.stringify(log))
-    appendErrorLog(new KVStorage(c.env.BANGUMI_KV), log)
-    return denied
-  }
-  await next()
-  for (const [name, value] of Object.entries(manageHeaders())) {
-    c.header(name, String(value))
-  }
-})
-
 // ── 管理 API ──
 app.post('/api/manage/oauth-url', async (c) => {
   const purpose: OAuthPurpose | null = parseOAuthPurposeBody(await c.req.json().catch(() => null))
@@ -263,7 +241,7 @@ app.post('/api/manage/oauth-url', async (c) => {
     appendErrorLog(new KVStorage(c.env.BANGUMI_KV), log)
     return publicError(503, 'OAUTH_NOT_CONFIGURED')
   }
-  const created = await createOAuthState(c.env.MANAGE_SECRET!, purpose)
+  const created = await createOAuthState((c.env as any).MANAGE_SECRET || 'unused', purpose)
   const redirectUri = `${new URL(c.req.url).origin}/manage/callback`
   console.log(JSON.stringify({ event: 'manage_oauth_url', purpose, at: new Date().toISOString() }))
   return Response.json({
@@ -281,7 +259,7 @@ app.post('/api/manage/exchange', async (c) => {
     appendErrorLog(new KVStorage(c.env.BANGUMI_KV), log)
     return publicError(400, 'INVALID_REQUEST')
   }
-  const state = await verifyOAuthState(c.env.MANAGE_SECRET!, body.state)
+  const state = await verifyOAuthState((c.env as any).MANAGE_SECRET || 'unused', body.state)
   if (!state) {
     const log = { event: 'manage_input_error', route: '/api/manage/exchange', reason: 'invalid_oauth_state', at: new Date().toISOString() }
     console.warn(JSON.stringify(log))

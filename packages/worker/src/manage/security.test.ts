@@ -389,7 +389,7 @@ test('management and callback CSP stay compatible with current inline assets', (
   )
 })
 
-test('worker source protects oauth routes behind POST JSON handlers', async () => {
+test('worker source protect public routes with CORS, no manage gate', async () => {
   const source = await readFile(new URL('../index.ts', import.meta.url), 'utf8')
 
   assert.ok(source.includes("const publicCors = cors({ origin: '*', allowMethods: ['GET', 'OPTIONS'] })"))
@@ -398,21 +398,9 @@ test('worker source protects oauth routes behind POST JSON handlers', async () =
   }
 
   assert.equal(source.includes("app.use('*', cors("), false)
-  assert.equal(source.includes('/api/manage/gate'), false)
-  assert.equal(source.includes('requireManageSecret'), false)
-  assert.ok(source.includes("app.use('/api/manage/*', async (c, next) => {"))
-
-  const middlewareIndex = source.indexOf("app.use('/api/manage/*', async (c, next) => {")
-  const manageRouteIndexes = [
-    source.indexOf("app.post('/api/manage/oauth-url'"),
-    source.indexOf("app.post('/api/manage/exchange'"),
-    source.indexOf("app.post('/api/manage/compare'"),
-    source.indexOf("app.post('/api/manage/sync'"),
-    source.indexOf("app.delete('/api/manage/cron-token'"),
-  ]
-  for (const index of manageRouteIndexes) {
-    assert.ok(index > middlewareIndex, 'expected manage middleware before management handlers')
-  }
+  // No manage auth middleware — manage endpoints are open
+  assert.ok(!source.includes('authorizeManageRequest'), 'no auth middleware')
+  assert.ok(!source.includes("app.use('/api/manage/*', async (c, next)"), 'no manage middleware')
 
   assert.equal(source.includes("app.get('/api/manage/oauth-url'"), false)
   assert.equal(source.includes("app.get('/api/manage/exchange'"), false)
@@ -436,7 +424,7 @@ test('worker source validates oauth-url body with parseOAuthPurposeBody and retu
   assert.match(oauthUrlBlock, /if \(!purpose\) \{[\s\S]*?return publicError\(400, 'INVALID_REQUEST'\)/)
   assert.match(oauthUrlBlock, /return publicError\(400, 'INVALID_REQUEST'\)/)
   assert.match(oauthUrlBlock, /return publicError\(503, 'OAUTH_NOT_CONFIGURED'\)/)
-  assert.match(oauthUrlBlock, /createOAuthState\(c\.env\.MANAGE_SECRET!, purpose\)/)
+  assert.match(oauthUrlBlock, /createOAuthState\([\s\S]*?MANAGE_SECRET[\s\S]*?purpose\)/)
   assert.match(oauthUrlBlock, /return Response\.json\(\{[\s\S]*url:[\s\S]*state:[\s\S]*nonce:/)
 })
 
@@ -448,7 +436,7 @@ test('worker source validates oauth exchange body before upstream and preserves 
 
   assert.match(exchangeBlock, /parseOAuthExchangeBody\(await c\.req\.json\(\)\.catch\(\(\) => null\)\)/)
   assert.match(exchangeBlock, /if \(!body\) \{[\s\S]*?return publicError\(400, 'INVALID_REQUEST'\)/)
-  assert.match(exchangeBlock, /const state = await verifyOAuthState\(c\.env\.MANAGE_SECRET!, body\.state\)/)
+  assert.match(exchangeBlock, /const state = await verifyOAuthState\([\s\S]*?MANAGE_SECRET[\s\S]*?body\.state\)/)
   assert.match(exchangeBlock, /if \(!state\) \{[\s\S]*?return publicError\(400, 'INVALID_OAUTH_STATE'\)/)
   assert.match(exchangeBlock, /if \(!c\.env\.BANGUMI_CLIENT_ID \|\| !c\.env\.BANGUMI_CLIENT_SECRET\) \{[\s\S]*?return publicError\(503, 'OAUTH_NOT_CONFIGURED'\)/)
   assert.ok(exchangeBlock.indexOf('verifyOAuthState') < exchangeBlock.indexOf('exchangeCode'))
@@ -482,7 +470,7 @@ test('worker source verifies state before exchange and never returns refresh tok
 
   assert.match(exchangeBlock, /parseOAuthExchangeBody\(await c\.req\.json\(\)\.catch\(\(\) => null\)\)/)
   assert.match(exchangeBlock, /if \(!body\) \{[\s\S]*?return publicError\(400, 'INVALID_REQUEST'\)/)
-  assert.match(exchangeBlock, /const state = await verifyOAuthState\(c\.env\.MANAGE_SECRET!, body\.state\)/)
+  assert.match(exchangeBlock, /const state = await verifyOAuthState\([\s\S]*?MANAGE_SECRET[\s\S]*?body\.state\)/)
   assert.match(exchangeBlock, /if \(!state\) \{[\s\S]*?return publicError\(400, 'INVALID_OAUTH_STATE'\)/)
   assert.match(exchangeBlock, /if \(!c\.env\.BANGUMI_CLIENT_ID \|\| !c\.env\.BANGUMI_CLIENT_SECRET\) \{[\s\S]*return publicError\(503, 'OAUTH_NOT_CONFIGURED'\)/)
   assert.match(exchangeBlock, /await exchangeCode\([\s\S]*body\.code/)

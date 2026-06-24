@@ -46,11 +46,11 @@ test('sync flow passes tokens from state', () => {
   assert.ok(script.includes('/api/manage/sync'), 'calls sync endpoint')
 })
 
-test('gate re-shows on 401/503 and manage secret stays memory-only', () => {
-  assert.ok(script.includes("manageSecret = ''"), 'manageSecret cleared on auth failure')
-  assert.ok(script.includes("document.getElementById('gate').style.display = 'block'"), 'gate re-shown')
-  assert.ok(!script.includes('localStorage'), 'no persistent secret storage')
-  assert.ok(!script.includes('sessionStorage'), 'no persistent secret storage')
+test('no password gate or persistent secret storage', () => {
+  assert.ok(!html.includes('id="gate"'), 'no password gate HTML')
+  assert.ok(!script.includes("gate-input"), 'no gate input JS')
+  assert.ok(!script.includes('manageSecret'), 'no manageSecret variable')
+  assert.ok(!script.includes('X-Manage-Secret'), 'no auth header injection')
 })
 
 test('interactive controls use event listeners and textContent', () => {
