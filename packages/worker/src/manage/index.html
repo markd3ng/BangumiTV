@@ -192,73 +192,87 @@ function renderComparison(data) {
     dir.parentNode.insertBefore(hint, dir.nextSibling)
   }
 
-  // Render table
-  clear(step2Diffs)
-  if (!diffLen && !onlyALen && !onlyBLen) {
-    step2Diffs.append(textElement('p', '双方收藏完全一致，无需同步。', 'muted'))
-    document.getElementById('step2-sync').style.display = 'none'
-    return
-  }
-  document.getElementById('step2-sync').style.display = ''
+  // Filter dropdown
+  var progressCount = (data.differences || []).filter(function(d) { return d.typeA === d.typeB && d.epStatusA !== d.epStatusB }).length
+  var filterHtml = '<div style="margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+  filterHtml += '<select id="compare-filter" style="padding:8px 12px;font-size:13px;">'
+  filterHtml += '<option value="all">全部差异 & 独有 (' + (diffLen + onlyALen + onlyBLen) + ')</option>'
+  if (diffLen) filterHtml += '<option value="diff">仅状态/评分/进度不同 (' + diffLen + ')</option>'
+  if (onlyALen) filterHtml += '<option value="onlyA">仅 ' + nameA + ' 有 (' + onlyALen + ')</option>'
+  if (onlyBLen) filterHtml += '<option value="onlyB">仅 ' + nameB + ' 有 (' + onlyBLen + ')</option>'
+  if (sameLen) filterHtml += '<option value="same">相同条目 (' + sameLen + ')</option>'
+  if (progressCount) filterHtml += '<option value="progress">状态相同但进度不同 (' + progressCount + ')</option>'
+  filterHtml += '</select></div>'
+  step2Diffs.innerHTML = filterHtml
 
-  var html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
-  html += '<thead><tr style="background:#0f3460;color:#a0a0b0;">'
-  html += '<th style="padding:8px;text-align:left;">条目</th>'
-  html += `<th style="padding:8px;text-align:center;">${nameA}</th>`
-  html += `<th style="padding:8px;text-align:center;">${nameB}</th>`
-  html += '<th style="padding:8px;text-align:center;width:40px;">✓</th></tr></thead><tbody>'
+  // Render filtered table
+  var tableWrap = document.createElement('div')
+  tableWrap.id = 'compare-table'
+  step2Diffs.appendChild(tableWrap)
 
-  // Different items (with checkboxes for sync)
-  if (diffLen) {
-    html += '<tr><td colspan="4" style="padding:8px;color:#e94560;font-weight:bold;background:#1a1a2e;">差异条目 (' + diffLen + ')</td></tr>'
-    ;(data.differences || []).forEach(function(d) {
-      html += '<tr style="border-bottom:1px solid #2a2a4a;">'
-      html += '<td style="padding:8px;"><b>' + (d.name_cn || d.name || '#' + d.subject_id) + '</b></td>'
-      html += '<td style="padding:8px;text-align:center;">' + typeLabel(d.typeA) + ' | ' + d.epStatusA + '话 | ' + d.rateA + '分</td>'
-      html += '<td style="padding:8px;text-align:center;">' + typeLabel(d.typeB) + ' | ' + d.epStatusB + '话 | ' + d.rateB + '分</td>'
-      html += '<td style="padding:8px;text-align:center;"><input type="checkbox" checked data-id="' + d.subject_id + '"></td></tr>'
+  function renderFilteredTable(filter) {
+    var rows = []
+
+    if (filter === 'all' || filter === 'diff') {
+      ;(data.differences || []).forEach(function(d) {
+        rows.push({ section: 'diff', name: d.name_cn || d.name, sid: d.subject_id,
+          a: typeLabel(d.typeA) + ' | ' + d.epStatusA + '话 | ' + d.rateA + '分',
+          b: typeLabel(d.typeB) + ' | ' + d.epStatusB + '话 | ' + d.rateB + '分',
+          checkbox: true, color: (d.typeA !== d.typeB ? '#e94560' : (d.epStatusA !== d.epStatusB ? '#ff9800' : '')) })
+      })
+    }
+    if (filter === 'all' || filter === 'onlyA') {
+      ;(data.onlyA || []).forEach(function(d) {
+        rows.push({ section: 'onlyA', name: d.name_cn || d.name, sid: d.subject_id,
+          a: typeLabel(d.typeA) + ' | ' + d.epStatusA + '话 | ' + d.rateA + '分', b: '—', checkbox: false, color: '#a0a0b0' })
+      })
+    }
+    if (filter === 'all' || filter === 'onlyB') {
+      ;(data.onlyB || []).forEach(function(d) {
+        rows.push({ section: 'onlyB', name: d.name_cn || d.name, sid: d.subject_id,
+          a: '—', b: typeLabel(d.typeB) + ' | ' + d.epStatusB + '话 | ' + d.rateB + '分', checkbox: false, color: '#a0a0b0' })
+      })
+    }
+    if (filter === 'same') {
+      ;(data.same || []).forEach(function(s) {
+        rows.push({ section: 'same', name: s.name_cn || s.name, sid: s.subject_id,
+          a: s.type + ' | ' + s.ep + '/' + (s.total||'??'), b: s.type + ' | ' + s.ep + '/' + (s.total||'??'), checkbox: false, color: '#4caf50' })
+      })
+    }
+    if (filter === 'progress') {
+      ;(data.differences || []).forEach(function(d) {
+        if (d.typeA === d.typeB && d.epStatusA !== d.epStatusB) {
+          rows.push({ section: 'progress', name: d.name_cn || d.name, sid: d.subject_id,
+            a: typeLabel(d.typeA) + ' | ' + d.epStatusA + '话 | ' + d.rateA + '分',
+            b: typeLabel(d.typeB) + ' | ' + d.epStatusB + '话 | ' + d.rateB + '分',
+            checkbox: true, color: '#ff9800' })
+        }
+      })
+    }
+
+    var h = '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+    h += '<thead><tr style="background:#0f3460;color:#a0a0b0;">'
+    h += '<th style="padding:8px;text-align:left;width:35%;">条目</th>'
+    h += '<th style="padding:8px;text-align:center;width:30%;background:#1a2744;">' + nameA + '</th>'
+    h += '<th style="padding:8px;text-align:center;width:30%;background:#1a2744;">' + nameB + '</th>'
+    h += '<th style="padding:8px;text-align:center;width:5%;">✓</th></tr></thead><tbody>'
+    rows.forEach(function(r) {
+      var bg = r.color ? 'border-left:3px solid ' + r.color + ';' : ''
+      h += '<tr style="border-bottom:1px solid #2a2a4a;' + bg + '">'
+      h += '<td style="padding:8px;">' + r.name + '</td>'
+      h += '<td style="padding:8px;text-align:center;background:#1a2744;">' + r.a + '</td>'
+      h += '<td style="padding:8px;text-align:center;">' + r.b + '</td>'
+      h += '<td style="padding:8px;text-align:center;">' + (r.checkbox ? '<input type="checkbox" checked data-id="' + r.sid + '">' : '') + '</td></tr>'
     })
+    h += '</tbody></table>'
+    tableWrap.innerHTML = h
   }
 
-  // Only in A
-  if (onlyALen) {
-    html += '<tr><td colspan="4" style="padding:8px;color:#a0a0b0;font-weight:bold;background:#1a1a2e;">仅 ' + nameA + ' 有 (' + onlyALen + ')</td></tr>'
-    ;(data.onlyA || []).forEach(function(d) {
-      html += '<tr style="border-bottom:1px solid #2a2a4a;color:#a0a0b0;">'
-      html += '<td style="padding:8px;">' + (d.name_cn || d.name || '#' + d.subject_id) + '</td>'
-      html += '<td style="padding:8px;text-align:center;">' + typeLabel(d.typeA) + ' | ' + d.epStatusA + '话 | ' + d.rateA + '分</td>'
-      html += '<td style="padding:8px;text-align:center;">—</td>'
-      html += '<td style="padding:8px;text-align:center;"></td></tr>'
-    })
-  }
+  document.getElementById('compare-filter').addEventListener('change', function(e) {
+    renderFilteredTable(e.target.value)
+  })
 
-  // Only in B
-  if (onlyBLen) {
-    html += '<tr><td colspan="4" style="padding:8px;color:#a0a0b0;font-weight:bold;background:#1a1a2e;">仅 ' + nameB + ' 有 (' + onlyBLen + ')</td></tr>'
-    ;(data.onlyB || []).forEach(function(d) {
-      html += '<tr style="border-bottom:1px solid #2a2a4a;color:#a0a0b0;">'
-      html += '<td style="padding:8px;">' + (d.name_cn || d.name || '#' + d.subject_id) + '</td>'
-      html += '<td style="padding:8px;text-align:center;">—</td>'
-      html += '<td style="padding:8px;text-align:center;">' + typeLabel(d.typeB) + ' | ' + d.epStatusB + '话 | ' + d.rateB + '分</td>'
-      html += '<td style="padding:8px;text-align:center;"></td></tr>'
-    })
-  }
-
-  // Same items (collapsed)
-  if (sameLen) {
-    html += '<tr><td colspan="4" style="padding:8px;text-align:center;"><details style="cursor:pointer;color:#a0a0b0;">'
-    html += '<summary>相同条目 (' + sameLen + ')</summary>'
-    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;">'
-    ;(data.same || []).forEach(function(s) {
-      html += '<tr style="border-bottom:1px solid #2a2a4a;">'
-      html += '<td style="padding:6px;">' + (s.name_cn || s.name || '#' + s.subject_id) + '</td>'
-      html += '<td style="padding:6px;text-align:center;color:#4caf50;">' + s.type + ' | ' + s.ep + '/' + (s.total || '??') + ' | ' + s.rate + '分</td></tr>'
-    })
-    html += '</table></details></td></tr>'
-  }
-
-  html += '</tbody></table>'
-  step2Diffs.innerHTML = html
+  renderFilteredTable('all')
 }
 
 function typeLabel(t) { return {1:'想看',2:'看过',3:'在看',4:'搁置',5:'抛弃',0:'—'}[t] || t }
