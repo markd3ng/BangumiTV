@@ -141,9 +141,9 @@ jobs:
           fi
           for f in ../../public/src/*.css; do
             if [ -f "$f" ]; then
-              last_char=$(tail -c 1 "$f")
+              last_char=$(sed -n '$s/.*\(.\)$/\1/p' "$f")
               if [ "$last_char" != "}" ]; then
-                echo "ERROR: $f may have incomplete CSS syntax" >&2
+                echo "ERROR: $f may have incomplete CSS syntax (last non-newline char: $last_char)" >&2
                 exit 1
               fi
             fi
