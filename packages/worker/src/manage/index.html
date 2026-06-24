@@ -192,7 +192,12 @@ function renderComparison(data) {
     dir.parentNode.insertBefore(hint, dir.nextSibling)
   }
 
-  // Filter dropdown
+  // Show sync section if anything to sync
+  if (diffLen || onlyALen || onlyBLen) {
+    document.getElementById('step2-sync').style.display = ''
+  }
+
+  // Filter dropdown + batch buttons
   var progressCount = (data.differences || []).filter(function(d) { return d.typeA === d.typeB && d.epStatusA !== d.epStatusB }).length
   var filterHtml = '<div style="margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
   filterHtml += '<select id="compare-filter" style="padding:8px 12px;font-size:13px;">'
@@ -202,8 +207,23 @@ function renderComparison(data) {
   if (onlyBLen) filterHtml += '<option value="onlyB">仅 ' + nameB + ' 有 (' + onlyBLen + ')</option>'
   if (sameLen) filterHtml += '<option value="same">相同条目 (' + sameLen + ')</option>'
   if (progressCount) filterHtml += '<option value="progress">状态相同但进度不同 (' + progressCount + ')</option>'
-  filterHtml += '</select></div>'
+  filterHtml += '</select>'
+  filterHtml += '<button id="select-all" class="secondary" style="font-size:12px;padding:6px 12px;">全选</button>'
+  filterHtml += '<button id="select-none" class="secondary" style="font-size:12px;padding:6px 12px;">全不选</button>'
+  filterHtml += '<button id="select-reverse" class="secondary" style="font-size:12px;padding:6px 12px;">反选</button>'
+  filterHtml += '</div>'
   step2Diffs.innerHTML = filterHtml
+
+  // Batch select handlers
+  document.getElementById('select-all').addEventListener('click', function() {
+    step2Diffs.querySelectorAll('input[type=checkbox]').forEach(function(c) { c.checked = true })
+  })
+  document.getElementById('select-none').addEventListener('click', function() {
+    step2Diffs.querySelectorAll('input[type=checkbox]').forEach(function(c) { c.checked = false })
+  })
+  document.getElementById('select-reverse').addEventListener('click', function() {
+    step2Diffs.querySelectorAll('input[type=checkbox]').forEach(function(c) { c.checked = !c.checked })
+  })
 
   // Render filtered table
   var tableWrap = document.createElement('div')
@@ -224,13 +244,13 @@ function renderComparison(data) {
     if (filter === 'all' || filter === 'onlyA') {
       ;(data.onlyA || []).forEach(function(d) {
         rows.push({ section: 'onlyA', name: d.name_cn || d.name, sid: d.subject_id,
-          a: typeLabel(d.typeA) + ' | ' + d.epStatusA + '话 | ' + d.rateA + '分', b: '—', checkbox: false, color: '#a0a0b0' })
+          a: typeLabel(d.typeA) + ' | ' + d.epStatusA + '话 | ' + d.rateA + '分', b: '—', checkbox: true, color: '#a0a0b0' })
       })
     }
     if (filter === 'all' || filter === 'onlyB') {
       ;(data.onlyB || []).forEach(function(d) {
         rows.push({ section: 'onlyB', name: d.name_cn || d.name, sid: d.subject_id,
-          a: '—', b: typeLabel(d.typeB) + ' | ' + d.epStatusB + '话 | ' + d.rateB + '分', checkbox: false, color: '#a0a0b0' })
+          a: '—', b: typeLabel(d.typeB) + ' | ' + d.epStatusB + '话 | ' + d.rateB + '分', checkbox: true, color: '#a0a0b0' })
       })
     }
     if (filter === 'same') {
