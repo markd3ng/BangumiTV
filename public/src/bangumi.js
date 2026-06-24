@@ -402,15 +402,18 @@
 
       if (totalPages > 1) {
         h += '<div style="display:flex;justify-content:center;gap:3px;margin-top:8px;">'
-        var pages = [1]; var cp = page || 1
-        for (var p = Math.max(2, cp - 1); p <= Math.min(totalPages - 1, cp + 1); p++) pages.push(p)
+        var cp = page || 1; var pages = [1]
+        var wStart = Math.max(2, cp - 4), wEnd = Math.min(totalPages - 1, cp + 4)
+        if (wStart > 2) pages.push('...')
+        for (var p = wStart; p <= wEnd; p++) pages.push(p)
+        if (wEnd < totalPages - 1) pages.push('...')
         pages.push(totalPages)
-        var seen = {}, prev = 0
         pages.forEach(function(p) {
-          if (seen[p]) return; seen[p] = true
-          if (prev && p > prev + 1) h += '<span style="padding:2px;color:#a0a0b0;">...</span>'
-          h += '<button class="sync-pg-btn" data-pg="' + p + '" style="padding:3px 8px;font-size:11px;border:1px solid #2a2a4a;border-radius:3px;background:' + (p === cp ? '#e94560' : '#0f3460') + ';color:#fff;cursor:pointer;">' + p + '</button>'
-          prev = p
+          if (p === '...') {
+            h += '<span style="padding:3px 4px;color:#a0a0b0;">...</span>'
+          } else {
+            h += '<button class="sync-pg-btn" data-pg="' + p + '" style="padding:3px 8px;font-size:11px;border:1px solid #2a2a4a;border-radius:3px;background:' + (p === cp ? '#e94560' : '#0f3460') + ';color:#fff;cursor:pointer;">' + p + '</button>'
+          }
         })
         h += '</div>'
       }
