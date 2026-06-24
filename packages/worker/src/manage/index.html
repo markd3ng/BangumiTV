@@ -146,12 +146,19 @@ document.getElementById('start-compare').addEventListener('click', async () => {
 
 function renderComparison(data) {
   clear(step2Summary)
+  const nameA = data?.userA?.name || 'Account A'
+  const nameB = data?.userB?.name || 'Account B'
+  const sameLen = (data?.same || []).length
+  const diffLen = (data?.differences || []).length
+  const onlyALen = (data?.onlyA || []).length
+  const onlyBLen = (data?.onlyB || []).length
+
+  // Summary cards
   ;[
-    { key: 'userA', label: (data?.userA?.name || 'Account A') },
-    { key: 'userB', label: (data?.userB?.name || 'Account B') },
+    { key: 'userA', label: nameA },
+    { key: 'userB', label: nameB },
   ].forEach(({ key, label }) => {
-    const card = document.createElement('div')
-    card.className = 'summary-card'
+    const card = document.createElement('div'); card.className = 'summary-card'
     const s = data?.[key]
     if (s?.error) {
       card.style.border = '1px solid #e94560'
@@ -165,40 +172,96 @@ function renderComparison(data) {
     step2Summary.append(card)
   })
 
-  const dir = document.getElementById('sync-direction')
-  dir.innerHTML = `<option value="A->B">Account A → Account B</option>
-                   <option value="B->A">Account B → Account A</option>`
+  // Stats bar
+  const statsBar = document.createElement('div')
+  statsBar.style.cssText = 'display:flex;gap:12px;flex-wrap:wrap;font-size:13px;margin-bottom:12px;'
+  statsBar.innerHTML = `<span style="color:#4caf50;">相同: ${sameLen}</span> <span style="color:#e94560;">差异: ${diffLen}</span> <span>仅${nameA}: ${onlyALen}</span> <span>仅${nameB}: ${onlyBLen}</span>`
+  step2Summary.append(statsBar)
 
+  // Sync direction suggestion
+  const dir = document.getElementById('sync-direction')
+  const suggestAtoB = onlyALen > onlyBLen || (onlyALen === onlyBLen && (data?.userA?.total || 0) > (data?.userB?.total || 0))
+  const aToB = `<option value="A->B"${suggestAtoB ? ' selected' : ''}>${nameA} → ${nameB}（${nameA} 覆盖 ${nameB}）</option>`
+  const bToA = `<option value="B->A"${!suggestAtoB ? ' selected' : ''}>${nameB} → ${nameA}（${nameB} 覆盖 ${nameA}）</option>`
+  dir.innerHTML = aToB + bToA
+  if (suggestAtoB) {
+    const hint = document.createElement('p')
+    hint.className = 'muted'
+    hint.style.cssText = 'font-size:12px;margin-top:4px;'
+    hint.textContent = `已自动选择 ${nameA} → ${nameB}（${nameA} 条目更多，建议以此方向同步）`
+    dir.parentNode.insertBefore(hint, dir.nextSibling)
+  }
+
+  // Render table
   clear(step2Diffs)
-  if (state.differences.length === 0) {
+  if (!diffLen && !onlyALen && !onlyBLen) {
     step2Diffs.append(textElement('p', '双方收藏完全一致，无需同步。', 'muted'))
     document.getElementById('step2-sync').style.display = 'none'
-  } else {
-    document.getElementById('step2-sync').style.display = ''
-    const list = document.createElement('div')
-    list.style.cssText = 'max-height:500px;overflow-y:auto;margin-top:12px;'
-    state.differences.forEach(d => {
-      const item = document.createElement('div')
-      item.className = 'diff-item'
-      item.innerHTML = `<div class="diff-info">
-        <h3>${d.name_cn || d.name || '#' + d.subject_id}</h3>
-        <p>A: ${diffStr(d.typeA, d.epStatusA, d.rateA)} | B: ${diffStr(d.typeB, d.epStatusB, d.rateB)}</p>
-      </div>`
-      const cb = document.createElement('input')
-      cb.type = 'checkbox'; cb.checked = true; cb.dataset.id = d.subject_id
-      cb.style.cssText = 'margin-top:4px;'
-      if (document.getElementById('partial-sync-toggle').style.display === 'none') cb.style.display = 'none'
-      item.prepend(cb)
-      list.appendChild(item)
-    })
-    step2Diffs.appendChild(list)
+    return
   }
+  document.getElementById('step2-sync').style.display = ''
+
+  var html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+  html += '<thead><tr style="background:#0f3460;color:#a0a0b0;">'
+  html += '<th style="padding:8px;text-align:left;">条目</th>'
+  html += `<th style="padding:8px;text-align:center;">${nameA}</th>`
+  html += `<th style="padding:8px;text-align:center;">${nameB}</th>`
+  html += '<th style="padding:8px;text-align:center;width:40px;">✓</th></tr></thead><tbody>'
+
+  // Different items (with checkboxes for sync)
+  if (diffLen) {
+    html += '<tr><td colspan="4" style="padding:8px;color:#e94560;font-weight:bold;background:#1a1a2e;">差异条目 (' + diffLen + ')</td></tr>'
+    ;(data.differences || []).forEach(function(d) {
+      html += '<tr style="border-bottom:1px solid #2a2a4a;">'
+      html += '<td style="padding:8px;"><b>' + (d.name_cn || d.name || '#' + d.subject_id) + '</b></td>'
+      html += '<td style="padding:8px;text-align:center;">' + typeLabel(d.typeA) + ' | ' + d.epStatusA + '话 | ' + d.rateA + '分</td>'
+      html += '<td style="padding:8px;text-align:center;">' + typeLabel(d.typeB) + ' | ' + d.epStatusB + '话 | ' + d.rateB + '分</td>'
+      html += '<td style="padding:8px;text-align:center;"><input type="checkbox" checked data-id="' + d.subject_id + '"></td></tr>'
+    })
+  }
+
+  // Only in A
+  if (onlyALen) {
+    html += '<tr><td colspan="4" style="padding:8px;color:#a0a0b0;font-weight:bold;background:#1a1a2e;">仅 ' + nameA + ' 有 (' + onlyALen + ')</td></tr>'
+    ;(data.onlyA || []).forEach(function(d) {
+      html += '<tr style="border-bottom:1px solid #2a2a4a;color:#a0a0b0;">'
+      html += '<td style="padding:8px;">' + (d.name_cn || d.name || '#' + d.subject_id) + '</td>'
+      html += '<td style="padding:8px;text-align:center;">' + typeLabel(d.typeA) + ' | ' + d.epStatusA + '话 | ' + d.rateA + '分</td>'
+      html += '<td style="padding:8px;text-align:center;">—</td>'
+      html += '<td style="padding:8px;text-align:center;"></td></tr>'
+    })
+  }
+
+  // Only in B
+  if (onlyBLen) {
+    html += '<tr><td colspan="4" style="padding:8px;color:#a0a0b0;font-weight:bold;background:#1a1a2e;">仅 ' + nameB + ' 有 (' + onlyBLen + ')</td></tr>'
+    ;(data.onlyB || []).forEach(function(d) {
+      html += '<tr style="border-bottom:1px solid #2a2a4a;color:#a0a0b0;">'
+      html += '<td style="padding:8px;">' + (d.name_cn || d.name || '#' + d.subject_id) + '</td>'
+      html += '<td style="padding:8px;text-align:center;">—</td>'
+      html += '<td style="padding:8px;text-align:center;">' + typeLabel(d.typeB) + ' | ' + d.epStatusB + '话 | ' + d.rateB + '分</td>'
+      html += '<td style="padding:8px;text-align:center;"></td></tr>'
+    })
+  }
+
+  // Same items (collapsed)
+  if (sameLen) {
+    html += '<tr><td colspan="4" style="padding:8px;text-align:center;"><details style="cursor:pointer;color:#a0a0b0;">'
+    html += '<summary>相同条目 (' + sameLen + ')</summary>'
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;">'
+    ;(data.same || []).forEach(function(s) {
+      html += '<tr style="border-bottom:1px solid #2a2a4a;">'
+      html += '<td style="padding:6px;">' + (s.name_cn || s.name || '#' + s.subject_id) + '</td>'
+      html += '<td style="padding:6px;text-align:center;color:#4caf50;">' + s.type + ' | ' + s.ep + '/' + (s.total || '??') + ' | ' + s.rate + '分</td></tr>'
+    })
+    html += '</table></details></td></tr>'
+  }
+
+  html += '</tbody></table>'
+  step2Diffs.innerHTML = html
 }
 
-function diffStr(type, ep, rate) {
-  const types = { 1: '想看', 2: '看过', 3: '在看', 4: '搁置', 5: '抛弃' }
-  return `${types[type] || type} | ${ep} 话 | ${rate} 分`
-}
+function typeLabel(t) { return {1:'想看',2:'看过',3:'在看',4:'搁置',5:'抛弃',0:'—'}[t] || t }
 
 // ── Sync ──
 document.getElementById('partial-sync-toggle').addEventListener('click', () => {
