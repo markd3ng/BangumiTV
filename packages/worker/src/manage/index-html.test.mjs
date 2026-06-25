@@ -34,6 +34,10 @@ test('token inputs are marked as requiring management secret', () => {
   }
 })
 
+test('sync copy states that only anime collections are synced', () => {
+  assert.ok(html.includes('仅同步动画收藏'), 'manage page states anime-only sync scope')
+})
+
 test('compare flow uses manual tokens, not OAuth', () => {
   assert.ok(script.includes('tokenA: ta, userA:'), 'compare body includes Account tokens')
   assert.ok(script.includes('/api/manage/compare'), 'calls compare endpoint')

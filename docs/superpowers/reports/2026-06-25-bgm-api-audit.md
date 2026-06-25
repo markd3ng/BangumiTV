@@ -1,10 +1,10 @@
-# bgm.tv API Usage Audit
+# bgm.tv API 使用审计报告
 
-## Scope
+## 范围
 
-This report audits runtime bgm.tv API calls and API claims in README/design/plan docs. Runtime findings are prioritized separately from documentation debt.
+本报告审计项目中实际运行的 bgm.tv API 调用，以及 README、设计文档、计划文档中的 API 描述。运行缺陷和文档债分开分级，避免把历史记录误当成当前缺陷。
 
-## Evidence Sources
+## 证据来源
 
 - `docs/example/api/bgm-api.json`
 - `packages/shared/src/bgm-client.ts`
@@ -18,134 +18,139 @@ This report audits runtime bgm.tv API calls and API claims in README/design/plan
 - `docs/superpowers/specs/**`
 - `docs/superpowers/plans/**`
 
-## Runtime API Inventory
+## 运行 API 清单
 
-| ID | Location | Runtime use | Endpoint | Method | Auth | Body/query | Parser | Caller semantics |
+| ID | 位置 | 运行用途 | Endpoint | 方法 | 认证 | Body/query | 解析 | 调用语义 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| INV-001 | `packages/shared/src/bgm-client.ts` | `getCollections()` | `/v0/users/{username}/collections` | GET | Optional Bearer via `this.headers()` | `subject_type=2`, `limit`, `offset` | JSON | Fetch anime collections for cron and account compare/sync |
-| INV-002 | `packages/shared/src/bgm-client.ts` | `getSubject()` | `/v0/subjects/{subject_id}` | GET | Optional Bearer via `this.headers()` | path `subjectId` | JSON, 404 -> `null` | Fetch subject detail when needed |
-| INV-003 | `packages/shared/src/bgm-client.ts` | `getCalendar()` | `/calendar` | GET | Optional Bearer via `this.headers()` | none | JSON | Fetch broadcast calendar for snapshots |
-| INV-004 | `packages/shared/src/bgm-client.ts` | `downloadImage()` | arbitrary image URL from bgm.tv response | GET | none | URL from API response | `arrayBuffer()` | Cache subject/calendar images |
-| INV-005 | `packages/shared/src/bgm-client.ts` | `oauthAccessToken()` | `https://bgm.tv/oauth/access_token` | POST | client credentials in JSON body | `authorization_code` grant | JSON | Exchange OAuth code |
-| INV-006 | `packages/shared/src/bgm-client.ts` | `refreshAccessToken()` | `https://bgm.tv/oauth/access_token` | POST | client credentials in JSON body | `refresh_token` grant | JSON | Refresh stored token |
-| INV-007 | `packages/shared/src/bgm-client.ts` | `tokenStatus()` | `https://bgm.tv/oauth/token_status` | POST | token in form body | `access_token` form field | JSON with fallback states | Probe token validity |
-| INV-008 | `packages/shared/src/bgm-client.ts` | `patchCollection()` | `/v0/users/-/collections/{subject_id}` | PATCH | Bearer required | caller body | shared `fetchJson()` | Update an existing target-account collection entry |
-| INV-009 | `packages/shared/src/bgm-client.ts` | `getMe()` | `/v0/me` | GET | Bearer required | none | JSON | Resolve token owner username/id |
-| INV-010 | `packages/shared/src/bgm-client.ts` | `upsertCollection()` | `/v0/users/-/collections/{subject_id}` | POST | Bearer required | sync write body | shared `fetchJson()` | Create or update target-account collection entry for account sync |
+| INV-001 | `packages/shared/src/bgm-client.ts` | `getCollections()` | `/v0/users/{username}/collections` | GET | `this.headers()` 可选 Bearer | `subject_type=2`, `limit`, `offset` | JSON | 拉取动画收藏，供 cron、账户对比和账户同步使用 |
+| INV-002 | `packages/shared/src/bgm-client.ts` | `getSubject()` | `/v0/subjects/{subject_id}` | GET | `this.headers()` 可选 Bearer | path `subjectId` | JSON，404 -> `null` | 按需拉取条目详情 |
+| INV-003 | `packages/shared/src/bgm-client.ts` | `getCalendar()` | `/calendar` | GET | `this.headers()` 可选 Bearer | 无 | JSON | 拉取每日放送日历写入快照 |
+| INV-004 | `packages/shared/src/bgm-client.ts` | `downloadImage()` | bgm.tv 响应中的图片 URL | GET | 无 | API 响应里的 URL | `arrayBuffer()` | 缓存收藏和日历图片 |
+| INV-005 | `packages/shared/src/bgm-client.ts` | `oauthAccessToken()` | `https://bgm.tv/oauth/access_token` | POST | JSON body 中的 client 凭据 | `authorization_code` grant | JSON | OAuth code 换 token |
+| INV-006 | `packages/shared/src/bgm-client.ts` | `refreshAccessToken()` | `https://bgm.tv/oauth/access_token` | POST | JSON body 中的 client 凭据 | `refresh_token` grant | JSON | 刷新已保存 token |
+| INV-007 | `packages/shared/src/bgm-client.ts` | `tokenStatus()` | `https://bgm.tv/oauth/token_status` | POST | form body 中的 token | `access_token` form 字段 | JSON + fallback 状态 | 探测 token 是否有效 |
+| INV-008 | `packages/shared/src/bgm-client.ts` | `patchCollection()` | `/v0/users/-/collections/{subject_id}` | PATCH | 必须 Bearer | 调用方 body | shared `fetchJson()` | 修改目标账号已有收藏 |
+| INV-009 | `packages/shared/src/bgm-client.ts` | `getMe()` | `/v0/me` | GET | 必须 Bearer | 无 | JSON | 解析 token 对应的当前用户 username/id |
+| INV-010 | `packages/shared/src/bgm-client.ts` | `upsertCollection()` | `/v0/users/-/collections/{subject_id}` | POST | 必须 Bearer | 同步写入 body | shared `fetchJson()` | 为账户同步创建或更新目标账号收藏 |
 
-## Findings
+## 问题清单
 
-### P0 Findings
+### P0 问题
 
-#### BGM-API-001: `fetchJson()` treats `204 No Content` as JSON
+#### BGM-API-001：`fetchJson()` 曾把 `204 No Content` 当成 JSON 解析
 
-- **Location:** `packages/shared/src/bgm-client.ts:73`, `packages/shared/src/bgm-client.ts:98`, `packages/shared/src/bgm-client.ts:198`
-- **Current use:** successful write endpoints flow through `fetchJson()` and end with `res.json()`.
-- **Evidence:** local OpenAPI for `POST/PATCH /v0/users/-/collections/{subject_id}` lists `204` as a successful response.
-- **Impact:** successful writes can be reported as `Unexpected end of JSON input`.
-- **Suggested fix:** return `undefined` or `null` for status `204`, before `res.json()`.
-- **Verification:** add a shared test where `patchCollection()` receives `204` and does not throw.
-- **Status:** fixed in Batch A; shared tests cover `204`.
+- **位置：** `packages/shared/src/bgm-client.ts:73`, `packages/shared/src/bgm-client.ts:98`, `packages/shared/src/bgm-client.ts:198`
+- **原写法：** 写入类 endpoint 成功后进入 `fetchJson()`，最后无条件 `res.json()`。
+- **证据：** 本地 OpenAPI 中 `POST/PATCH /v0/users/-/collections/{subject_id}` 的成功响应是 `204`。
+- **影响：** 写入已经成功时仍可能被报告为 `Unexpected end of JSON input`。
+- **建议修法：** 在 `res.json()` 之前对 `204` 直接返回 `undefined` 或 `null`。
+- **验证方式：** 增加 shared 测试，模拟 `patchCollection()` 收到 `204` 时不抛错。
+- **状态：** 已在 批次 A 修复；shared 测试覆盖 `204`。
 
-#### BGM-API-002: account sync uses PATCH for upsert semantics
+#### BGM-API-002：账户同步曾用 PATCH 执行 upsert 语义
 
-- **Location:** `packages/shared/src/bgm-client.ts:198`, `packages/shared/src/platform/bgm.ts:43`, `packages/worker/src/manage/sync-write.ts:72`
-- **Current use:** sync writes call `patchCollection()` with `PATCH /v0/users/-/collections/{subject_id}`.
-- **Evidence:** local OpenAPI describes `POST /v0/users/-/collections/{subject_id}` as create-or-modify. The same OpenAPI entry describes `PATCH` as modifying collection, and its 404 response includes item-not-collected semantics.
-- **Impact:** syncing an item that the target account has not collected can fail with 404.
-- **Suggested fix:** add a clearly named `upsertCollection()` method using `POST` and call that from `BgmPlatformClient.patchEntry()`.
-- **Verification:** add a test that bgm platform sync writes use `POST`.
-- **Status:** fixed in Batch A; `BgmPlatformClient.patchEntry()` now calls `upsertCollection()`.
+- **位置：** `packages/shared/src/bgm-client.ts:198`, `packages/shared/src/platform/bgm.ts:43`, `packages/worker/src/manage/sync-write.ts:72`
+- **原写法：** 同步写入调用 `patchCollection()`，请求为 `PATCH /v0/users/-/collections/{subject_id}`。
+- **证据：** 本地 OpenAPI 描述 `POST /v0/users/-/collections/{subject_id}` 是“新增或修改”；同一条目的 `PATCH` 是修改已有收藏，404 语义包含“条目未收藏”。
+- **影响：** 目标账号尚未收藏某条目时，同步可能 404。
+- **建议修法：** 增加语义明确的 `upsertCollection()`，使用 `POST`，并由 `BgmPlatformClient.patchEntry()` 调用。
+- **验证方式：** 增加测试确认 bgm 平台同步写入使用 `POST`。
+- **状态：** 已在 批次 A 修复；`BgmPlatformClient.patchEntry()` 现在调用 `upsertCollection()`。
 
-### P1 Findings
+### P1 问题
 
-#### BGM-API-003: account sync only fetches anime collections
+#### BGM-API-003：账户同步只拉取动画收藏
 
-- **Location:** `packages/shared/src/bgm-client.ts:101`, `packages/shared/src/platform/bgm.ts:30`, `packages/shared/src/utils.ts:6`
-- **Current use:** `getCollections()` always sends `subject_type=2`.
-- **Evidence:** local OpenAPI `SubjectType` says `2` is anime; other valid subject types are book, music, game, and real.
-- **Impact:** if product intent is full-account sync, non-anime collections are silently excluded. If product intent is anime-only, the current implementation is correct but docs/UI must say so.
-- **Suggested fix:** decide product scope. Either rename/document as anime-only, or parameterize subject type and update UI/report copy.
-- **Verification:** add a test or source assertion for intended query construction after scope decision.
+- **位置：** `packages/shared/src/bgm-client.ts:101`, `packages/shared/src/platform/bgm.ts:30`, `packages/shared/src/utils.ts:6`
+- **当前写法：** `getCollections()` 固定发送 `subject_type=2`。
+- **证据：** 本地 OpenAPI `SubjectType` 说明 `2` 是动画；其他合法类型还有书籍、音乐、游戏、三次元。
+- **影响：** 如果产品预期是全账户同步，书籍/音乐/游戏/三次元会被静默排除。
+- **决策：** 批次 B 已明确产品口径：账户同步继续只同步动画收藏。
+- **建议修法：** 不扩展全类型；把 README、管理页、嵌入页和报告文案全部写成“动画同步”。
+- **验证方式：** 管理页测试断言页面明确出现“仅同步动画收藏”。
+- **状态：** 批次 B 已按动画同步口径推进。
 
-#### BGM-API-004: OAuth endpoints are not covered by the local OpenAPI file
+#### BGM-API-004：OAuth endpoint 不在本地 OpenAPI 文件中
 
-- **Location:** `packages/shared/src/bgm-client.ts:135`, `packages/shared/src/bgm-client.ts:151`, `packages/shared/src/bgm-client.ts:171`, `packages/worker/src/manage/oauth.ts:3`
-- **Current use:** OAuth authorize, token exchange, refresh, and token status calls use `https://bgm.tv/oauth/...`.
-- **Evidence:** `jq '.paths | keys[]' docs/example/api/bgm-api.json | rg 'oauth|token_status|access_token'` returns no matches. `/calendar` is covered by local OpenAPI, but OAuth is not.
-- **Impact:** project rules require verification before changing API calls; future OAuth edits need a separate authoritative evidence source.
-- **Suggested fix:** before modifying OAuth behavior, add or cite a local OAuth reference for `authorize`, `access_token`, and `token_status`.
-- **Verification:** keep the local OpenAPI gap command in the report or future plan.
+- **位置：** `packages/shared/src/bgm-client.ts:135`, `packages/shared/src/bgm-client.ts:151`, `packages/shared/src/bgm-client.ts:171`, `packages/worker/src/manage/oauth.ts:3`
+- **当前写法：** OAuth authorize、token exchange、refresh、token status 使用 `https://bgm.tv/oauth/...`。
+- **证据：** `jq '.paths | keys[]' docs/example/api/bgm-api.json | rg 'oauth|token_status|access_token'` 无匹配。`/calendar` 已由本地 OpenAPI 覆盖，OAuth 才是缺口。
+- **影响：** 项目规则要求修改 API 调用前必须验证；后续改 OAuth 逻辑时需要额外权威证据。
+- **建议修法：** 修改 OAuth 行为前，补充或引用 `authorize`、`access_token`、`token_status` 的本地证据来源。
+- **验证方式：** 保留本地 OpenAPI 缺口查询命令，未来计划中单独处理。
 
-#### BGM-API-005: `ep_status` and `vol_status` are invalid for non-book write bodies
+#### BGM-API-005：`ep_status` 和 `vol_status` 不能作为非书籍写入字段
 
-- **Location:** `packages/shared/src/platform/bgm.ts:46`; historical docs/plans may still mention these fields for sync writes.
-- **Current use:** current HEAD does not send these fields from `BgmPlatformClient.patchEntry()`.
-- **Evidence:** local OpenAPI `UserSubjectCollectionModifyPayload` says both fields can only modify book progress.
-- **Impact:** old deployments or docs that include these fields can trigger 400 on anime, music, game, or real subjects.
-- **Suggested fix:** keep current runtime omission for anime sync; update active docs that imply these fields are general-purpose write fields.
-- **Verification:** add a test that bgm platform write body excludes `ep_status` and `vol_status`.
-- **Status:** runtime covered in Batch A; remaining stale docs are tracked as P2.
+- **位置：** `packages/shared/src/platform/bgm.ts:46`；历史文档/计划仍可能把这些字段写进同步 body。
+- **当前写法：** 当前 HEAD 的 `BgmPlatformClient.patchEntry()` 不再发送这两个字段。
+- **证据：** 本地 OpenAPI `UserSubjectCollectionModifyPayload` 写明两个字段只能修改书籍进度。
+- **影响：** 旧部署或过期文档若继续传这两个字段，动画、音乐、游戏、三次元条目会 400。
+- **建议修法：** 保持当前动画同步不传这两个字段；修正仍把它们描述为通用同步字段的活跃文档。
+- **验证方式：** 测试确认 bgm 平台写入 body 不含 `ep_status` 和 `vol_status`。
+- **状态：** 运行逻辑已在 批次 A 覆盖；剩余过期文档归入 P2。
 
-### P2 Findings
+### P2 问题
 
-#### BGM-API-101: current audit docs incorrectly list `/calendar` as a local OpenAPI gap
+#### BGM-API-101：审计设计/计划曾误把 `/calendar` 列成本地 OpenAPI 缺口
 
-- **Location:** `docs/superpowers/specs/2026-06-25-bgm-api-audit-design.md:49`, `docs/superpowers/specs/2026-06-25-bgm-api-audit-design.md:81`, `docs/superpowers/plans/2026-06-25-bgm-api-audit.md:205`, `docs/superpowers/plans/2026-06-25-bgm-api-audit.md:208`
-- **Current text:** `/calendar` is grouped with OAuth `access_token` and `token_status` as not covered by local OpenAPI.
-- **Evidence:** local OpenAPI contains `GET /calendar` with operationId `getCalendar`. The OAuth paths are the actual local OpenAPI gap.
-- **Impact:** future audit or fix work may waste time treating `/calendar` as undocumented.
-- **Suggested fix:** update active audit design/plan docs to say `/calendar` is covered, while OAuth endpoints remain outside local OpenAPI.
-- **Verification:** `jq '.paths["/calendar"]' docs/example/api/bgm-api.json`.
+- **位置：** `docs/superpowers/specs/2026-06-25-bgm-api-audit-design.md:49`, `docs/superpowers/specs/2026-06-25-bgm-api-audit-design.md:81`, `docs/superpowers/plans/2026-06-25-bgm-api-audit.md:205`, `docs/superpowers/plans/2026-06-25-bgm-api-audit.md:208`
+- **当前文本：** 把 `/calendar` 与 OAuth `access_token`、`token_status` 一起列为本地 OpenAPI 未覆盖。
+- **证据：** 本地 OpenAPI 包含 `GET /calendar`，operationId 为 `getCalendar`。真正缺口是 OAuth 路径。
+- **影响：** 后续审计或修复可能误以为 `/calendar` 缺少规范证据。
+- **建议修法：** 更新活跃审计设计/计划，说明 `/calendar` 已覆盖，OAuth endpoint 才未覆盖。
+- **验证方式：** `jq '.paths["/calendar"]' docs/example/api/bgm-api.json`。
 
-#### BGM-API-102: historical Cloudflare design describes sync write as PATCH with book-only fields
+#### BGM-API-102：历史 Cloudflare 设计仍写着 PATCH + 书籍专用字段
 
-- **Location:** `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:285`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:286`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:452`
-- **Current text:** sync write uses `PATCH /v0/users/-/collections/{subject_id}` with `{ ep_status, vol_status, type, rate, tags, comment }`.
-- **Evidence:** runtime findings BGM-API-002 and BGM-API-005; local OpenAPI says POST is create-or-modify and `ep_status`/`vol_status` are book-only.
-- **Impact:** because this file lives under active `docs/superpowers/specs`, future implementation work can copy the stale write semantics.
-- **Suggested fix:** mark this design as historical or update the API checklist to prefer POST upsert and avoid book-only fields for anime sync.
-- **Verification:** `rg -n "PATCH /v0/users/-/collections|ep_status|vol_status" docs/superpowers/specs`.
+- **位置：** `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:285`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:286`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:452`
+- **当前文本：** 同步写回使用 `PATCH /v0/users/-/collections/{subject_id}`，body 包含 `{ ep_status, vol_status, type, rate, tags, comment }`。
+- **证据：** BGM-API-002 和 BGM-API-005；本地 OpenAPI 说明 POST 是新增或修改，`ep_status`/`vol_status` 只能用于书籍。
+- **影响：** 该文件位于活跃 `docs/superpowers/specs` 下，后续实现可能复制过期语义。
+- **建议修法：** 标记该设计为历史记录，或更新 API checklist：同步写回用 POST upsert，动画同步不传书籍专用字段。
+- **验证方式：** `rg -n "PATCH /v0/users/-/collections|ep_status|vol_status" docs/superpowers/specs`。
 
-#### BGM-API-103: sync docs imply full account sync while runtime fetches anime only
+#### BGM-API-103：部分同步文档曾暗示全账户同步，但运行逻辑只同步动画
 
-- **Location:** `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:272`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:274`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:235`
-- **Current text:** full sync says it syncs all source-account collection status, while the API flow uses `subject_type=2`.
-- **Evidence:** runtime finding BGM-API-003; local OpenAPI `SubjectType` says `2` is anime.
-- **Impact:** users and future implementers may expect book/music/game/real collections to be synced.
-- **Suggested fix:** choose and document either anime-only sync or all-subject sync before changing runtime behavior.
-- **Verification:** `rg -n "全部收藏|subject_type=2|多账户同步" README.md docs/superpowers/specs docs/superpowers/plans`.
+- **位置：** `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:272`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:274`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:235`
+- **当前文本：** “完整同步”写作同步源账户全部收藏状态，同时 API 流程使用 `subject_type=2`。
+- **证据：** BGM-API-003；本地 OpenAPI `SubjectType` 说明 `2` 是动画。
+- **影响：** 用户或后续实现者可能误以为书籍/音乐/游戏/三次元也会同步。
+- **决策：** 批次 B 已定为“继续只同步动画收藏”。
+- **建议修法：** README、管理页、嵌入页和后续活跃文档统一使用“动画同步”措辞。
+- **验证方式：** `rg -n "全部收藏|subject_type=2|多账户同步" README.md docs/superpowers/specs docs/superpowers/plans`。
 
-#### BGM-API-104: OAuth paths in docs need an explicit non-OpenAPI evidence source
+#### BGM-API-104：OAuth 路径需要额外非 OpenAPI 证据
 
-- **Location:** `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:265`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:266`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:454`, `docs/superpowers/plans/2026-06-22-stabilize-sync-consistency.md:206`
-- **Current text:** docs mention `https://bgm.tv/oauth/authorize`, `https://bgm.tv/oauth/access_token`, and `https://bgm.tv/oauth/token_status`.
-- **Evidence:** runtime finding BGM-API-004; local OpenAPI has no OAuth paths.
-- **Impact:** future OAuth edits can violate the project rule requiring verified API evidence before changing calls.
-- **Suggested fix:** add a local OAuth reference or cite an authoritative source before modifying these calls.
-- **Verification:** `jq '.paths | keys[]' docs/example/api/bgm-api.json | rg 'oauth|token_status|access_token' || true`.
+- **位置：** `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:265`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:266`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:454`, `docs/superpowers/plans/2026-06-22-stabilize-sync-consistency.md:206`
+- **当前文本：** 文档提到 `https://bgm.tv/oauth/authorize`、`https://bgm.tv/oauth/access_token`、`https://bgm.tv/oauth/token_status`。
+- **证据：** BGM-API-004；本地 OpenAPI 没有 OAuth paths。
+- **影响：** 未来修改 OAuth 调用时可能违反“修改 API 前先验证”的项目规则。
+- **建议修法：** 修改这些调用前，增加本地 OAuth reference 或引用权威来源。
+- **验证方式：** `jq '.paths | keys[]' docs/example/api/bgm-api.json | rg 'oauth|token_status|access_token' || true`。
 
-## Fix Batch Proposal
+## 修复批次建议
 
-### Batch A: P0 Runtime Fixes
+### 批次 A：P0 运行修复
 
-Status: implemented.
+状态：已实现。
 
-- Handle `204 No Content` before JSON parsing in the shared bgm client.
-- Add an upsert write method using `POST /v0/users/-/collections/{subject_id}` for account sync.
-- Keep `ep_status` and `vol_status` out of non-book sync write bodies.
-- Add focused tests for `204`, write method, and write body.
+- 在 shared bgm client 中，`204 No Content` 直接视为成功，不再解析 JSON。
+- 账户同步写回新增 `POST /v0/users/-/collections/{subject_id}` 的 upsert 方法。
+- 非书籍同步写入 body 不包含 `ep_status` 和 `vol_status`。
+- 已增加针对 `204`、写入方法、写入 body 的聚焦测试。
 
-### Batch B: P1 Product Semantics
+### 批次 B：P1 产品语义
 
-- Decide whether account sync is anime-only or all-subject.
-- If anime-only, make README/UI/report copy explicit.
-- If all-subject, parameterize collection fetch by subject type and define merge behavior across subject classes before implementation.
-- Keep OAuth behavior unchanged until an authoritative OAuth reference is added or cited.
+状态：已定为“只同步动画收藏”，正在推进。
 
-### Batch C: P2 Documentation Sync
+- 账户同步继续只使用 `subject_type=2`。
+- README、管理页、嵌入页和报告文案统一写成“动画同步”。
+- 不扩展书籍/音乐/游戏/三次元同步。
+- OAuth 行为保持不变，直到补充权威 OAuth 证据来源。
 
-- Update the active audit design/plan docs to remove the false `/calendar` local OpenAPI gap claim.
-- Update active specs that describe current API behavior with stale PATCH/write-body semantics.
-- Leave old implementation plans unchanged unless they are used as current guidance.
-- Add a note for OAuth endpoints not covered by `docs/example/api/bgm-api.json`.
+### 批次 C：P2 文档同步
+
+- 更新活跃审计设计/计划，移除 `/calendar` 是本地 OpenAPI 缺口的错误说法。
+- 更新仍描述当前 API 行为的活跃 spec 中过期的 PATCH/write-body 语义。
+- 旧实施计划保持历史记录，除非它被当作当前指导文档使用。
+- 为 `docs/example/api/bgm-api.json` 未覆盖的 OAuth endpoint 增加说明。

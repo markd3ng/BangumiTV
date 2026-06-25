@@ -6,11 +6,11 @@
 
   const TYPE_NAMES = { want: '想看', watched: '看过', watching: '在看', on_hold: '搁置', dropped: '抛弃' }
 
-  // 顶部视图切换：番组计划（收藏列表） / 放送日历（/api/calendar） / 条目同步
+  // 顶部视图切换：番组计划（收藏列表） / 放送日历（/api/calendar） / 动画同步
   const VIEWS = [
     { key: 'collection', label: '番组计划' },
     { key: 'calendar', label: '放送日历' },
-    { key: 'sync', label: '条目同步' },
+    { key: 'sync', label: '动画同步' },
   ]
 
   // ---------------------------------------------------------------
@@ -259,7 +259,7 @@
   }
 
   // ---------------------------------------------------------------
-  // 条目同步视图（多账户对比 + 同步）
+  // 动画同步视图（多账户对比 + 同步）
   // ---------------------------------------------------------------
   function buildSyncView() {
     var view = document.createElement('div')
@@ -268,8 +268,8 @@
     // ── Token area ──
     var tok = document.createElement('div')
     tok.className = 'sync-token-area'
-    tok.innerHTML = '<h3>多账户条目同步</h3>' +
-      '<p class="muted" style="font-size:12px;margin-bottom:8px;">粘贴 <a href="https://bgm.tv/dev" target="_blank">bgm.tv Access Token</a>，两个账号各一个</p>'
+    tok.innerHTML = '<h3>多账户动画同步</h3>' +
+      '<p class="muted" style="font-size:12px;margin-bottom:8px;">粘贴 <a href="https://bgm.tv/dev" target="_blank">bgm.tv Access Token</a>，两个账号各一个；仅同步动画收藏</p>'
     view.appendChild(tok)
 
     function buildTokenRow(side, idSuffix) {

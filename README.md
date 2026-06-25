@@ -121,7 +121,7 @@ Sync Worker 在定时同步时自动下载条目封面（来源：bgm.tv），�
 
 访问 `https://bangumi-tv.<你的子域名>.workers.dev/manage`：
 
-- **多账户同步**：粘贴两个 bgm.tv access token（用户名可选）→ 点击对比 → 选择完整同步或部分同步 → 执行。Token 在 [bgm.tv 开发者设置](https://bgm.tv/dev) 生成，永久有效。
+- **多账户动画同步**：粘贴两个 bgm.tv access token（用户名可选）→ 点击对比 → 选择完整同步动画或部分同步动画 → 执行。当前仅同步 bgm.tv 动画收藏（`subject_type=2`）。Token 在 [bgm.tv 开发者设置](https://bgm.tv/dev) 生成，永久有效。
 - 管理密码只保存在浏览器内存中，刷新后重新输入。
 - **Cron token** 通过 Cloudflare Dashboard 环境变量 `BANGUMI_TOKEN` 配置，不在管理页操作。
 

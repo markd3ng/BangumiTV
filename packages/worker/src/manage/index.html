@@ -47,7 +47,7 @@
 
   <div class="step active" id="step1">
     <h2>步骤 1: 输入 bgm.tv Access Token</h2>
-    <p class="muted" style="margin-bottom:12px;">在 <a href="https://bgm.tv/dev" target="_blank" style="color:#e94560;">bgm.tv 开发者设置</a> 分别生成两个账号的 access token（永久有效），粘贴到下方。</p>
+    <p class="muted" style="margin-bottom:12px;">在 <a href="https://bgm.tv/dev" target="_blank" style="color:#e94560;">bgm.tv 开发者设置</a> 分别生成两个账号的 access token（永久有效），粘贴到下方。仅同步动画收藏。</p>
 
     <label>账号 A Access Token <span style="color:#e94560;">*</span></label>
     <input type="password" id="tokenA" placeholder="粘贴账号 A 的 Access Token">
@@ -67,9 +67,9 @@
       <label>同步方向</label>
       <select id="sync-direction"></select>
       <div class="button-row" style="margin-top:12px;">
-        <button id="full-sync">完整同步</button>
-        <button id="partial-sync-toggle" class="secondary">按选中条目同步</button>
-        <button id="partial-sync-start" style="display:none;">执行选中条目同步</button>
+        <button id="full-sync">完整同步动画</button>
+        <button id="partial-sync-toggle" class="secondary">按选中动画同步</button>
+        <button id="partial-sync-start" style="display:none;">执行选中动画同步</button>
       </div>
       <div class="progress" id="sync-progress" style="display:none;">
         <div class="progress-bar"><div class="progress-fill" id="sync-progress-fill"></div></div>
@@ -350,7 +350,7 @@ document.getElementById('partial-sync-toggle').addEventListener('click', () => {
     start.style.display = ''; toggle.textContent = '取消选择'
     cbs.forEach(c => c.style.display = '')
   } else {
-    start.style.display = 'none'; toggle.textContent = '按选中条目同步'
+    start.style.display = 'none'; toggle.textContent = '按选中动画同步'
     cbs.forEach(c => c.style.display = 'none')
   }
 })
@@ -358,7 +358,7 @@ document.getElementById('partial-sync-toggle').addEventListener('click', () => {
 document.getElementById('full-sync').addEventListener('click', () => doSync('full', []))
 document.getElementById('partial-sync-start').addEventListener('click', () => {
   const ids = Array.from(step2Diffs.querySelectorAll('input[type=checkbox]:checked')).map(c => Number(c.dataset.id))
-  if (!ids.length) return alert('请至少选中一个条目')
+  if (!ids.length) return alert('请至少选中一个动画')
   doSync('partial', ids)
 })
 
