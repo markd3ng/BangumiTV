@@ -482,6 +482,10 @@
       if (sameLen) h += '<button class="sync-pill" data-filter="same">\u76f8\u540c ' + sameLen + '</button>'
       h += '</div>'
 
+      // Progress bar (top)
+      h += '<div id="sync-progress" style="display:none;margin-bottom:12px;"><div class="bgm-progress"><span id="sync-progress-fill" style="width:0%"></span></div>' +
+        '<p id="sync-progress-text" class="muted" style="font-size:12px;margin-top:4px;"></p></div>'
+
       // Toolbar
       h += '<div class="sync-toolbar">'
       h += '<button id="sync-sel-all" class="sync-tool-btn">\u5168\u9009</button>'
@@ -498,10 +502,6 @@
 
       // Cards container
       h += '<div class="sync-cards-wrap"></div>'
-
-      // Progress
-      h += '<div id="sync-progress" style="display:none;margin-top:12px;"><div class="bgm-progress"><span id="sync-progress-fill" style="width:0%"></span></div>' +
-        '<p id="sync-progress-text" class="muted" style="font-size:12px;margin-top:4px;"></p></div>'
 
       resultArea.innerHTML = h
 
@@ -562,13 +562,26 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tokenA: fromToken, platformA: platformA, from: fromUser, tokenB: toToken, platformB: platformB, to: toUser, mode: mode, subject_ids: subjectIds }),
         })
-        var results = await res.json()
+        var results = await res.json().catch(function() { return null })
+        if (!res.ok) {
+          var errMsg = (results && results.error && results.error.message) || ('HTTP ' + res.status + ' ' + res.statusText)
+          document.getElementById('sync-progress-fill').style.width = '0%'
+          document.getElementById('sync-progress-text').innerHTML = '<span style="color:#e94560;">\u540c\u6b65\u5931\u8d25: ' + errMsg + '</span>'
+          return
+        }
+        if (!Array.isArray(results)) throw new Error('Invalid response')
         var ok = results.filter(function(r) { return r.status === 'ok' }).length
         var err = results.filter(function(r) { return r.status === 'error' }).length
         document.getElementById('sync-progress-fill').style.width = '100%'
-        document.getElementById('sync-progress-text').textContent = '\u540c\u6b65\u5b8c\u6210\uff1a' + ok + ' \u6210\u529f\uff0c' + err + ' \u5931\u8d25'
+        var msg = '\u540c\u6b65\u5b8c\u6210\uff1a' + ok + ' \u6210\u529f\uff0c' + err + ' \u5931\u8d25'
+        if (err > 0) {
+          var failed = results.filter(function(r) { return r.status === 'error' }).slice(0, 3).map(function(r) { return r.title || r.externalId }).join(', ')
+          msg += '<br><small style="color:#e94560;">\u5931\u8d25\u6761\u76ee: ' + failed + (err > 3 ? ' \u7b49' + err + '\u9879' : '') + '</small>'
+        }
+        document.getElementById('sync-progress-text').innerHTML = msg
       } catch (e) {
-        document.getElementById('sync-progress-text').textContent = '\u540c\u6b65\u5931\u8d25: ' + (e.message || '')
+        document.getElementById('sync-progress-fill').style.width = '0%'
+        document.getElementById('sync-progress-text').innerHTML = '<span style="color:#e94560;">\u540c\u6b65\u5931\u8d25: ' + (e.message || '\u672a\u77e5\u9519\u8bef') + '</span>'
       }
     }
 
