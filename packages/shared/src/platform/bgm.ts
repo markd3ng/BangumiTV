@@ -43,13 +43,9 @@ export class BgmPlatformClient implements PlatformClient {
   async patchEntry(token: string, externalId: string, item: ComparisonItem): Promise<void> {
     const client = new BgmClient()
     const bgmType = WATCH_STATUS_TO_BGM[item.status] || 3
-    await client.patchCollection(token, Number(externalId), {
-      type: bgmType,
-      rate: item.score,
-      ep_status: item.progress,
-      vol_status: 0,
-      tags: [],
-      comment: '',
-    })
+    const body: Record<string, unknown> = { type: bgmType, rate: item.score, tags: [], comment: '' }
+    // ep_status 仅对动画类条目有效；vol_status 仅对书籍有效——不发送 vol_status
+    if (item.progress > 0) body.ep_status = item.progress
+    await client.patchCollection(token, Number(externalId), body)
   }
 }
