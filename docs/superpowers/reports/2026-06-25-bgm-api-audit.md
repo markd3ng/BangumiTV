@@ -83,6 +83,44 @@ This report audits runtime bgm.tv API calls and API claims in README/design/plan
 - **Suggested fix:** keep current runtime omission for anime sync; update active docs that imply these fields are general-purpose write fields.
 - **Verification:** add a test that bgm platform write body excludes `ep_status` and `vol_status`.
 
+### P2 Findings
+
+#### BGM-API-101: current audit docs incorrectly list `/calendar` as a local OpenAPI gap
+
+- **Location:** `docs/superpowers/specs/2026-06-25-bgm-api-audit-design.md:49`, `docs/superpowers/specs/2026-06-25-bgm-api-audit-design.md:81`, `docs/superpowers/plans/2026-06-25-bgm-api-audit.md:205`, `docs/superpowers/plans/2026-06-25-bgm-api-audit.md:208`
+- **Current text:** `/calendar` is grouped with OAuth `access_token` and `token_status` as not covered by local OpenAPI.
+- **Evidence:** local OpenAPI contains `GET /calendar` with operationId `getCalendar`. The OAuth paths are the actual local OpenAPI gap.
+- **Impact:** future audit or fix work may waste time treating `/calendar` as undocumented.
+- **Suggested fix:** update active audit design/plan docs to say `/calendar` is covered, while OAuth endpoints remain outside local OpenAPI.
+- **Verification:** `jq '.paths["/calendar"]' docs/example/api/bgm-api.json`.
+
+#### BGM-API-102: historical Cloudflare design describes sync write as PATCH with book-only fields
+
+- **Location:** `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:285`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:286`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:452`
+- **Current text:** sync write uses `PATCH /v0/users/-/collections/{subject_id}` with `{ ep_status, vol_status, type, rate, tags, comment }`.
+- **Evidence:** runtime findings BGM-API-002 and BGM-API-005; local OpenAPI says POST is create-or-modify and `ep_status`/`vol_status` are book-only.
+- **Impact:** because this file lives under active `docs/superpowers/specs`, future implementation work can copy the stale write semantics.
+- **Suggested fix:** mark this design as historical or update the API checklist to prefer POST upsert and avoid book-only fields for anime sync.
+- **Verification:** `rg -n "PATCH /v0/users/-/collections|ep_status|vol_status" docs/superpowers/specs`.
+
+#### BGM-API-103: sync docs imply full account sync while runtime fetches anime only
+
+- **Location:** `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:272`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:274`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:235`
+- **Current text:** full sync says it syncs all source-account collection status, while the API flow uses `subject_type=2`.
+- **Evidence:** runtime finding BGM-API-003; local OpenAPI `SubjectType` says `2` is anime.
+- **Impact:** users and future implementers may expect book/music/game/real collections to be synced.
+- **Suggested fix:** choose and document either anime-only sync or all-subject sync before changing runtime behavior.
+- **Verification:** `rg -n "全部收藏|subject_type=2|多账户同步" README.md docs/superpowers/specs docs/superpowers/plans`.
+
+#### BGM-API-104: OAuth paths in docs need an explicit non-OpenAPI evidence source
+
+- **Location:** `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:265`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:266`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:454`, `docs/superpowers/plans/2026-06-22-stabilize-sync-consistency.md:206`
+- **Current text:** docs mention `https://bgm.tv/oauth/authorize`, `https://bgm.tv/oauth/access_token`, and `https://bgm.tv/oauth/token_status`.
+- **Evidence:** runtime finding BGM-API-004; local OpenAPI has no OAuth paths.
+- **Impact:** future OAuth edits can violate the project rule requiring verified API evidence before changing calls.
+- **Suggested fix:** add a local OAuth reference or cite an authoritative source before modifying these calls.
+- **Verification:** `jq '.paths | keys[]' docs/example/api/bgm-api.json | rg 'oauth|token_status|access_token' || true`.
+
 ## Fix Batch Proposal
 
 The final batch proposal is added after all findings are classified.
