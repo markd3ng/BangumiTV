@@ -360,7 +360,7 @@
           var isDiff = d._section === 'diff'
           var isOnlyA = d._section === 'onlyA'
           var isOnlyB = d._section === 'onlyB'
-          var isSame = d._section === 'same'
+          var isSame = d._section === 'same'; if (isSame) { d.statusA = d.statusB = d.status; d.progressA = d.progressB = d.progress; d.scoreA = d.scoreB = d.score; }
 
           var borderColor = ''
           if (isDiff && d.statusA !== d.statusB) borderColor = '#e94560'
@@ -370,8 +370,8 @@
           h += '<div class="sync-card" style="' + (borderColor ? 'border-left:4px solid ' + borderColor : '') + '">'
 
           // Title row
-          var highScore = Math.max(d.scoreA || 0, d.scoreB || 0)
-          var highEp = Math.max(d.totalEpisodes || d.progressA || 0, d.totalEpisodes || d.progressB || 0)
+          var highScore = Math.max(d.scoreA || 0, d.scoreB || 0, d.score || 0)
+          var highEp = Math.max(d.totalEpisodes || d.progressA || d.progressB || d.progress || 0)
           var titleExtras = ''
           if (highEp > 0 || highScore > 0) {
             titleExtras = '<span style="float:right;font-size:11px;color:#a0a0b0;font-weight:normal;">'
