@@ -575,7 +575,7 @@
         document.getElementById('sync-progress-fill').style.width = '100%'
         var msg = '\u540c\u6b65\u5b8c\u6210\uff1a' + ok + ' \u6210\u529f\uff0c' + err + ' \u5931\u8d25'
         if (err > 0) {
-          var failed = results.filter(function(r) { return r.status === 'error' }).slice(0, 3).map(function(r) { return r.title || r.externalId }).join(', ')
+          var failed = results.filter(function(r) { return r.status === 'error' }).slice(0, 3).map(function(r) { return (r.title || r.externalId) + ': ' + (r.error || 'unknown') }).join('; ')
           msg += '<br><small style="color:#e94560;">\u5931\u8d25\u6761\u76ee: ' + failed + (err > 3 ? ' \u7b49' + err + '\u9879' : '') + '</small>'
         }
         document.getElementById('sync-progress-text').innerHTML = msg

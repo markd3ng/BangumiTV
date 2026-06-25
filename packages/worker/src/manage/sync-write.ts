@@ -74,8 +74,9 @@ async function doSync(
       await clientB.patchEntry(toToken, entry.externalId, entry)
       results.push({ externalId: entry.externalId, title: entry.title, status: 'ok' })
     } catch (err) {
-      console.warn(JSON.stringify({ event: 'sync_item_failed', external_id: entry.externalId, reason: err instanceof Error ? err.message : String(err), at: new Date().toISOString() }))
-      results.push({ externalId: entry.externalId, title: entry.title, status: 'error', error: '同步失败，请稍后重试' })
+      const reason = err instanceof Error ? err.message : String(err)
+      console.warn(JSON.stringify({ event: 'sync_item_failed', external_id: entry.externalId, reason, at: new Date().toISOString() }))
+      results.push({ externalId: entry.externalId, title: entry.title, status: 'error', error: reason })
     }
     await new Promise(r => setTimeout(r, 200))
   }

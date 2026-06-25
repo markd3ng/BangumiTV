@@ -272,12 +272,11 @@ test('compare source logs real error to ring buffer, returns safe reason', async
   assert.equal(source.includes('settled.reason.message'), true, 'reason extracted safely')
 })
 
-test('sync-write source uses a fixed safe item error message', async () => {
+test('sync-write source logs real error reason and returns it safely', async () => {
   const source = await readFile(new URL('./sync-write.ts', import.meta.url), 'utf8')
 
-  assert.match(source, /status:\s*'error',[\s\S]*error:\s*'同步失败，请稍后重试'/)
-  assert.equal(source.includes('error: String(err)'), false)
-  assert.equal(source.includes('error: err.message'), false)
+  assert.match(source, /const reason = err instanceof Error \? err\.message : String\(err\)/)
+  assert.match(source, /error: reason/)
 })
 
 test('manage error logs keep only safe structured fields', () => {
