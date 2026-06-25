@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { BgmClient } from './bgm-client.ts'
+import { BgmPlatformClient } from './platform/bgm.ts'
+import { WatchStatus } from './platform/client.ts'
 
 // 辅助：模拟 fetch 响应的简单工厂
 function mockFetch(status: number, body: unknown, ok?: boolean): typeof globalThis.fetch {
@@ -15,6 +17,17 @@ function mockFetch(status: number, body: unknown, ok?: boolean): typeof globalTh
 
 function mockNetworkError(): typeof globalThis.fetch {
   return async () => { throw new TypeError('fetch failed') }
+}
+
+function captureFetch(status = 204): { calls: { url: string; init?: RequestInit }[]; fetch: typeof globalThis.fetch } {
+  const calls: { url: string; init?: RequestInit }[] = []
+  return {
+    calls,
+    fetch: async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init })
+      return new Response(null, { status }) as unknown as Response
+    },
+  }
 }
 
 test('tokenStatus returns valid when 2xx and valid:true', async () => {
@@ -96,6 +109,49 @@ test('tokenStatus returns probe_failed on network error', async () => {
   try {
     const result = await client.tokenStatus('test-token')
     assert.deepEqual(result, { status: 'probe_failed' })
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('patchCollection accepts 204 No Content without parsing JSON', async () => {
+  const client = new BgmClient()
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = captureFetch().fetch
+  try {
+    const result = await client.patchCollection('token', 265, { type: 3 })
+    assert.equal(result, undefined)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('BgmPlatformClient upserts collection with POST and omits book-only progress fields', async () => {
+  const client = new BgmPlatformClient()
+  const originalFetch = globalThis.fetch
+  const captured = captureFetch()
+  globalThis.fetch = captured.fetch
+  try {
+    await client.patchEntry('token', '265', {
+      externalId: '265',
+      title: 'Neon Genesis Evangelion',
+      status: WatchStatus.WATCHING,
+      progress: 26,
+      totalEpisodes: 26,
+      score: 9,
+      platform: 'bgm',
+    })
+
+    assert.equal(captured.calls.length, 1)
+    assert.equal(captured.calls[0].init?.method, 'POST')
+    assert.equal(captured.calls[0].url, 'https://api.bgm.tv/v0/users/-/collections/265')
+    assert.equal(captured.calls[0].init?.headers && (captured.calls[0].init.headers as Record<string, string>).Authorization, 'Bearer token')
+    assert.deepEqual(JSON.parse(String(captured.calls[0].init?.body)), {
+      type: 3,
+      rate: 9,
+      tags: [],
+      comment: '',
+    })
   } finally {
     globalThis.fetch = originalFetch
   }

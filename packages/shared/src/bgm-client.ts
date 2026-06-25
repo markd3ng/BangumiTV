@@ -95,6 +95,7 @@ export class BgmClient {
       const body = await res.text().catch(() => '')
       throw new BgmHttpError(res.status, `bgm.tv 返回错误 (${res.status}): ${body.slice(0, 300)}`)
     }
+    if (res.status === 204) return undefined
     return res.json()
   }
 
@@ -199,6 +200,16 @@ export class BgmClient {
     const url = `${BGM_BASE}/v0/users/-/collections/${subjectId}`
     return this.fetchJson(url, {
       method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'User-Agent': UA },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(30000),
+    })
+  }
+
+  async upsertCollection(token: string, subjectId: number, body: Record<string, unknown>) {
+    const url = `${BGM_BASE}/v0/users/-/collections/${subjectId}`
+    return this.fetchJson(url, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'User-Agent': UA },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(30000),

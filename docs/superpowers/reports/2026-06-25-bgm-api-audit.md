@@ -29,8 +29,9 @@ This report audits runtime bgm.tv API calls and API claims in README/design/plan
 | INV-005 | `packages/shared/src/bgm-client.ts` | `oauthAccessToken()` | `https://bgm.tv/oauth/access_token` | POST | client credentials in JSON body | `authorization_code` grant | JSON | Exchange OAuth code |
 | INV-006 | `packages/shared/src/bgm-client.ts` | `refreshAccessToken()` | `https://bgm.tv/oauth/access_token` | POST | client credentials in JSON body | `refresh_token` grant | JSON | Refresh stored token |
 | INV-007 | `packages/shared/src/bgm-client.ts` | `tokenStatus()` | `https://bgm.tv/oauth/token_status` | POST | token in form body | `access_token` form field | JSON with fallback states | Probe token validity |
-| INV-008 | `packages/shared/src/bgm-client.ts` | `patchCollection()` | `/v0/users/-/collections/{subject_id}` | PATCH | Bearer required | sync write body | shared `fetchJson()` | Write target account collection entry |
+| INV-008 | `packages/shared/src/bgm-client.ts` | `patchCollection()` | `/v0/users/-/collections/{subject_id}` | PATCH | Bearer required | caller body | shared `fetchJson()` | Update an existing target-account collection entry |
 | INV-009 | `packages/shared/src/bgm-client.ts` | `getMe()` | `/v0/me` | GET | Bearer required | none | JSON | Resolve token owner username/id |
+| INV-010 | `packages/shared/src/bgm-client.ts` | `upsertCollection()` | `/v0/users/-/collections/{subject_id}` | POST | Bearer required | sync write body | shared `fetchJson()` | Create or update target-account collection entry for account sync |
 
 ## Findings
 
@@ -44,6 +45,7 @@ This report audits runtime bgm.tv API calls and API claims in README/design/plan
 - **Impact:** successful writes can be reported as `Unexpected end of JSON input`.
 - **Suggested fix:** return `undefined` or `null` for status `204`, before `res.json()`.
 - **Verification:** add a shared test where `patchCollection()` receives `204` and does not throw.
+- **Status:** fixed in Batch A; shared tests cover `204`.
 
 #### BGM-API-002: account sync uses PATCH for upsert semantics
 
@@ -53,6 +55,7 @@ This report audits runtime bgm.tv API calls and API claims in README/design/plan
 - **Impact:** syncing an item that the target account has not collected can fail with 404.
 - **Suggested fix:** add a clearly named `upsertCollection()` method using `POST` and call that from `BgmPlatformClient.patchEntry()`.
 - **Verification:** add a test that bgm platform sync writes use `POST`.
+- **Status:** fixed in Batch A; `BgmPlatformClient.patchEntry()` now calls `upsertCollection()`.
 
 ### P1 Findings
 
@@ -82,6 +85,7 @@ This report audits runtime bgm.tv API calls and API claims in README/design/plan
 - **Impact:** old deployments or docs that include these fields can trigger 400 on anime, music, game, or real subjects.
 - **Suggested fix:** keep current runtime omission for anime sync; update active docs that imply these fields are general-purpose write fields.
 - **Verification:** add a test that bgm platform write body excludes `ep_status` and `vol_status`.
+- **Status:** runtime covered in Batch A; remaining stale docs are tracked as P2.
 
 ### P2 Findings
 
@@ -124,6 +128,8 @@ This report audits runtime bgm.tv API calls and API claims in README/design/plan
 ## Fix Batch Proposal
 
 ### Batch A: P0 Runtime Fixes
+
+Status: implemented.
 
 - Handle `204 No Content` before JSON parsing in the shared bgm client.
 - Add an upsert write method using `POST /v0/users/-/collections/{subject_id}` for account sync.
