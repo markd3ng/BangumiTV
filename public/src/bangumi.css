@@ -424,3 +424,36 @@ body {
 .bgm-nav-button { padding:8px 16px;border:2px solid #000;border-radius:0;background:#fff;color:#000;cursor:pointer;font-size:13px;font-weight:800;box-shadow:3px 3px 0 0 #000; }
 .bgm-nav-button:hover { transform:translate(-2px,-2px);box-shadow:5px 5px 0 0 #000; }
 .bgm-nav-button:active { transform:translate(1px,1px);box-shadow:1px 1px 0 0 #000; }
+
+/* ── Sync view overhaul ── */
+.sync-token-area { margin-bottom:16px; }
+.sync-token-row { margin-bottom:8px; }
+
+.sync-pills { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+.sync-pill { padding:6px 14px; border:2px solid #000; border-radius:0; background:#fff; color:#000; cursor:pointer; font-size:13px; font-weight:800; box-shadow:3px 3px 0 0 #000; }
+.sync-pill:hover { transform:translate(-1px,-1px); box-shadow:4px 4px 0 0 #000; }
+.sync-pill.active { background:#e94560; color:#fff; transform:translate(1px,1px); box-shadow:1px 1px 0 0 #000; }
+
+.sync-toolbar { display:flex; gap:8px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
+.sync-tool-btn { padding:6px 12px; border:2px solid #000; border-radius:0; background:#fff; color:#000; cursor:pointer; font-size:12px; font-weight:800; box-shadow:2px 2px 0 0 #000; }
+.sync-tool-btn:hover { transform:translate(-1px,-1px); }
+
+.sync-cards { display:flex; flex-direction:column; gap:12px; }
+.sync-card { background:#fff; border:2px solid #000; border-radius:0; box-shadow:4px 4px 0 0 #000; overflow:hidden; }
+.sync-card-title { padding:10px 14px; font-weight:800; font-size:14px; border-bottom:2px solid #000; overflow:hidden; }
+.sync-card-cols { display:grid; grid-template-columns:1fr 1fr; }
+.sync-card-col { padding:12px 14px; border-right:1px solid #e0e0e0; }
+.sync-card-col:last-child { border-right:none; }
+.sync-col-label { font-size:11px; font-weight:800; color:#a0a0b0; margin-bottom:6px; text-transform:uppercase; }
+.sync-col-empty { padding:20px 0; text-align:center; color:#ccc; font-size:24px; }
+.sync-badge { display:inline-block; padding:2px 8px; border-radius:0; color:#fff; font-size:11px; font-weight:800; margin-bottom:6px; }
+.sync-progress-bar { height:8px; background:#e0e0e0; border:1px solid #000; margin:6px 0; }
+.sync-progress-bar span { display:block; height:100%; background:#00a1d6; }
+.sync-progress-text { font-size:12px; color:#666; font-weight:800; }
+.sync-score { display:block; font-size:12px; color:#666; font-weight:800; margin-top:2px; }
+.sync-card-check { padding:10px 14px; border-top:1px solid #e0e0e0; text-align:center; background:#f8f8f8; }
+.sync-card-check label { font-size:12px; color:#333; cursor:pointer; font-weight:800; }
+
+.sync-pagination { display:flex; justify-content:center; gap:4px; margin-top:16px; flex-wrap:wrap; }
+.sync-pg-btn { padding:4px 10px; border:2px solid #000; border-radius:0; background:#fff; color:#000; cursor:pointer; font-size:12px; font-weight:800; }
+.sync-pg-active { padding:4px 10px; border:2px solid #000; border-radius:0; background:#e94560; color:#fff; font-size:12px; font-weight:800; }

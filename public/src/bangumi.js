@@ -264,82 +264,269 @@
   function buildSyncView() {
     var view = document.createElement('div')
     view.className = 'bgm-view bgm-view-sync'
-    view.style.cssText = 'padding:0;'
 
-    var form = document.createElement('div')
-    form.style.cssText = 'margin-bottom:16px;'
-    form.innerHTML = '<h3 style="margin-bottom:8px;">多账户条目同步</h3>' +
-      '<p class="muted" style="font-size:12px;margin-bottom:12px;">在 <a href="https://bgm.tv/dev" target="_blank">bgm.tv 开发者设置</a> 生成 access token</p>' +
-      <div style="display:flex;gap:8px;margin-bottom:8px;">
-      <label style="flex:1;display:block;color:#a0a0b0;font-size:12px;">账号 A Token
-      <input type="password" id="sync-tokenA" placeholder="Access Token" style="width:100%;padding:8px;border:1px solid #2a2a4a;border-radius:4px;background:#0f3460;color:#fff;font-size:13px;"></label>
-      <label style="color:#a0a0b0;font-size:12px;">平台<select id="sync-platformA" style="margin-top:18px;padding:8px;border:1px solid #2a2a4a;border-radius:4px;background:#0f3460;color:#fff;font-size:13px;"><option value="bgm">bgm.tv</option></select></label>
-      </div>
-      '<input type="password" id="sync-tokenA" placeholder="粘贴账号 A 的 Access Token" style="width:100%;padding:8px;border:1px solid #2a2a4a;border-radius:4px;background:#0f3460;color:#fff;margin-bottom:8px;font-size:13px;">' +
-      <div style="display:flex;gap:8px;margin-bottom:8px;">
-      <label style="flex:1;display:block;color:#a0a0b0;font-size:12px;">账号 B Token
-      <input type="password" id="sync-tokenB" placeholder="Access Token" style="width:100%;padding:8px;border:1px solid #2a2a4a;border-radius:4px;background:#0f3460;color:#fff;font-size:13px;"></label>
-      <label style="color:#a0a0b0;font-size:12px;">平台<select id="sync-platformB" style="margin-top:18px;padding:8px;border:1px solid #2a2a4a;border-radius:4px;background:#0f3460;color:#fff;font-size:13px;"><option value="bgm">bgm.tv</option></select></label>
-      </div>
-      '<input type="password" id="sync-tokenB" placeholder="粘贴账号 B 的 Access Token" style="width:100%;padding:8px;border:1px solid #2a2a4a;border-radius:4px;background:#0f3460;color:#fff;margin-bottom:8px;font-size:13px;">' +
-      '<button id="sync-compare-btn" class="bgm-nav-button">对比收藏</button>'
-    view.appendChild(form)
+    // ── Token area ──
+    var tok = document.createElement('div')
+    tok.className = 'sync-token-area'
+    tok.innerHTML = '<h3>多账户条目同步</h3>' +
+      '<p class="muted" style="font-size:12px;margin-bottom:8px;">粘贴 <a href="https://bgm.tv/dev" target="_blank">bgm.tv Access Token</a>，两个账号各一个</p>'
+    view.appendChild(tok)
 
+    function buildTokenRow(side, idSuffix) {
+      var row = document.createElement('div')
+      row.className = 'sync-token-row'
+      var saved = sessionStorage.getItem('sync-token' + idSuffix) || ''
+      if (saved) {
+        row.innerHTML = '<span style="color:#4caf50;font-size:13px;">\u2713 ' + side + ' token 已就绪</span>' +
+          ' <button class="sync-token-clear" data-side="' + idSuffix + '" style="font-size:11px;background:none;border:none;color:#e94560;cursor:pointer;text-decoration:underline;">清除</button>'
+      } else {
+        row.innerHTML = '<div style="display:flex;gap:8px;">' +
+          '<label style="flex:1;font-size:12px;color:#a0a0b0;">' + side + ' Token' +
+          '<input type="password" class="sync-token-input" data-side="' + idSuffix + '" placeholder="Access Token" style="width:100%;padding:8px;border:1px solid #2a2a4a;border-radius:4px;background:#0f3460;color:#fff;font-size:13px;margin-top:2px;"></label>' +
+          '<label style="font-size:12px;color:#a0a0b0;">平台<select class="sync-platform" data-side="' + idSuffix + '" style="margin-top:18px;padding:8px;border:1px solid #2a2a4a;border-radius:4px;background:#0f3460;color:#fff;font-size:13px;"><option value="bgm">bgm.tv</option></select></label>' +
+          '</div>'
+      }
+      return row
+    }
+
+    var rowA = buildTokenRow('Account A', 'A')
+    var rowB = buildTokenRow('Account B', 'B')
+    tok.appendChild(rowA)
+    tok.appendChild(rowB)
+
+    var compareBtn = document.createElement('button')
+    compareBtn.id = 'sync-compare-btn'
+    compareBtn.className = 'bgm-nav-button'
+    compareBtn.textContent = '对比收藏'
+    compareBtn.style.cssText = 'margin-top:8px;width:100%;'
+    tok.appendChild(compareBtn)
+
+    // ── Result area ──
     var resultArea = document.createElement('div')
     resultArea.id = 'sync-result'
     view.appendChild(resultArea)
 
     var loaded = false
-    var syncState = { tokenA: '', tokenB: '', data: null, page: 1, filter: 'all' }
+    var syncState = { tokenA: '', tokenB: '', data: null, page: 1, filter: 'all', search: '' }
+
+    // ── Token clear handler ──
+    tok.addEventListener('click', function(e) {
+      if (e.target.classList.contains('sync-token-clear')) {
+        var side = e.target.dataset.side
+        sessionStorage.removeItem('sync-token' + side)
+        var row = e.target.closest('.sync-token-row')
+        var newRow = buildTokenRow(side === 'A' ? 'Account A' : 'Account B', side)
+        row.parentNode.replaceChild(newRow, row)
+      }
+    })
+
+    // ── Card renderer ──
+    function renderCards(filter, page, pageSize, search) {
+      var data = syncState.data; if (!data) return
+      var nameA = (data.userA && data.userA.name) || 'A'
+      var nameB = (data.userB && data.userB.name) || 'B'
+
+      var all = []
+      function push(d, section) {
+        if (search && d.title.toLowerCase().indexOf(search.toLowerCase()) === -1) return
+        d._section = section
+        d._checkbox = section !== 'same'
+        all.push(d)
+      }
+
+      if (filter === 'all' || filter === 'diff') {
+        ;(data.differences || []).forEach(function(d) { push(d, 'diff') })
+      }
+      if (filter === 'all' || filter === 'onlyA') {
+        ;(data.onlyA || []).forEach(function(d) { push(d, 'onlyA') })
+      }
+      if (filter === 'all' || filter === 'onlyB') {
+        ;(data.onlyB || []).forEach(function(d) { push(d, 'onlyB') })
+      }
+      if (filter === 'same') {
+        ;(data.same || []).forEach(function(d) { push(d, 'same') })
+      }
+
+      var tp = Math.ceil(all.length / pageSize) || 1
+      var start = (page - 1) * pageSize
+      var pageItems = all.slice(start, start + pageSize)
+
+      var h = ''
+      h += '<div class="sync-cards">'
+      if (!pageItems.length) {
+        h += '<p class="bgm-empty" style="padding:20px;text-align:center;">无匹配条目</p>'
+      } else {
+        pageItems.forEach(function(d) {
+          var isDiff = d._section === 'diff'
+          var isOnlyA = d._section === 'onlyA'
+          var isOnlyB = d._section === 'onlyB'
+          var isSame = d._section === 'same'
+
+          var borderColor = ''
+          if (isDiff && d.statusA !== d.statusB) borderColor = '#e94560'
+          else if (isDiff && d.progressA !== d.progressB) borderColor = '#ff9800'
+          else if (isOnlyA || isOnlyB) borderColor = '#4caf50'
+
+          h += '<div class="sync-card" style="' + (borderColor ? 'border-left:4px solid ' + borderColor : '') + '">'
+
+          // Title row
+          var highScore = Math.max(d.scoreA || 0, d.scoreB || 0)
+          var highEp = Math.max(d.totalEpisodes || d.progressA || 0, d.totalEpisodes || d.progressB || 0)
+          var titleExtras = ''
+          if (highEp > 0 || highScore > 0) {
+            titleExtras = '<span style="float:right;font-size:11px;color:#a0a0b0;font-weight:normal;">'
+            if (highEp > 0) titleExtras += highEp + '话'
+            if (highScore > 0) titleExtras += (highEp > 0 ? ' / ' : '') + '\u2605 ' + highScore
+            titleExtras += '</span>'
+          }
+          var titleName = d.title || d.name_cn || d.name || '#' + (d.externalId || d.subject_id)
+          h += '<div class="sync-card-title">' + titleName + titleExtras + '</div>'
+
+          // Side-by-side columns
+          h += '<div class="sync-card-cols">'
+
+          // Column A
+          h += '<div class="sync-card-col">'
+          h += '<div class="sync-col-label">' + nameA + '</div>'
+          if (isOnlyB) {
+            h += '<div class="sync-col-empty">\u2014</div>'
+          } else {
+            h += '<span class="sync-badge" style="background:' + statusBadgeColor(d.statusA) + '">' + statusLabel(d.statusA) + '</span>'
+            var pctA = (d.totalEpisodes || d.progressA) > 0 ? Math.round(d.progressA / Math.max(d.totalEpisodes || d.progressA, 1) * 100) : 0
+            h += '<div class="sync-progress-bar"><span style="width:' + pctA + '%"></span></div>'
+            h += '<span class="sync-progress-text">' + d.progressA + '话</span>'
+            if (d.scoreA > 0) {
+              var arrow = (d.scoreA > d.scoreB) ? ' <span style="color:#e94560;">\u2191</span>' : ''
+              h += '<span class="sync-score">\u2605 ' + d.scoreA + arrow + '</span>'
+            }
+          }
+          h += '</div>'
+
+          // Column B
+          h += '<div class="sync-card-col">'
+          h += '<div class="sync-col-label">' + nameB + '</div>'
+          if (isOnlyA) {
+            h += '<div class="sync-col-empty">\u2014</div>'
+          } else {
+            h += '<span class="sync-badge" style="background:' + statusBadgeColor(d.statusB) + '">' + statusLabel(d.statusB) + '</span>'
+            var pctB = (d.totalEpisodes || d.progressB) > 0 ? Math.round(d.progressB / Math.max(d.totalEpisodes || d.progressB, 1) * 100) : 0
+            h += '<div class="sync-progress-bar"><span style="width:' + pctB + '%"></span></div>'
+            h += '<span class="sync-progress-text">' + d.progressB + '话</span>'
+            if (d.scoreB > 0) {
+              var arrowB = (d.scoreB > d.scoreA) ? ' <span style="color:#e94560;">\u2191</span>' : ''
+              h += '<span class="sync-score">\u2605 ' + d.scoreB + arrowB + '</span>'
+            }
+          }
+          h += '</div>'
+
+          h += '</div>' // sync-card-cols
+
+          // Checkbox row
+          if (!isSame) {
+            var cid = d.externalId || d.subject_id
+            h += '<div class="sync-card-check"><label><input type="checkbox" checked data-id="' + cid + '"> \u540c\u6b65\u6b64\u9879</label></div>'
+          }
+
+          h += '</div>' // sync-card
+        })
+      }
+      h += '</div>' // sync-cards
+
+      // Pagination
+      if (tp > 1) {
+        h += '<div class="sync-pagination">'
+        var pages = [1]
+        for (var p = Math.max(2, page - 2); p <= Math.min(tp - 1, page + 2); p++) pages.push(p)
+        pages.push(tp)
+        pages.forEach(function(p, i) {
+          if (i > 0 && pages[i-1] !== '...' && p - pages[i-1] > 1) h += '<span>...</span>'
+          if (p === page) h += '<span class="sync-pg-active">' + p + '</span>'
+          else h += '<button class="sync-pg-btn" data-pg="' + p + '">' + p + '</button>'
+        })
+        h += '</div>'
+      }
+
+      resultArea.querySelector('.sync-cards-wrap').innerHTML = h
+
+      // Wire pagination
+      resultArea.querySelectorAll('.sync-pg-btn').forEach(function(b) {
+        b.addEventListener('click', function() {
+          syncState.page = parseInt(this.dataset.pg)
+          renderCards(syncState.filter, syncState.page, parseInt(document.getElementById('sync-pagesize').value), syncState.search)
+        })
+      })
+    }
 
     function renderCompareResult(data) {
-      var nameA = (data.userA && data.userA.name) || 'A'; var nameB = (data.userB && data.userB.name) || 'B'
-      var sameLen = (data.same || []).length; var diffLen = (data.differences || []).length
-      var onlyALen = (data.onlyA || []).length; var onlyBLen = (data.onlyB || []).length
+      var nameA = (data.userA && data.userA.name) || 'A'
+      var nameB = (data.userB && data.userB.name) || 'B'
+      var sameLen = (data.same || []).length
+      var diffLen = (data.differences || []).length
+      var onlyALen = (data.onlyA || []).length
+      var onlyBLen = (data.onlyB || []).length
+      var allLen = diffLen + onlyALen + onlyBLen
 
-      var html = '<div style="display:flex;gap:8px;margin-bottom:8px;font-size:13px;">' +
-        '<span style="color:#4caf50;">相同: ' + sameLen + '</span> <span style="color:#e94560;">差异: ' + diffLen + '</span>' +
-        '<span>仅' + nameA + ': ' + onlyALen + '</span> <span>仅' + nameB + ': ' + onlyBLen + '</span></div>'
-
-      html += '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">' +
-        '<select id="sync-filter" style="padding:6px 8px;font-size:12px;">' +
-        '<option value="all">全部差异&独有(' + (diffLen+onlyALen+onlyBLen) + ')</option>' +
-        (diffLen ? '<option value="diff">仅差异(' + diffLen + ')</option>' : '') +
-        (onlyALen ? '<option value="onlyA">仅' + nameA + '有(' + onlyALen + ')</option>' : '') +
-        (onlyBLen ? '<option value="onlyB">仅' + nameB + '有(' + onlyBLen + ')</option>' : '') +
-        (sameLen ? '<option value="same">相同(' + sameLen + ')</option>' : '') +
-        '</select>' +
-        '<button id="sync-sel-all" class="bgm-nav-button" style="font-size:11px;padding:4px 8px;">全选</button>' +
-        '<button id="sync-sel-rev" class="bgm-nav-button" style="font-size:11px;padding:4px 8px;">反选</button>' +
-        '<select id="sync-pagesize" style="padding:6px 8px;font-size:12px;margin-left:auto;">' +
-        '<option value="20">20/页</option><option value="50">50/页</option><option value="100">100/页</option></select></div>'
-
-      html += '<div id="sync-table"></div>'
-
-      html += '<div style="margin-top:16px;border-top:1px solid #2a2a4a;padding-top:12px;">' +
-        '<label style="font-size:12px;">同步方向</label>' +
-        '<select id="sync-direction" style="margin:4px 0 8px;padding:6px 8px;font-size:12px;">' +
-        '<option value="A->B">' + nameA + ' → ' + nameB + '</option>' +
-        '<option value="B->A">' + nameB + ' → ' + nameA + '</option></select>' +
-        '<div style="display:flex;gap:8px;">' +
-        '<button id="sync-full-btn" class="bgm-nav-button">完整同步</button>' +
-        '<button id="sync-sel-btn" class="bgm-nav-button" style="font-size:11px;">按选中条目同步</button></div>' +
-        '<div id="sync-progress" style="display:none;margin-top:8px;"><div class="bgm-progress"><span id="sync-progress-fill" style="width:0%"></span></div>' +
-        '<p id="sync-progress-text" class="muted" style="font-size:12px;margin-top:4px;"></p></div></div>'
-
-      resultArea.innerHTML = html
       syncState.data = data
       syncState.filter = 'all'
       syncState.page = 1
-      renderSyncTable('all', 1, 20)
+      syncState.search = ''
 
-      document.getElementById('sync-filter').addEventListener('change', function() {
-        syncState.filter = this.value; syncState.page = 1
-        renderSyncTable(this.value, 1, parseInt(document.getElementById('sync-pagesize').value))
+      var h = ''
+
+      // Pill navigation
+      h += '<div class="sync-pills">'
+      h += '<button class="sync-pill active" data-filter="all">\u5168\u90e8 ' + allLen + '</button>'
+      if (diffLen) h += '<button class="sync-pill" data-filter="diff">\u5dee\u5f02 ' + diffLen + '</button>'
+      if (onlyALen) h += '<button class="sync-pill" data-filter="onlyA">\u4ec5' + nameA + ' ' + onlyALen + '</button>'
+      if (onlyBLen) h += '<button class="sync-pill" data-filter="onlyB">\u4ec5' + nameB + ' ' + onlyBLen + '</button>'
+      if (sameLen) h += '<button class="sync-pill" data-filter="same">\u76f8\u540c ' + sameLen + '</button>'
+      h += '</div>'
+
+      // Toolbar
+      h += '<div class="sync-toolbar">'
+      h += '<button id="sync-sel-all" class="sync-tool-btn">\u5168\u9009</button>'
+      h += '<button id="sync-sel-rev" class="sync-tool-btn">\u53cd\u9009</button>'
+      h += '<select id="sync-pagesize" style="padding:4px 6px;font-size:11px;"><option value="20">20/\u9875</option><option value="50">50/\u9875</option><option value="100">100/\u9875</option></select>'
+      h += '<input type="text" id="sync-search" placeholder="\u641c\u7d22\u6761\u76ee..." style="padding:4px 8px;font-size:11px;border:1px solid #2a2a4a;border-radius:4px;background:#0f3460;color:#fff;width:140px;">'
+      h += '<span style="flex:1;"></span>'
+      h += '<select id="sync-direction" style="padding:4px 6px;font-size:11px;">'
+      h += '<option value="A->B">' + nameA + ' \u2192 ' + nameB + '</option>'
+      h += '<option value="B->A">' + nameB + ' \u2192 ' + nameA + '</option></select>'
+      h += '<button id="sync-full-btn" class="sync-tool-btn" style="background:#e94560;color:#fff;">\u5b8c\u6574\u540c\u6b65</button>'
+      h += '<button id="sync-sel-btn" class="sync-tool-btn">\u9009\u4e2d\u540c\u6b65</button>'
+      h += '</div>'
+
+      // Cards container
+      h += '<div class="sync-cards-wrap"></div>'
+
+      // Progress
+      h += '<div id="sync-progress" style="display:none;margin-top:12px;"><div class="bgm-progress"><span id="sync-progress-fill" style="width:0%"></span></div>' +
+        '<p id="sync-progress-text" class="muted" style="font-size:12px;margin-top:4px;"></p></div>'
+
+      resultArea.innerHTML = h
+
+      // Wire events
+      resultArea.querySelectorAll('.sync-pill').forEach(function(pill) {
+        pill.addEventListener('click', function() {
+          resultArea.querySelectorAll('.sync-pill').forEach(function(p) { p.classList.remove('active') })
+          this.classList.add('active')
+          syncState.filter = this.dataset.filter
+          syncState.page = 1
+          renderCards(syncState.filter, 1, parseInt(document.getElementById('sync-pagesize').value), syncState.search)
+        })
       })
+
       document.getElementById('sync-pagesize').addEventListener('change', function() {
-        renderSyncTable(document.getElementById('sync-filter').value, 1, parseInt(this.value))
+        syncState.page = 1
+        renderCards(syncState.filter, 1, parseInt(this.value), syncState.search)
       })
+
+      document.getElementById('sync-search').addEventListener('input', function() {
+        syncState.search = this.value
+        syncState.page = 1
+        renderCards(syncState.filter, 1, parseInt(document.getElementById('sync-pagesize').value), this.value)
+      })
+
       document.getElementById('sync-sel-all').addEventListener('click', function() {
         resultArea.querySelectorAll('input[type=checkbox]').forEach(function(c) { c.checked = true })
       })
@@ -347,95 +534,14 @@
         resultArea.querySelectorAll('input[type=checkbox]').forEach(function(c) { c.checked = !c.checked })
       })
 
-      // Sync handlers
-      document.getElementById('sync-full-btn').addEventListener('click', function() {
-        doSyncOp('full', [])
-      })
+      document.getElementById('sync-full-btn').addEventListener('click', function() { doSyncOp('full', []) })
       document.getElementById('sync-sel-btn').addEventListener('click', function() {
-        var ids = Array.from(resultArea.querySelectorAll('input[type=checkbox]:checked')).map(function(c) { return Number(c.dataset.id) })
-        if (!ids.length) return alert('请至少选中一个条目')
+        var ids = Array.from(resultArea.querySelectorAll('input[type=checkbox]:checked')).map(function(c) { return c.dataset.id })
+        if (!ids.length) return alert('\u8bf7\u81f3\u5c11\u9009\u4e2d\u4e00\u4e2a\u6761\u76ee')
         doSyncOp('partial', ids)
       })
-    }
 
-    function renderSyncTable(filter, page, pageSize) {
-      var data = syncState.data; if (!data) return
-      var nameA = (data.userA && data.userA.name) || 'A'; var nameB = (data.userB && data.userB.name) || 'B'
-      var rows = []
-
-      function push(d, label, cb) {
-        rows.push({ sid: d.externalId, name: d.title, a: label.a, b: label.b, cb: cb,
-          color: d.typeA !== d.typeB ? '#e94560' : (d.epStatusA !== d.epStatusB ? '#ff9800' : '#a0a0b0') })
-      }
-
-      if (filter === 'all' || filter === 'diff') {
-        ;(data.differences || []).forEach(function(d) {
-          push(d, { a: typeLabel(d.typeA)+' | '+d.epStatusA+'话 | '+d.rateA+'分', b: typeLabel(d.typeB)+' | '+d.epStatusB+'话 | '+d.rateB+'分' }, true)
-        })
-      }
-      if (filter === 'all' || filter === 'onlyA') {
-        ;(data.onlyA || []).forEach(function(d) {
-          push(d, { a: typeLabel(d.typeA)+' | '+d.epStatusA+'话 | '+d.rateA+'分', b: '—' }, true)
-        })
-      }
-      if (filter === 'all' || filter === 'onlyB') {
-        ;(data.onlyB || []).forEach(function(d) {
-          push(d, { a: '—', b: typeLabel(d.typeB)+' | '+d.epStatusB+'话 | '+d.rateB+'分' }, true)
-        })
-      }
-      if (filter === 'same') {
-        ;(data.same || []).forEach(function(s) {
-          rows.push({ sid: s.externalId, name: s.title, a: s.type+' | '+s.ep+'/'+(s.total||'??'), b: s.type+' | '+s.ep+'/'+(s.total||'??'), cb: false, color: '#4caf50' })
-        })
-      }
-
-      var totalPages = Math.ceil(rows.length / pageSize) || 1
-      var start = (page - 1) * pageSize
-      var pageRows = rows.slice(start, start + pageSize)
-
-      var h = '<table style="width:100%;border-collapse:collapse;font-size:12px;">' +
-        '<thead><tr style="background:#0f3460;color:#a0a0b0;">' +
-        '<th style="padding:6px;text-align:left;">条目 (' + rows.length + ')</th>' +
-        '<th style="padding:6px;text-align:center;background:#1a2744;">' + nameA + '</th>' +
-        '<th style="padding:6px;text-align:center;background:#1a2744;">' + nameB + '</th>' +
-        '<th style="padding:6px;text-align:center;width:30px;">✓</th></tr></thead><tbody>'
-      pageRows.forEach(function(r) {
-        h += '<tr style="border-bottom:1px solid #2a2a4a;' + (r.color ? 'border-left:3px solid ' + r.color : '') + '">' +
-          '<td style="padding:6px;">' + r.name + '</td>' +
-          '<td style="padding:6px;text-align:center;background:#1a2744;">' + r.a + '</td>' +
-          '<td style="padding:6px;text-align:center;">' + r.b + '</td>' +
-          '<td style="padding:6px;text-align:center;">' + (r.cb ? '<input type="checkbox" checked data-id="' + r.sid + '">' : '') + '</td></tr>'
-      })
-      h += '</tbody></table>'
-
-      if (totalPages > 1) {
-        h += '<div style="display:flex;justify-content:center;gap:3px;margin-top:8px;">'
-        var cp = page || 1; var pages = [1]
-        var wStart = Math.max(2, cp - 4), wEnd = Math.min(totalPages - 1, cp + 4)
-        if (wStart > 2) pages.push('...')
-        for (var p = wStart; p <= wEnd; p++) pages.push(p)
-        if (wEnd < totalPages - 1) pages.push('...')
-        pages.push(totalPages)
-        pages.forEach(function(p) {
-          if (p === '...') {
-            h += '<span style="padding:3px 4px;color:#a0a0b0;">...</span>'
-          } else {
-            h += '<button class="sync-pg-btn" data-pg="' + p + '" style="padding:3px 8px;font-size:11px;border:1px solid #2a2a4a;border-radius:3px;background:' + (p === cp ? '#e94560' : '#0f3460') + ';color:#fff;cursor:pointer;">' + p + '</button>'
-          }
-        })
-        h += '</div>'
-      }
-
-      var tableEl = document.getElementById('sync-table')
-      if (tableEl) {
-        tableEl.innerHTML = h
-        tableEl.querySelectorAll('.sync-pg-btn').forEach(function(b) {
-          b.addEventListener('click', function() {
-            syncState.page = parseInt(this.dataset.pg)
-            renderSyncTable(document.getElementById('sync-filter').value, syncState.page, parseInt(document.getElementById('sync-pagesize').value))
-          })
-        })
-      }
+      renderCards('all', 1, 20, '')
     }
 
     async function doSyncOp(mode, subjectIds) {
@@ -443,24 +549,26 @@
       var fromToken = dir === 'A->B' ? syncState.tokenA : syncState.tokenB
       var toToken = dir === 'A->B' ? syncState.tokenB : syncState.tokenA
       var fromUser = dir === 'A->B' ? 'A' : 'B'; var toUser = dir === 'A->B' ? 'B' : 'A'
+      var platformA = (resultArea.querySelector('.sync-platform[data-side="A"]') || {}).value || 'bgm'
+      var platformB = (resultArea.querySelector('.sync-platform[data-side="B"]') || {}).value || 'bgm'
 
       document.getElementById('sync-progress').style.display = ''
       document.getElementById('sync-progress-fill').style.width = '0%'
-      document.getElementById('sync-progress-text').textContent = '正在同步...'
+      document.getElementById('sync-progress-text').textContent = '\u6b63\u5728\u540c\u6b65...'
 
       try {
         var res = await fetch(API + '/api/manage/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tokenA: fromToken, platformA: "bgm", from: fromUser, tokenB: toToken, platformB: "bgm", to: toUser, mode: mode, subject_ids: subjectIds }),
+          body: JSON.stringify({ tokenA: fromToken, platformA: platformA, from: fromUser, tokenB: toToken, platformB: platformB, to: toUser, mode: mode, subject_ids: subjectIds }),
         })
         var results = await res.json()
         var ok = results.filter(function(r) { return r.status === 'ok' }).length
         var err = results.filter(function(r) { return r.status === 'error' }).length
         document.getElementById('sync-progress-fill').style.width = '100%'
-        document.getElementById('sync-progress-text').textContent = '同步完成：' + ok + ' 成功，' + err + ' 失败'
+        document.getElementById('sync-progress-text').textContent = '\u540c\u6b65\u5b8c\u6210\uff1a' + ok + ' \u6210\u529f\uff0c' + err + ' \u5931\u8d25'
       } catch (e) {
-        document.getElementById('sync-progress-text').textContent = '同步失败: ' + (e.message || '')
+        document.getElementById('sync-progress-text').textContent = '\u540c\u6b65\u5931\u8d25: ' + (e.message || '')
       }
     }
 
@@ -469,31 +577,54 @@
       activate: function() {
         if (loaded) return
         loaded = true
-        document.getElementById('sync-compare-btn').addEventListener('click', async function() {
-          var ta = document.getElementById('sync-tokenA').value.trim()
-          var tb = document.getElementById('sync-tokenB').value.trim()
-          if (!ta || !tb) return alert('请填写两个账号的 Access Token')
+        compareBtn.addEventListener('click', async function() {
+          var inputA = tok.querySelector('.sync-token-input[data-side="A"]')
+          var inputB = tok.querySelector('.sync-token-input[data-side="B"]')
+          var selA = tok.querySelector('.sync-platform[data-side="A"]')
+          var selB = tok.querySelector('.sync-platform[data-side="B"]')
+          var ta = inputA ? inputA.value.trim() : ''
+          var tb = inputB ? inputB.value.trim() : ''
+          if (!ta && sessionStorage.getItem('sync-tokenA')) ta = sessionStorage.getItem('sync-tokenA')
+          if (!tb && sessionStorage.getItem('sync-tokenB')) tb = sessionStorage.getItem('sync-tokenB')
+          if (!ta || !tb) return alert('\u8bf7\u586b\u5199\u4e24\u4e2a\u8d26\u53f7\u7684 Access Token')
+
           syncState.tokenA = ta; syncState.tokenB = tb
 
-          resultArea.innerHTML = '<p class="bgm-status">正在加载双方收藏数据...</p>'
+          resultArea.innerHTML = '<p class="bgm-status">\u6b63\u5728\u52a0\u8f7d\u53cc\u65b9\u6536\u85cf\u6570\u636e...</p>'
           try {
+            var platformA = selA ? selA.value : 'bgm'
+            var platformB = selB ? selB.value : 'bgm'
             var res = await fetch(API + '/api/manage/compare', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ tokenA: ta, platformA: document.getElementById('sync-platformA').value, tokenB: tb, platformB: document.getElementById('sync-platformB').value }),
+              body: JSON.stringify({ tokenA: ta, platformA: platformA, tokenB: tb, platformB: platformB }),
             })
             var data = await res.json()
-            if (!res.ok) throw new Error(data.error || '请求失败')
+            if (!res.ok) throw new Error(data.error || '\u8bf7\u6c42\u5931\u8d25')
+
+            // Save tokens
+            sessionStorage.setItem('sync-tokenA', ta)
+            sessionStorage.setItem('sync-tokenB', tb)
+            // Update token row display
+            var rows = tok.querySelectorAll('.sync-token-row')
+            if (rows[0]) { var nrA = buildTokenRow('Account A', 'A'); rows[0].parentNode.replaceChild(nrA, rows[0]) }
+            if (rows[1]) { var nrB = buildTokenRow('Account B', 'B'); rows[1].parentNode.replaceChild(nrB, rows[1]) }
+
             renderCompareResult(data)
           } catch (e) {
-            resultArea.innerHTML = '<p class="bgm-error">对比失败: ' + (e.message || '未知错误') + '</p>'
+            resultArea.innerHTML = '<p class="bgm-error">\u5bf9\u6bd4\u5931\u8d25: ' + (e.message || '\u672a\u77e5\u9519\u8bef') + '</p>'
           }
         })
       },
     }
   }
-
-  function statusLabel(t) { return ({1:'想看',2:'看过',3:'在看',4:'搁置',5:'抛弃',0:'—'})[t] || t }
+  function statusLabel(s) {
+  var map = { watching: '在看', completed: '看过', plan_to_watch: '想看', on_hold: '搁置', dropped: '抛弃' }
+  return map[s] || s || '—'
+}
+function statusBadgeColor(s) {
+  return { watching: '#00a1d6', completed: '#4caf50', plan_to_watch: '#9b59b6', on_hold: '#f39c12', dropped: '#e74c3c' }[s] || '#666'
+}
 
   // ---------------------------------------------------------------
   // 顶层：渲染 tab 切换 + 三个视图
