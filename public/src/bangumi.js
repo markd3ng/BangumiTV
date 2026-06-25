@@ -270,9 +270,17 @@
     form.style.cssText = 'margin-bottom:16px;'
     form.innerHTML = '<h3 style="margin-bottom:8px;">多账户条目同步</h3>' +
       '<p class="muted" style="font-size:12px;margin-bottom:12px;">在 <a href="https://bgm.tv/dev" target="_blank">bgm.tv 开发者设置</a> 生成 access token</p>' +
-      '<label style="display:block;margin-bottom:4px;color:#a0a0b0;font-size:12px;">账号 A Token</label>' +
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+      <label style="flex:1;display:block;color:#a0a0b0;font-size:12px;">账号 A Token
+      <input type="password" id="sync-tokenA" placeholder="Access Token" style="width:100%;padding:8px;border:1px solid #2a2a4a;border-radius:4px;background:#0f3460;color:#fff;font-size:13px;"></label>
+      <label style="color:#a0a0b0;font-size:12px;">平台<select id="sync-platformA" style="margin-top:18px;padding:8px;border:1px solid #2a2a4a;border-radius:4px;background:#0f3460;color:#fff;font-size:13px;"><option value="bgm">bgm.tv</option></select></label>
+      </div>
       '<input type="password" id="sync-tokenA" placeholder="粘贴账号 A 的 Access Token" style="width:100%;padding:8px;border:1px solid #2a2a4a;border-radius:4px;background:#0f3460;color:#fff;margin-bottom:8px;font-size:13px;">' +
-      '<label style="display:block;margin-bottom:4px;color:#a0a0b0;font-size:12px;">账号 B Token</label>' +
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+      <label style="flex:1;display:block;color:#a0a0b0;font-size:12px;">账号 B Token
+      <input type="password" id="sync-tokenB" placeholder="Access Token" style="width:100%;padding:8px;border:1px solid #2a2a4a;border-radius:4px;background:#0f3460;color:#fff;font-size:13px;"></label>
+      <label style="color:#a0a0b0;font-size:12px;">平台<select id="sync-platformB" style="margin-top:18px;padding:8px;border:1px solid #2a2a4a;border-radius:4px;background:#0f3460;color:#fff;font-size:13px;"><option value="bgm">bgm.tv</option></select></label>
+      </div>
       '<input type="password" id="sync-tokenB" placeholder="粘贴账号 B 的 Access Token" style="width:100%;padding:8px;border:1px solid #2a2a4a;border-radius:4px;background:#0f3460;color:#fff;margin-bottom:8px;font-size:13px;">' +
       '<button id="sync-compare-btn" class="bgm-nav-button">对比收藏</button>'
     view.appendChild(form)
@@ -356,7 +364,7 @@
       var rows = []
 
       function push(d, label, cb) {
-        rows.push({ sid: d.subject_id, name: d.name_cn || d.name, a: label.a, b: label.b, cb: cb,
+        rows.push({ sid: d.externalId, name: d.title, a: label.a, b: label.b, cb: cb,
           color: d.typeA !== d.typeB ? '#e94560' : (d.epStatusA !== d.epStatusB ? '#ff9800' : '#a0a0b0') })
       }
 
@@ -377,7 +385,7 @@
       }
       if (filter === 'same') {
         ;(data.same || []).forEach(function(s) {
-          rows.push({ sid: s.subject_id, name: s.name_cn || s.name, a: s.type+' | '+s.ep+'/'+(s.total||'??'), b: s.type+' | '+s.ep+'/'+(s.total||'??'), cb: false, color: '#4caf50' })
+          rows.push({ sid: s.externalId, name: s.title, a: s.type+' | '+s.ep+'/'+(s.total||'??'), b: s.type+' | '+s.ep+'/'+(s.total||'??'), cb: false, color: '#4caf50' })
         })
       }
 
@@ -444,7 +452,7 @@
         var res = await fetch(API + '/api/manage/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tokenA: fromToken, from: fromUser, tokenB: toToken, to: toUser, mode: mode, subject_ids: subjectIds }),
+          body: JSON.stringify({ tokenA: fromToken, platformA: "bgm", from: fromUser, tokenB: toToken, platformB: "bgm", to: toUser, mode: mode, subject_ids: subjectIds }),
         })
         var results = await res.json()
         var ok = results.filter(function(r) { return r.status === 'ok' }).length
@@ -472,7 +480,7 @@
             var res = await fetch(API + '/api/manage/compare', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ tokenA: ta, userA: 'Account A', tokenB: tb, userB: 'Account B' }),
+              body: JSON.stringify({ tokenA: ta, platformA: document.getElementById('sync-platformA').value, tokenB: tb, platformB: document.getElementById('sync-platformB').value }),
             })
             var data = await res.json()
             if (!res.ok) throw new Error(data.error || '请求失败')
@@ -485,7 +493,7 @@
     }
   }
 
-  function typeLabel(t) { return ({1:'想看',2:'看过',3:'在看',4:'搁置',5:'抛弃',0:'—'})[t] || t }
+  function statusLabel(t) { return ({1:'想看',2:'看过',3:'在看',4:'搁置',5:'抛弃',0:'—'})[t] || t }
 
   // ---------------------------------------------------------------
   // 顶层：渲染 tab 切换 + 三个视图

@@ -1,9 +1,8 @@
-import { BgmClient, type BgmCollection } from '@bangumi-tv/shared'
-import { fetchAllCollections } from '@bangumi-tv/shared'
+import { type PlatformClient, type ComparisonItem } from '@bangumi-tv/shared'
 
 export interface CompareResult {
-  userA: { name: string; collections: BgmCollection[]; total: number; error?: string }
-  userB: { name: string; collections: BgmCollection[]; total: number; error?: string }
+  userA: { name: string; total: number; error?: string }
+  userB: { name: string; total: number; error?: string }
   common: number
   differences: Difference[]
   same: SameEntry[]
@@ -12,69 +11,65 @@ export interface CompareResult {
 }
 
 export interface Difference {
-  subject_id: number
-  name: string
-  name_cn: string
-  images: { large: string; common: string; medium: string; small: string; grid: string }
-  typeA: number
-  typeB: number
-  epStatusA: number
-  epStatusB: number
-  volStatusA: number
-  volStatusB: number
-  rateA: number
-  rateB: number
+  externalId: string
+  title: string
+  statusA: string
+  statusB: string
+  progressA: number
+  progressB: number
+  scoreA: number
+  scoreB: number
 }
 
 export interface SameEntry {
-  subject_id: number
-  name: string
-  name_cn: string
-  type: string
-  ep: number
-  total: number
-  rate: number
+  externalId: string
+  title: string
+  status: string
+  progress: number
+  totalEpisodes: number
+  score: number
 }
 
-const TYPE_NAMES: Record<number, string> = { 1: '想看', 2: '看过', 3: '在看', 4: '搁置', 5: '抛弃' }
+function statusLabel(s: string): string {
+  return ({ watching: '在看', completed: '看过', plan_to_watch: '想看', on_hold: '搁置', dropped: '抛弃' })[s] || s
+}
 
 export async function compareAccounts(
+  clientA: PlatformClient,
   tokenA: string,
-  _userA: string,
+  clientB: PlatformClient,
   tokenB: string,
-  _userB: string,
 ): Promise<CompareResult> {
-  const client = new BgmClient()
   const [meA, meB] = await Promise.allSettled([
-    client.getMe(tokenA),
-    client.getMe(tokenB),
+    clientA.getMe(tokenA),
+    clientB.getMe(tokenB),
   ])
-  const userA = meA.status === 'fulfilled' ? meA.value.username : (_userA || 'Account A')
-  const userB = meB.status === 'fulfilled' ? meB.value.username : (_userB || 'Account B')
+  const nameA = meA.status === 'fulfilled' ? meA.value.username : 'Account A'
+  const nameB = meB.status === 'fulfilled' ? meB.value.username : 'Account B'
 
   const [settledA, settledB] = await Promise.allSettled([
-    fetchAllCollections(new BgmClient(tokenA), userA),
-    fetchAllCollections(new BgmClient(tokenB), userB),
+    clientA.fetchCollections(tokenA, nameA),
+    clientB.fetchCollections(tokenB, nameB),
   ])
 
-  function unwrap(settled: PromiseSettledResult<BgmCollection[]>, name: string) {
+  function unwrap(settled: PromiseSettledResult<ComparisonItem[]>, name: string) {
     if (settled.status === 'fulfilled') {
-      return { name, collections: settled.value, total: settled.value.length }
+      return { name, items: settled.value, total: settled.value.length }
     }
     const reason = settled.reason instanceof Error ? settled.reason.message : String(settled.reason)
     console.error(JSON.stringify({ event: 'manage_compare_fetch_failed', user: name, reason, at: new Date().toISOString() }))
-    return { name, collections: [] as BgmCollection[], total: 0, error: reason }
+    return { name, items: [] as ComparisonItem[], total: 0, error: reason }
   }
 
-  const colA = unwrap(settledA, userA)
-  const colB = unwrap(settledB, userB)
+  const colA = unwrap(settledA, nameA)
+  const colB = unwrap(settledB, nameB)
 
   if (colA.error && colB.error) {
     return { userA: colA, userB: colB, common: 0, same: [], onlyA: [], onlyB: [], differences: [] }
   }
 
-  const mapA = new Map(colA.collections.map(c => [c.subject_id, c]))
-  const mapB = new Map(colB.collections.map(c => [c.subject_id, c]))
+  const mapA = new Map(colA.items.map(c => [c.externalId, c]))
+  const mapB = new Map(colB.items.map(c => [c.externalId, c]))
 
   const differences: Difference[] = []
   const same: SameEntry[] = []
@@ -87,52 +82,17 @@ export async function compareAccounts(
     const b = mapB.get(id)
 
     if (a && b) {
-      if (a.type === b.type && a.ep_status === b.ep_status && a.rate === b.rate) {
-        same.push({
-          subject_id: id,
-          name: a.subject?.name ?? '',
-          name_cn: a.subject?.name_cn ?? '',
-          type: TYPE_NAMES[a.type] || String(a.type),
-          ep: a.ep_status,
-          total: (a as any).eps || (a as any).total_episodes || 0,
-          rate: a.rate,
-        })
+      if (a.status === b.status && a.progress === b.progress && a.score === b.score) {
+        same.push({ externalId: id, title: a.title, status: statusLabel(a.status), progress: a.progress, totalEpisodes: a.totalEpisodes, score: a.score })
       } else {
-        differences.push({
-          subject_id: id,
-          name: a.subject?.name ?? b.subject?.name ?? '',
-          name_cn: a.subject?.name_cn ?? b.subject?.name_cn ?? '',
-          images: a.subject?.images ?? b.subject?.images ?? { large: '', common: '', medium: '', small: '', grid: '' },
-          typeA: a.type, typeB: b.type,
-          epStatusA: a.ep_status, epStatusB: b.ep_status,
-          volStatusA: a.vol_status, volStatusB: b.vol_status,
-          rateA: a.rate, rateB: b.rate,
-        })
+        differences.push({ externalId: id, title: a.title || b.title, statusA: statusLabel(a.status), statusB: statusLabel(b.status), progressA: a.progress, progressB: b.progress, scoreA: a.score, scoreB: b.score })
       }
     } else if (a && !b) {
-      const diff: Difference = {
-        subject_id: id,
-        name: a.subject?.name ?? '', name_cn: a.subject?.name_cn ?? '',
-        images: a.subject?.images ?? { large: '', common: '', medium: '', small: '', grid: '' },
-        typeA: a.type, typeB: 0,
-        epStatusA: a.ep_status, epStatusB: 0,
-        volStatusA: a.vol_status, volStatusB: 0,
-        rateA: a.rate, rateB: 0,
-      }
-      onlyA.push(diff)
-      differences.push(diff)
+      const d: Difference = { externalId: id, title: a.title, statusA: statusLabel(a.status), statusB: '—', progressA: a.progress, progressB: 0, scoreA: a.score, scoreB: 0 }
+      onlyA.push(d); differences.push(d)
     } else if (!a && b) {
-      const diff: Difference = {
-        subject_id: id,
-        name: b.subject?.name ?? '', name_cn: b.subject?.name_cn ?? '',
-        images: b.subject?.images ?? { large: '', common: '', medium: '', small: '', grid: '' },
-        typeA: 0, typeB: b.type,
-        epStatusA: 0, epStatusB: b.ep_status,
-        volStatusA: 0, volStatusB: b.vol_status,
-        rateA: 0, rateB: b.rate,
-      }
-      onlyB.push(diff)
-      differences.push(diff)
+      const d: Difference = { externalId: id, title: b.title, statusA: '—', statusB: statusLabel(b.status), progressA: 0, progressB: b.progress, scoreA: 0, scoreB: b.score }
+      onlyB.push(d); differences.push(d)
     }
   }
 

@@ -7,6 +7,8 @@ import { handleCalendar } from './api/calendar'
 import { handleConfig } from './api/config'
 import { compareAccounts } from './manage/compare'
 import { executeSync } from './manage/sync-write'
+import { BgmPlatformClient, type PlatformId } from '@bangumi-tv/shared'
+import type { PlatformClient } from '@bangumi-tv/shared'
 import { getOAuthRedirectUrl, exchangeCode } from './manage/oauth'
 import { handleImage } from './image/proxy'
 import { getSnapshot } from './storage/snapshot'
@@ -296,12 +298,19 @@ app.post('/api/manage/exchange', async (c) => {
   }
 })
 
+function getPlatformClient(platform: string): PlatformClient {
+  if (platform === 'bgm' || !platform) return new BgmPlatformClient()
+  throw new Error(`Unsupported platform: ${platform}`)
+}
+
 app.post('/api/manage/compare', async (c) => {
   const storage = new KVStorage(c.env.BANGUMI_KV)
   try {
     const body = await c.req.json()
-    const result = await compareAccounts(body.tokenA || '', body.userA || '', body.tokenB || '', body.userB || '')
-    console.log(JSON.stringify({ event: 'manage_compare', user_a: body.userA || '', user_b: body.userB || '', total_a: result.userA.total, total_b: result.userB.total, common: result.common, diffs: result.differences.length, at: new Date().toISOString() }))
+    const clientA = getPlatformClient(body.platformA || 'bgm')
+    const clientB = getPlatformClient(body.platformB || 'bgm')
+    const result = await compareAccounts(clientA, body.tokenA || '', clientB, body.tokenB || '')
+    console.log(JSON.stringify({ event: 'manage_compare', platform_a: body.platformA || 'bgm', platform_b: body.platformB || 'bgm', total_a: result.userA.total, total_b: result.userB.total, common: result.common, diffs: result.differences.length, at: new Date().toISOString() }))
     return Response.json(result)
   } catch (err) {
     return errorToResponse('/api/manage/compare', err, storage)
@@ -312,7 +321,9 @@ app.post('/api/manage/sync', async (c) => {
   const storage = new KVStorage(c.env.BANGUMI_KV)
   try {
     const body = await c.req.json()
-    const results = await executeSync(body.tokenA, body.from, body.tokenB, body.to, {
+    const clientA = getPlatformClient(body.platformA || 'bgm')
+    const clientB = getPlatformClient(body.platformB || 'bgm')
+    const results = await executeSync(clientA, body.tokenA, clientB, body.tokenB, {
       mode: body.mode,
       from: body.from,
       to: body.to,

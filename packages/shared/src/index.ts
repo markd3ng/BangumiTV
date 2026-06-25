@@ -7,3 +7,6 @@ export type { MergedEntry, MergedCollections } from './merger'
 export { fetchAllCollections } from './utils'
 
 export type { StorageAdapter } from './storage/adapter'
+
+export { WatchStatus, BgmPlatformClient } from './platform'
+export type { PlatformId, ComparisonItem, AccountInfo, PlatformClient } from './platform'

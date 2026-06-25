@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 
 test('executeSync validates mode is either full or partial', async () => {
   const source = readFileSync(new URL('./sync-write.ts', import.meta.url), 'utf8')
-  assert.match(source, /mode === 'full' \|\| mode === 'partial'/)
+  assert.match(source, /mode.*===.*('full'|"full").*mode.*===.*('partial'|"partial")/)
 })
 
 test('executeSync validates from and to are non-empty strings', async () => {
