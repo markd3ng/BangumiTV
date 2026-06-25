@@ -123,4 +123,23 @@ This report audits runtime bgm.tv API calls and API claims in README/design/plan
 
 ## Fix Batch Proposal
 
-The final batch proposal is added after all findings are classified.
+### Batch A: P0 Runtime Fixes
+
+- Handle `204 No Content` before JSON parsing in the shared bgm client.
+- Add an upsert write method using `POST /v0/users/-/collections/{subject_id}` for account sync.
+- Keep `ep_status` and `vol_status` out of non-book sync write bodies.
+- Add focused tests for `204`, write method, and write body.
+
+### Batch B: P1 Product Semantics
+
+- Decide whether account sync is anime-only or all-subject.
+- If anime-only, make README/UI/report copy explicit.
+- If all-subject, parameterize collection fetch by subject type and define merge behavior across subject classes before implementation.
+- Keep OAuth behavior unchanged until an authoritative OAuth reference is added or cited.
+
+### Batch C: P2 Documentation Sync
+
+- Update the active audit design/plan docs to remove the false `/calendar` local OpenAPI gap claim.
+- Update active specs that describe current API behavior with stale PATCH/write-body semantics.
+- Leave old implementation plans unchanged unless they are used as current guidance.
+- Add a note for OAuth endpoints not covered by `docs/example/api/bgm-api.json`.
