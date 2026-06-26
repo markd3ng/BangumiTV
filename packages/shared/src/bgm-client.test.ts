@@ -126,7 +126,7 @@ test('patchCollection accepts 204 No Content without parsing JSON', async () => 
   }
 })
 
-test('BgmPlatformClient upserts collection with POST and omits book-only progress fields', async () => {
+test('BgmPlatformClient upserts collection with POST and only syncs anime-safe fields', async () => {
   const client = new BgmPlatformClient()
   const originalFetch = globalThis.fetch
   const captured = captureFetch()
@@ -149,8 +149,6 @@ test('BgmPlatformClient upserts collection with POST and omits book-only progres
     assert.deepEqual(JSON.parse(String(captured.calls[0].init?.body)), {
       type: 3,
       rate: 9,
-      tags: [],
-      comment: '',
     })
   } finally {
     globalThis.fetch = originalFetch

@@ -43,12 +43,10 @@ export class BgmPlatformClient implements PlatformClient {
   async patchEntry(token: string, externalId: string, item: ComparisonItem): Promise<void> {
     const client = new BgmClient()
     const bgmType = WATCH_STATUS_TO_BGM[item.status] || 3
-    // ep_status/vol_status 仅对书籍条目有效（bgm API 文档），动画/电影/音乐不能传
+    // 账户同步当前只覆盖动画收藏；不要发送会清空目标账号标签/评论的字段。
     await client.upsertCollection(token, Number(externalId), {
       type: bgmType,
       rate: item.score,
-      tags: [],
-      comment: '',
     })
   }
 }

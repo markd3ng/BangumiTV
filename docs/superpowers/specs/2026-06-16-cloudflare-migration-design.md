@@ -253,7 +253,7 @@ Cron 触发 → Worker /__cron/sync（校验 secret header）
 
 ## 多账户同步（管理页面）
 
-> 历史设计更正（2026-06-26）：当前实现将本功能收窄为“多账户动画同步”，只同步 bgm.tv 动画收藏（`subject_type=2`）。写回使用 `POST /v0/users/-/collections/{subject_id}` 的新增或修改语义；动画同步写入 body 不传 `ep_status` 或 `vol_status`，这两个字段只适用于书籍进度。
+> 历史设计更正（2026-06-26）：当前实现将本功能收窄为“多账户动画同步”，只同步 bgm.tv 动画收藏（`subject_type=2`）。写回使用 `POST /v0/users/-/collections/{subject_id}` 的新增或修改语义；动画同步写入 body 只发送 `type` 和 `rate`。不要发送 `ep_status` 或 `vol_status`，这两个字段只适用于书籍进度；也不要发送 `tags: []` 或空 `comment`，避免清空目标账号已有标签和评价。
 
 URL：`https://<worker域名>/manage`。不在前端 widget 中暴露入口，需要知道地址才能访问。
 
@@ -285,7 +285,7 @@ URL：`https://<worker域名>/manage`。不在前端 widget 中暴露入口，�
 ### 步骤 4：执行
 
 - 对每个选中动画条目调用 `POST /v0/users/-/collections/{subject_id}`
-- 请求体：`{ type, rate, tags, comment }`
+- 请求体：`{ type, rate }`
 - 实时显示执行进度
 - 完成后展示结果汇总
 

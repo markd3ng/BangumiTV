@@ -89,6 +89,16 @@
 - **验证方式：** 测试确认 bgm 平台写入 body 不含 `ep_status` 和 `vol_status`。
 - **状态：** 运行逻辑已在 批次 A 覆盖；剩余过期文档归入 P2。
 
+#### BGM-API-006：账户同步曾发送会覆盖目标标签和评价的字段
+
+- **位置：** `packages/shared/src/platform/bgm.ts:47`；历史设计文档中同步写回 body 曾包含 `tags` 和 `comment`。
+- **原写法：** 动画同步写入 body 固定包含 `tags: []` 和 `comment: ''`。
+- **证据：** 本地 OpenAPI `UserSubjectCollectionModifyPayload.tags` 写明“不传或者 `null` 都会被忽略，传 `[]` 则会删除所有 tag”；`comment` 是收藏评价字段。
+- **影响：** 同步动画状态和评分时，会无意清空目标账号该条目的标签和评价。
+- **建议修法：** 当前动画同步只发送 `type` 和 `rate`；除非产品明确支持标签/评价同步，否则不要发送 `tags` 或 `comment`。
+- **验证方式：** 测试确认 bgm 平台写入 body 只包含动画同步需要的安全字段。
+- **状态：** 已修复；`BgmPlatformClient.patchEntry()` 不再发送 `tags` 和 `comment`。
+
 ### P2 问题
 
 #### BGM-API-101：审计设计/计划曾误把 `/calendar` 列成本地 OpenAPI 缺口
@@ -104,10 +114,10 @@
 
 - **位置：** `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:285`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:286`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:452`
 - **原文本：** 同步写回使用 `PATCH /v0/users/-/collections/{subject_id}`，body 包含 `{ ep_status, vol_status, type, rate, tags, comment }`。
-- **证据：** BGM-API-002 和 BGM-API-005；本地 OpenAPI 说明 POST 是新增或修改，`ep_status`/`vol_status` 只能用于书籍。
+- **证据：** BGM-API-002、BGM-API-005 和 BGM-API-006；本地 OpenAPI 说明 POST 是新增或修改，`ep_status`/`vol_status` 只能用于书籍，`tags: []` 会删除目标条目所有 tag。
 - **影响：** 该文件位于活跃 `docs/superpowers/specs` 下，后续实现可能复制过期语义。
-- **处理结果：** 已在历史设计中加入更正说明，并把相关同步步骤/API checklist 更新为 POST upsert；动画同步不传书籍专用字段。
-- **验证方式：** `rg -n "PATCH /v0/users/-/collections|ep_status|vol_status" docs/superpowers/specs`。
+- **处理结果：** 已在历史设计中加入更正说明，并把相关同步步骤/API checklist 更新为 POST upsert；动画同步只发送 `type` 和 `rate`，不传书籍专用字段，也不清空目标标签或评价。
+- **验证方式：** `rg -n "PATCH /v0/users/-/collections|请求体：.*tags|请求体：.*comment" docs/superpowers/specs`。
 
 #### BGM-API-103：部分同步文档曾暗示全账户同步，但运行逻辑只同步动画
 
@@ -137,11 +147,12 @@
 - 在 shared bgm client 中，`204 No Content` 直接视为成功，不再解析 JSON。
 - 账户同步写回新增 `POST /v0/users/-/collections/{subject_id}` 的 upsert 方法。
 - 非书籍同步写入 body 不包含 `ep_status` 和 `vol_status`。
+- 动画同步写入 body 不包含会覆盖目标账号标签/评价的 `tags` 和 `comment`。
 - 已增加针对 `204`、写入方法、写入 body 的聚焦测试。
 
 ### 批次 B：P1 产品语义
 
-状态：已定为“只同步动画收藏”，正在推进。
+状态：已完成。
 
 - 账户同步继续只使用 `subject_type=2`。
 - README、管理页、嵌入页和报告文案统一写成“动画同步”。
@@ -153,6 +164,6 @@
 状态：已处理。
 
 - 已更新活跃审计设计/计划，移除 `/calendar` 是本地 OpenAPI 缺口的错误说法。
-- 已更新当前仍可能作为指导的 Cloudflare 迁移设计，将账户同步说明改为动画同步、POST upsert、且不传书籍专用进度字段。
+- 已更新当前仍可能作为指导的 Cloudflare 迁移设计，将账户同步说明改为动画同步、POST upsert，且只写 `type` 和 `rate`。
 - 旧实施计划保持历史记录，除非它被当作当前指导文档使用。
 - 已为 `docs/example/api/bgm-api.json` 未覆盖的 OAuth endpoint 保留说明。
