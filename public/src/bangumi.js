@@ -308,6 +308,7 @@
 
     var loaded = false
     var syncState = { tokenA: '', tokenB: '', data: null, page: 1, filter: 'all', search: '' }
+    var SYNC_BATCH_SIZE = 35
 
     // ── Token clear handler ──
     tok.addEventListener('click', function(e) {
@@ -544,38 +545,73 @@
       renderCards('all', 1, 20, '')
     }
 
+    function getEntryId(entry) {
+      return entry && (entry.externalId || entry.subject_id)
+    }
+
+    function uniqueIds(entries) {
+      var seen = {}
+      var ids = []
+      entries.forEach(function(entry) {
+        var id = String(getEntryId(entry) || '')
+        if (!id || seen[id]) return
+        seen[id] = true
+        ids.push(id)
+      })
+      return ids
+    }
+
+    function getFullSyncIds(dir) {
+      if (!syncState.data) return []
+      var sourceOnly = dir === 'A->B' ? syncState.data.onlyA : syncState.data.onlyB
+      return uniqueIds([]
+        .concat(syncState.data.differences || [])
+        .concat(sourceOnly || [])
+        .concat(syncState.data.same || []))
+    }
+
     async function doSyncOp(mode, subjectIds) {
       var dir = document.getElementById('sync-direction').value
       var fromToken = dir === 'A->B' ? syncState.tokenA : syncState.tokenB
       var toToken = dir === 'A->B' ? syncState.tokenB : syncState.tokenA
       var nameA = (syncState.data && syncState.data.userA && syncState.data.userA.name) || 'Account A'
       var nameB = (syncState.data && syncState.data.userB && syncState.data.userB.name) || 'Account B'
-      var totalA = (syncState.data && syncState.data.userA && syncState.data.userA.total) || 0
-      var totalB = (syncState.data && syncState.data.userB && syncState.data.userB.total) || 0
       var fromUser = dir === 'A->B' ? nameA : nameB
       var toUser = dir === 'A->B' ? nameB : nameA
-      var expected = mode === 'full' ? (dir === 'A->B' ? totalA : totalB) : subjectIds.length
+      var ids = mode === 'full' ? getFullSyncIds(dir) : subjectIds
+      var expected = ids.length
       var platformA = (resultArea.querySelector('.sync-platform[data-side="A"]') || {}).value || 'bgm'
       var platformB = (resultArea.querySelector('.sync-platform[data-side="B"]') || {}).value || 'bgm'
+      var allResults = []
+
+      if (!ids.length) return alert('\u6ca1\u6709\u53ef\u540c\u6b65\u7684\u6761\u76ee')
 
       document.getElementById('sync-progress').style.display = ''
       document.getElementById('sync-progress-fill').style.width = '0%'
       document.getElementById('sync-progress-text').textContent = '\u6b63\u5728\u540c\u6b65... \u6a21\u5f0f ' + mode + '\uff0c\u9884\u8ba1 ' + expected + ' \u9879'
 
       try {
-        var res = await fetch(API + '/api/sync/apply', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tokenA: fromToken, platformA: platformA, from: fromUser, tokenB: toToken, platformB: platformB, to: toUser, mode: mode, subject_ids: subjectIds }),
-        })
-        var results = await res.json().catch(function() { return null })
-        if (!res.ok) {
-          var errMsg = (results && results.error && results.error.message) || ('HTTP ' + res.status + ' ' + res.statusText)
-          document.getElementById('sync-progress-fill').style.width = '0%'
-          document.getElementById('sync-progress-text').innerHTML = '<span style="color:#e94560;">\u540c\u6b65\u5931\u8d25: ' + errMsg + '</span>'
-          return
+        for (var start = 0; start < ids.length; start += SYNC_BATCH_SIZE) {
+          var chunk = ids.slice(start, start + SYNC_BATCH_SIZE)
+          var res = await fetch(API + '/api/sync/apply', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tokenA: fromToken, platformA: platformA, from: fromUser, tokenB: toToken, platformB: platformB, to: toUser, mode: 'partial', subject_ids: chunk }),
+          })
+          var batchResults = await res.json().catch(function() { return null })
+          if (!res.ok) {
+            var errMsg = (batchResults && batchResults.error && batchResults.error.message) || ('HTTP ' + res.status + ' ' + res.statusText)
+            document.getElementById('sync-progress-fill').style.width = '0%'
+            document.getElementById('sync-progress-text').innerHTML = '<span style="color:#e94560;">\u540c\u6b65\u5931\u8d25: ' + errMsg + '</span>'
+            return
+          }
+          if (!Array.isArray(batchResults)) throw new Error('Invalid response')
+          allResults = allResults.concat(batchResults)
+          var done = Math.min(start + chunk.length, expected)
+          document.getElementById('sync-progress-fill').style.width = Math.round(done / expected * 100) + '%'
+          document.getElementById('sync-progress-text').textContent = '\u6b63\u5728\u540c\u6b65... \u6a21\u5f0f ' + mode + '\uff0c' + done + '/' + expected + ' \u9879'
         }
-        if (!Array.isArray(results)) throw new Error('Invalid response')
+        var results = allResults
         var ok = results.filter(function(r) { return r.status === 'ok' }).length
         var err = results.filter(function(r) { return r.status === 'error' }).length
         document.getElementById('sync-progress-fill').style.width = '100%'
