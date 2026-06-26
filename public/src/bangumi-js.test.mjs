@@ -20,7 +20,8 @@ test('public sync result shows backend result count for diagnosis', () => {
 
 test('public sync displays operation log lookup urls', () => {
   assert.ok(source.includes("res.headers.get('X-Sync-Operation-Id')"), 'reads operation id header')
-  assert.ok(source.includes("'/api/sync/operations/' + operationId"), 'builds operation log endpoint')
+  assert.ok(source.includes("'/api/check/' + operationId"), 'builds human-readable check page endpoint')
+  assert.equal(source.includes('/api/sync/operations/'), false)
   assert.ok(source.includes('operationLinks.push'), 'collects operation links per batch')
   assert.ok(source.includes('\\u64cd\\u4f5c\\u65e5\\u5fd7'), 'renders operation log label')
 })

@@ -51,14 +51,33 @@ function operationLogKey(id: string): string {
 }
 
 function createOperationId(): string {
-  return crypto.randomUUID()
+  return `${Date.now().toString(36)}-${crypto.randomUUID().replaceAll('-', '').slice(0, 16)}`
+}
+
+function isOperationId(id: string): boolean {
+  return /^[0-9a-z]+-[0-9a-f]{16}$/i.test(id)
 }
 
 function syncOperationHeaders(id: string): Headers {
   const headers = new Headers(syncHeaders())
   headers.set('X-Sync-Operation-Id', id)
-  headers.set('X-Sync-Operation-Url', `/api/sync/operations/${id}`)
+  headers.set('X-Sync-Operation-Url', `/api/check/${id}`)
   return headers
+}
+
+function htmlHeaders(): Headers {
+  const headers = new Headers(syncHeaders())
+  headers.set('Content-Type', 'text/html; charset=utf-8')
+  return headers
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
 }
 
 function createSyncOperationLog(
@@ -93,6 +112,56 @@ async function persistSyncOperationLog(kv: KVNamespace, log: SyncOperationLog): 
   await kv.put(operationLogKey(log.id), JSON.stringify(log), {
     expirationTtl: SYNC_OPERATION_TTL_SECONDS,
   })
+}
+
+function renderSyncOperationHtml(operation: SyncOperationLog): string {
+  const rows = operation.items.map((item) => {
+    const statusClass = item.status === 'ok' ? 'ok' : 'error'
+    return `<tr>
+      <td>${escapeHtml(item.externalId)}</td>
+      <td>${escapeHtml(item.title)}</td>
+      <td class="${statusClass}">${escapeHtml(item.status)}</td>
+      <td>${escapeHtml(item.error || '')}</td>
+    </tr>`
+  }).join('')
+
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>同步操作日志 ${escapeHtml(operation.id)}</title>
+  <style>
+    body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:24px;line-height:1.5;background:#fff;color:#111}
+    h1{font-size:22px;margin:0 0 16px}
+    .summary{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px}
+    .summary span{border:2px solid #111;padding:6px 10px;background:#ffe24a;font-weight:700}
+    table{border-collapse:collapse;width:100%;font-size:14px}
+    th,td{border:1px solid #ccc;padding:8px;text-align:left;vertical-align:top}
+    th{background:#f5f5f5}
+    .ok{color:#0a7f2e;font-weight:700}
+    .error{color:#c81e1e;font-weight:700}
+    code{word-break:break-all}
+  </style>
+</head>
+<body>
+  <h1>同步操作日志</h1>
+  <div class="summary">
+    <span>ID <code>${escapeHtml(operation.id)}</code></span>
+    <span>模式 ${escapeHtml(operation.mode)}</span>
+    <span>请求 ${operation.requested_count}</span>
+    <span>返回 ${operation.returned_count}</span>
+    <span>成功 ${operation.ok}</span>
+    <span>失败 ${operation.errors}</span>
+    <span>耗时 ${operation.duration_ms}ms</span>
+    <span>时间 ${escapeHtml(operation.at)}</span>
+  </div>
+  <table>
+    <thead><tr><th>Subject ID</th><th>标题</th><th>状态</th><th>错误</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="4">没有返回条目</td></tr>'}</tbody>
+  </table>
+</body>
+</html>`
 }
 
 async function appendErrorLog(storage: KVStorage, entry: unknown): Promise<void> {
@@ -315,19 +384,30 @@ app.post('/api/sync/apply', async (c) => {
   }
 })
 
-app.get('/api/sync/operations/:id', async (c) => {
+app.get('/api/check/:id', async (c) => {
   const id = c.req.param('id')
-  if (!/^[0-9a-fA-F-]{36}$/.test(id)) {
-    return Response.json({ ok: false, error: { code: 'INVALID_OPERATION_ID', message: 'Invalid operation id' } }, { status: 400, headers: syncHeaders() })
+  const wantsJson = c.req.raw.headers.get('accept')?.includes('application/json') || false
+  if (!isOperationId(id)) {
+    if (wantsJson) {
+      return Response.json({ ok: false, error: { code: 'INVALID_OPERATION_ID', message: 'Invalid operation id' } }, { status: 400, headers: syncHeaders() })
+    }
+    return new Response('<!doctype html><meta charset="utf-8"><title>无效操作日志</title><h1>无效操作日志</h1><p>这个操作日志链接格式不正确。</p>', { status: 400, headers: htmlHeaders() })
   }
 
   const storage = new KVStorage(c.env.BANGUMI_KV)
   const operation = await storage.get<SyncOperationLog>(operationLogKey(id))
   if (!operation) {
-    return Response.json({ ok: false, error: { code: 'NOT_FOUND', message: 'Operation log not found or expired' } }, { status: 404, headers: syncHeaders() })
+    if (wantsJson) {
+      return Response.json({ ok: false, error: { code: 'NOT_FOUND', message: 'Operation log not found or expired' } }, { status: 404, headers: syncHeaders() })
+    }
+    return new Response('<!doctype html><meta charset="utf-8"><title>操作日志不存在</title><h1>操作日志不存在</h1><p>这次同步操作日志不存在，或已经超过 24 小时被清理。</p>', { status: 404, headers: htmlHeaders() })
   }
 
-  return Response.json({ ok: true, operation }, { headers: syncHeaders() })
+  if (wantsJson) {
+    return Response.json({ ok: true, operation }, { headers: syncHeaders() })
+  }
+
+  return new Response(renderSyncOperationHtml(operation), { headers: htmlHeaders() })
 })
 
 

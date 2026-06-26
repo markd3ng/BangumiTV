@@ -620,7 +620,7 @@
             body: JSON.stringify({ tokenA: fromToken, platformA: platformA, from: fromUser, tokenB: toToken, platformB: platformB, to: toUser, mode: 'partial', subject_ids: chunk }),
           })
           var operationId = res.headers.get('X-Sync-Operation-Id')
-          if (operationId) operationLinks.push('/api/sync/operations/' + operationId)
+          if (operationId) operationLinks.push('/api/check/' + operationId)
           var batchResults = await res.json().catch(function() { return null })
           if (!res.ok) {
             var errMsg = (batchResults && batchResults.error && batchResults.error.message) || ('HTTP ' + res.status + ' ' + res.statusText)

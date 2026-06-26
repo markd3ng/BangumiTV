@@ -125,7 +125,7 @@ Sync Worker 在定时同步时自动下载条目封面（来源：bgm.tv），�
 
 > 说明：旧 `/manage` 页面入口和 `/api/manage/*` 同步接口已移除；首页动画同步视图调用 `POST /api/sync/compare` 和 `POST /api/sync/apply`。
 
-同步写入完成后，`POST /api/sync/apply` 会在响应头返回 `X-Sync-Operation-Id` 和 `X-Sync-Operation-Url`。页面会把每个批次的“操作日志”链接显示在结果区，可用于确认这一批真实写入了多少条、成功/失败数量和失败原因。
+同步写入完成后，`POST /api/sync/apply` 会在响应头返回 `X-Sync-Operation-Id` 和 `X-Sync-Operation-Url`。页面会把每个批次的“操作日志”链接显示在结果区，链接格式为 `/api/check/<operation-id>`；点开就是可读结果页，用于确认这一批真实写入了多少条、成功/失败数量和失败原因。
 
 ## 本地开发
 
@@ -214,12 +214,13 @@ KV 环形缓冲区仍在内部保留最近 **50 条**错误/warn 事件，供 Wo
 
 **单次同步操作日志**
 
-```bash
-curl https://your-worker.workers.dev/api/sync/operations/<operation-id>
-# → {"ok":true,"operation":{"id":"...","requested_count":35,"returned_count":35,"ok":35,"errors":0,"items":[...]}}
+前端同步完成后点击结果区的“操作日志”链接即可查看，地址格式为：
+
+```text
+https://your-worker.workers.dev/api/check/<operation-id>
 ```
 
-`operation-id` 来自同步响应头或前端结果里的“操作日志”链接。该端点只按不可猜的 id 查询单次操作，不提供全局列表；日志不包含 access token，默认保留 24 小时。
+`operation-id` 由时间戳和随机 hash 组成，来自同步响应头或前端结果里的“操作日志”链接。该端点只按不可猜的 id 查询单次操作，不提供全局列表；日志不包含 access token，默认保留 24 小时。浏览器默认返回可读 HTML 页面；自动化检查如需 JSON，可请求同一路径并带 `Accept: application/json`。
 
 ### 日志事件速查
 
