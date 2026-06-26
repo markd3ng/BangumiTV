@@ -89,10 +89,10 @@ export async function compareAccounts(
       }
     } else if (a && !b) {
       const d: Difference = { externalId: id, title: a.title, statusA: statusLabel(a.status), statusB: '—', progressA: a.progress, progressB: 0, scoreA: a.score, scoreB: 0 }
-      onlyA.push(d); differences.push(d)
+      onlyA.push(d)
     } else if (!a && b) {
       const d: Difference = { externalId: id, title: b.title, statusA: '—', statusB: statusLabel(b.status), progressA: 0, progressB: b.progress, scoreA: 0, scoreB: b.score }
-      onlyB.push(d); differences.push(d)
+      onlyB.push(d)
     }
   }
 
