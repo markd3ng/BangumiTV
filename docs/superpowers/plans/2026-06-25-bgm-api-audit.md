@@ -197,7 +197,7 @@ Expected:
 - POST/PATCH success response is 204.
 - `ep_status` and `vol_status` say they are only for book progress.
 
-- [ ] **Step 2: Check local OpenAPI gaps**
+- [x] **Step 2: Check local OpenAPI gaps**
 
 Run:
 
@@ -205,7 +205,7 @@ Run:
 jq '.paths | keys[]' docs/example/api/bgm-api.json | rg 'calendar|oauth|token_status|access_token' || true
 ```
 
-Expected: no local v0 path evidence for `/calendar`, OAuth `access_token`, or OAuth `token_status`. Mark these as “规范缺口” instead of proven correct by local OpenAPI.
+Result: local OpenAPI includes `GET /calendar`; OAuth `access_token` and OAuth `token_status` are not covered by local paths. Mark OAuth endpoints as “规范缺口” unless another authoritative local reference is added.
 
 - [ ] **Step 3: Add runtime findings**
 
@@ -332,7 +332,7 @@ Append `### P2 Findings` to the report. Include entries with this shape:
 
 #### BGM-API-103: docs mention API paths not covered by local OpenAPI
 
-- **Location:** list exact paths and line numbers for `/calendar`, OAuth `access_token`, OAuth `token_status`, or `/v0/subjects/{id}/image`.
+- **Location:** list exact paths and line numbers for OAuth `access_token` and OAuth `token_status`; `GET /calendar` is covered by local OpenAPI and should not be reported as a gap.
 - **Current text:** quote the short API path.
 - **Evidence:** `jq '.paths | keys[]' docs/example/api/bgm-api.json` does not include these paths.
 - **Impact:** project rules require verification before writing API calls; these paths need an explicit evidence source before future edits.

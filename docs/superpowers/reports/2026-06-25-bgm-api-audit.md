@@ -94,29 +94,29 @@
 #### BGM-API-101：审计设计/计划曾误把 `/calendar` 列成本地 OpenAPI 缺口
 
 - **位置：** `docs/superpowers/specs/2026-06-25-bgm-api-audit-design.md:49`, `docs/superpowers/specs/2026-06-25-bgm-api-audit-design.md:81`, `docs/superpowers/plans/2026-06-25-bgm-api-audit.md:205`, `docs/superpowers/plans/2026-06-25-bgm-api-audit.md:208`
-- **当前文本：** 把 `/calendar` 与 OAuth `access_token`、`token_status` 一起列为本地 OpenAPI 未覆盖。
+- **原文本：** 把 `/calendar` 与 OAuth `access_token`、`token_status` 一起列为本地 OpenAPI 未覆盖。
 - **证据：** 本地 OpenAPI 包含 `GET /calendar`，operationId 为 `getCalendar`。真正缺口是 OAuth 路径。
 - **影响：** 后续审计或修复可能误以为 `/calendar` 缺少规范证据。
-- **建议修法：** 更新活跃审计设计/计划，说明 `/calendar` 已覆盖，OAuth endpoint 才未覆盖。
+- **处理结果：** 已更新活跃审计设计/计划，说明 `/calendar` 已覆盖，OAuth endpoint 才未覆盖。
 - **验证方式：** `jq '.paths["/calendar"]' docs/example/api/bgm-api.json`。
 
 #### BGM-API-102：历史 Cloudflare 设计仍写着 PATCH + 书籍专用字段
 
 - **位置：** `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:285`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:286`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:452`
-- **当前文本：** 同步写回使用 `PATCH /v0/users/-/collections/{subject_id}`，body 包含 `{ ep_status, vol_status, type, rate, tags, comment }`。
+- **原文本：** 同步写回使用 `PATCH /v0/users/-/collections/{subject_id}`，body 包含 `{ ep_status, vol_status, type, rate, tags, comment }`。
 - **证据：** BGM-API-002 和 BGM-API-005；本地 OpenAPI 说明 POST 是新增或修改，`ep_status`/`vol_status` 只能用于书籍。
 - **影响：** 该文件位于活跃 `docs/superpowers/specs` 下，后续实现可能复制过期语义。
-- **建议修法：** 标记该设计为历史记录，或更新 API checklist：同步写回用 POST upsert，动画同步不传书籍专用字段。
+- **处理结果：** 已在历史设计中加入更正说明，并把相关同步步骤/API checklist 更新为 POST upsert；动画同步不传书籍专用字段。
 - **验证方式：** `rg -n "PATCH /v0/users/-/collections|ep_status|vol_status" docs/superpowers/specs`。
 
 #### BGM-API-103：部分同步文档曾暗示全账户同步，但运行逻辑只同步动画
 
 - **位置：** `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:272`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:274`, `docs/superpowers/specs/2026-06-16-cloudflare-migration-design.md:235`
-- **当前文本：** “完整同步”写作同步源账户全部收藏状态，同时 API 流程使用 `subject_type=2`。
+- **原文本：** “完整同步”写作同步源账户全部收藏状态，同时 API 流程使用 `subject_type=2`。
 - **证据：** BGM-API-003；本地 OpenAPI `SubjectType` 说明 `2` 是动画。
 - **影响：** 用户或后续实现者可能误以为书籍/音乐/游戏/三次元也会同步。
 - **决策：** 批次 B 已定为“继续只同步动画收藏”。
-- **建议修法：** README、管理页、嵌入页和后续活跃文档统一使用“动画同步”措辞。
+- **处理结果：** README、管理页、嵌入页和当前仍可能作为指导的设计文档已统一使用“动画同步”措辞。
 - **验证方式：** `rg -n "全部收藏|subject_type=2|多账户同步" README.md docs/superpowers/specs docs/superpowers/plans`。
 
 #### BGM-API-104：OAuth 路径需要额外非 OpenAPI 证据
@@ -150,7 +150,9 @@
 
 ### 批次 C：P2 文档同步
 
-- 更新活跃审计设计/计划，移除 `/calendar` 是本地 OpenAPI 缺口的错误说法。
-- 更新仍描述当前 API 行为的活跃 spec 中过期的 PATCH/write-body 语义。
+状态：已处理。
+
+- 已更新活跃审计设计/计划，移除 `/calendar` 是本地 OpenAPI 缺口的错误说法。
+- 已更新当前仍可能作为指导的 Cloudflare 迁移设计，将账户同步说明改为动画同步、POST upsert、且不传书籍专用进度字段。
 - 旧实施计划保持历史记录，除非它被当作当前指导文档使用。
-- 为 `docs/example/api/bgm-api.json` 未覆盖的 OAuth endpoint 增加说明。
+- 已为 `docs/example/api/bgm-api.json` 未覆盖的 OAuth endpoint 保留说明。

@@ -253,6 +253,8 @@ Cron 触发 → Worker /__cron/sync（校验 secret header）
 
 ## 多账户同步（管理页面）
 
+> 历史设计更正（2026-06-26）：当前实现将本功能收窄为“多账户动画同步”，只同步 bgm.tv 动画收藏（`subject_type=2`）。写回使用 `POST /v0/users/-/collections/{subject_id}` 的新增或修改语义；动画同步写入 body 不传 `ep_status` 或 `vol_status`，这两个字段只适用于书籍进度。
+
 URL：`https://<worker域名>/manage`。不在前端 widget 中暴露入口，需要知道地址才能访问。
 
 ### 步骤 1：输入用户名
@@ -271,7 +273,7 @@ URL：`https://<worker域名>/manage`。不在前端 widget 中暴露入口，�
 
 **完整同步：**
 - 选择方向：A → B 或 B → A
-- 将源账户的全部收藏状态完整同步到目标账户
+- 将源账户的动画收藏状态同步到目标账户
 - 逐条显示执行进度
 
 **部分同步：**
@@ -282,8 +284,8 @@ URL：`https://<worker域名>/manage`。不在前端 widget 中暴露入口，�
 
 ### 步骤 4：执行
 
-- 对每个选中条目调用 `PATCH /v0/users/-/collections/{subject_id}`
-- 请求体：`{ ep_status, vol_status, type, rate, tags, comment }`
+- 对每个选中动画条目调用 `POST /v0/users/-/collections/{subject_id}`
+- 请求体：`{ type, rate, tags, comment }`
 - 实时显示执行进度
 - 完成后展示结果汇总
 
@@ -449,7 +451,7 @@ GitHub Actions 触发
 | `GET /v0/users/{user}/collections` | 获取用户收藏（分页） | Bearer（公开收藏可选） |
 | `GET /v0/subjects/{subject_id}` | 获取条目详情 + 图片 | Bearer（公开条目可选） |
 | `GET /v0/subjects/{subject_id}/image?type=large` | 获取条目图片跳转地址 | 可选 |
-| `PATCH /v0/users/-/collections/{subject_id}` | 写回同步 | Bearer 必须 |
+| `POST /v0/users/-/collections/{subject_id}` | 写回动画同步（新增或修改） | Bearer 必须 |
 | `GET /calendar` | 每日放送 | 无 |
 | `POST /oauth/access_token` | 用 code 换 token | client_id/secret |
 

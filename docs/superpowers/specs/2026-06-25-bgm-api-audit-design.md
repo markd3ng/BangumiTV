@@ -46,7 +46,7 @@
 3. README、design、plan 中的 API 描述
 4. 本地 OpenAPI 未覆盖的接口使用额外证据标注为“规范缺口”
 
-`/calendar`、OAuth `access_token`、OAuth `token_status` 不在本地 `bgm-api.json` 的 v0 paths 中。审计时必须明确标注规范缺口，不得把未验证内容写成已由本地 OpenAPI 证明。
+本地 `bgm-api.json` 已覆盖 `GET /calendar`。OAuth `access_token`、OAuth `token_status` 不在本地 OpenAPI paths 中；审计时必须明确标注 OAuth 规范缺口，不得把未验证内容写成已由本地 OpenAPI 证明。
 
 ## 审计矩阵
 
@@ -74,11 +74,11 @@
 
 这些候选项必须进入审计矩阵，但最终判断以证据为准。
 
-- 账户同步写回使用 `PATCH /v0/users/-/collections/{subject_id}`，但同步语义需要新增或修改时可能应使用 `POST`。
+- 账户同步写回曾使用 `PATCH /v0/users/-/collections/{subject_id}`；同步语义需要新增或修改时应使用 `POST`。
 - bgm.tv 写回成功返回 `204 No Content` 时，统一 `res.json()` 会把成功误判为 `Unexpected end of JSON input`。
 - `ep_status` 和 `vol_status` 只能用于书籍条目进度；动画、音乐、游戏、三次元写回时不能传。
 - `getCollections()` 固定 `subject_type=2` 是否符合“账户同步”产品语义。
-- `/calendar`、OAuth `access_token`、OAuth `token_status` 不在本地 OpenAPI paths 中，需要标注规范缺口。
+- `GET /calendar` 已在本地 OpenAPI 中覆盖；OAuth `access_token`、OAuth `token_status` 不在本地 OpenAPI paths 中，需要标注规范缺口。
 - README/spec/plan 中仍可能存在 “PATCH 写回同步” 或过期 body 字段说明。
 
 ## 报告结构
