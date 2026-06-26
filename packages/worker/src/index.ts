@@ -43,6 +43,11 @@ interface SyncOperationLog {
     title: string
     status: 'ok' | 'error'
     episodeChanged?: number
+    episodeProgress?: {
+      before: number
+      after: number
+      total: number
+    }
     error?: string
   }>
 }
@@ -81,11 +86,21 @@ function escapeHtml(value: unknown): string {
     .replaceAll("'", '&#39;')
 }
 
+function formatEpisodeProgress(progress?: { before: number; after: number; total: number }): string {
+  if (!progress) return ''
+  const delta = progress.after - progress.before
+  const suffix = delta === 0 ? '无变化' : `${delta > 0 ? '+' : ''}${delta}`
+  if (progress.total > 0) {
+    return `${progress.before}/${progress.total} -> ${progress.after}/${progress.total} (${suffix})`
+  }
+  return `${progress.before} -> ${progress.after} (${suffix})`
+}
+
 function createSyncOperationLog(
   id: string,
   mode: string,
   requestedCount: number,
-  results: Array<{ externalId: string; title: string; status: 'ok' | 'error'; episodeChanged?: number; error?: string }>,
+  results: Array<{ externalId: string; title: string; status: 'ok' | 'error'; episodeChanged?: number; episodeProgress?: { before: number; after: number; total: number }; error?: string }>,
   durationMs: number,
 ): SyncOperationLog {
   const ok = results.filter((r) => r.status === 'ok').length
@@ -105,6 +120,7 @@ function createSyncOperationLog(
       title: result.title,
       status: result.status,
       ...(typeof result.episodeChanged === 'number' ? { episodeChanged: result.episodeChanged } : {}),
+      ...(result.episodeProgress ? { episodeProgress: result.episodeProgress } : {}),
       ...(result.error ? { error: result.error } : {}),
     })),
   }
@@ -123,7 +139,7 @@ function renderSyncOperationHtml(operation: SyncOperationLog): string {
       <td>${escapeHtml(item.externalId)}</td>
       <td>${escapeHtml(item.title)}</td>
       <td class="${statusClass}">${escapeHtml(item.status)}</td>
-      <td>${typeof item.episodeChanged === 'number' ? item.episodeChanged : ''}</td>
+      <td>${escapeHtml(formatEpisodeProgress(item.episodeProgress))}</td>
       <td>${escapeHtml(item.error || '')}</td>
     </tr>`
   }).join('')

@@ -55,20 +55,23 @@ export class BgmPlatformClient implements PlatformClient {
       rate: item.score,
     })
 
-    const episodeChanged = options?.sourceToken
-      ? await this.syncEpisodeProgress(client, options.sourceToken, token, Number(externalId))
-      : 0
+    const progressResult = options?.sourceToken
+      ? await this.syncEpisodeProgress(client, options.sourceToken, token, Number(externalId), item.totalEpisodes)
+      : { episodeChanged: 0, episodeProgress: { before: item.progress, after: item.progress, total: item.totalEpisodes } }
 
-    return { episodeChanged }
+    return progressResult
   }
 
-  private async syncEpisodeProgress(client: BgmClient, sourceToken: string, targetToken: string, subjectId: number): Promise<number> {
+  private async syncEpisodeProgress(client: BgmClient, sourceToken: string, targetToken: string, subjectId: number, totalEpisodes: number): Promise<PatchEntryResult> {
     const [source, target] = await Promise.all([
       client.getSubjectEpisodeCollections(sourceToken, subjectId),
       client.getSubjectEpisodeCollections(targetToken, subjectId),
     ])
     const sourceMap = episodeTypeMap(source.data)
     const targetMap = episodeTypeMap(target.data)
+    const before = [...targetMap.values()].filter((type) => type === 2).length
+    const after = [...sourceMap.values()].filter((type) => type === 2).length
+    const total = totalEpisodes || Math.max(sourceMap.size, targetMap.size)
     const changedByType = new Map<EpisodeCollectionType, number[]>()
     const ids = new Set([...sourceMap.keys(), ...targetMap.keys()])
 
@@ -88,6 +91,6 @@ export class BgmPlatformClient implements PlatformClient {
       changed += episodeIds.length
     }
 
-    return changed
+    return { episodeChanged: changed, episodeProgress: { before, after, total } }
   }
 }

@@ -13,6 +13,11 @@ export interface SyncResult {
   title: string
   status: 'ok' | 'error'
   episodeChanged?: number
+  episodeProgress?: {
+    before: number
+    after: number
+    total: number
+  }
   error?: string
 }
 
@@ -74,7 +79,7 @@ async function doSync(
   for (const entry of targets) {
     try {
       const result = await clientB.patchEntry(toToken, entry.externalId, entry, { sourceToken: fromToken })
-      results.push({ externalId: entry.externalId, title: entry.title, status: 'ok', episodeChanged: result.episodeChanged })
+      results.push({ externalId: entry.externalId, title: entry.title, status: 'ok', episodeChanged: result.episodeChanged, episodeProgress: result.episodeProgress })
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err)
       console.warn(JSON.stringify({ event: 'sync_item_failed', external_id: entry.externalId, reason, at: new Date().toISOString() }))

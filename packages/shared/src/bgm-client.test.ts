@@ -254,6 +254,11 @@ test('BgmPlatformClient syncs episode progress after collection fields', async (
     const patchCalls = calls.filter((call) => call.init?.method === 'PATCH')
     assert.equal(calls[0].init?.method, 'POST')
     assert.equal(result.episodeChanged, 2)
+    assert.deepEqual(result.episodeProgress, {
+      before: 2,
+      after: 2,
+      total: 3,
+    })
     assert.deepEqual(patchCalls.map((call) => JSON.parse(String(call.init?.body))), [
       { episode_id: [102], type: 2 },
       { episode_id: [103], type: 0 },

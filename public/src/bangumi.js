@@ -590,6 +590,43 @@
       }))
     }
 
+    function escapeSyncHtml(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+    }
+
+    function formatEpisodeProgress(progress) {
+      if (!progress) return ''
+      var delta = progress.after - progress.before
+      var suffix = delta === 0 ? '\u65e0\u53d8\u5316' : ((delta > 0 ? '+' : '') + delta)
+      if (progress.total > 0) return progress.before + '/' + progress.total + ' -> ' + progress.after + '/' + progress.total + ' (' + suffix + ')'
+      return progress.before + ' -> ' + progress.after + ' (' + suffix + ')'
+    }
+
+    function renderInlineSyncLog(results, operationLinks) {
+      var rows = results.map(function(r) {
+        var cls = r.status === 'ok' ? 'ok' : 'error'
+        return '<tr>' +
+          '<td>' + escapeSyncHtml(r.externalId) + '</td>' +
+          '<td>' + escapeSyncHtml(r.title || '') + '</td>' +
+          '<td class="' + cls + '">' + escapeSyncHtml(r.status) + '</td>' +
+          '<td>' + escapeSyncHtml(formatEpisodeProgress(r.episodeProgress)) + '</td>' +
+          '<td>' + escapeSyncHtml(r.error || '') + '</td>' +
+          '</tr>'
+      }).join('')
+      var links = operationLinks.length ? '<div class="sync-log-links">\u5b8c\u6574\u65e5\u5fd7: ' + operationLinks.map(function(url, index) {
+        return '<a href="' + url + '" target="_blank" rel="noreferrer">#' + (index + 1) + '</a>'
+      }).join(' ') + '</div>' : ''
+      return '<div class="sync-inline-log"><h4>\u672c\u6b21\u64cd\u4f5c\u65e5\u5fd7</h4>' + links +
+        '<table><thead><tr><th>Subject ID</th><th>\u6807\u9898</th><th>\u72b6\u6001</th><th>\u7ae0\u8282\u8fdb\u5ea6</th><th>\u9519\u8bef</th></tr></thead><tbody>' +
+        (rows || '<tr><td colspan="5">\u6ca1\u6709\u8fd4\u56de\u6761\u76ee</td></tr>') +
+        '</tbody></table></div>'
+    }
+
     async function doSyncOp(mode, subjectIds) {
       var dir = document.getElementById('sync-direction').value
       var fromToken = dir === 'A->B' ? syncState.tokenA : syncState.tokenB
@@ -640,11 +677,7 @@
         document.getElementById('sync-progress-fill').style.width = '100%'
         var msg = '\u540c\u6b65\u5b8c\u6210\uff1a' + ok + ' \u6210\u529f\uff0c' + err + ' \u5931\u8d25'
         msg += '<br><small>\u8bf7\u6c42\u6a21\u5f0f: ' + mode + '\uff1b\u9884\u8ba1: ' + expected + '\uff1b\u540e\u7aef\u8fd4\u56de: ' + results.length + '</small>'
-        if (operationLinks.length) {
-          msg += '<br><small>\u64cd\u4f5c\u65e5\u5fd7: ' + operationLinks.map(function(url, index) {
-            return '<a href="' + url + '" target="_blank" rel="noreferrer">#' + (index + 1) + '</a>'
-          }).join(' ') + '</small>'
-        }
+        msg += renderInlineSyncLog(results, operationLinks)
         if (err > 0) {
           var failed = results.filter(function(r) { return r.status === 'error' }).slice(0, 3).map(function(r) { return (r.title || r.externalId) + ': ' + (r.error || 'unknown') }).join('; ')
           msg += '<br><small style="color:#e94560;">\u5931\u8d25\u6761\u76ee: ' + failed + (err > 3 ? ' \u7b49' + err + '\u9879' : '') + '</small>'

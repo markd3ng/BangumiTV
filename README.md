@@ -125,7 +125,7 @@ Sync Worker 在定时同步时自动下载条目封面（来源：bgm.tv），�
 
 > 说明：旧 `/manage` 页面入口和 `/api/manage/*` 同步接口已移除；首页动画同步视图调用 `POST /api/sync/compare` 和 `POST /api/sync/apply`。
 
-同步写入完成后，`POST /api/sync/apply` 会在响应头返回 `X-Sync-Operation-Id` 和 `X-Sync-Operation-Url`。页面会把每个批次的“操作日志”链接显示在结果区，链接格式为 `/api/check/<operation-id>`；点开就是可读结果页，用于确认这一批真实写入了多少条、章节进度变更数量、成功/失败数量和失败原因。
+同步写入完成后，`POST /api/sync/apply` 会在响应头返回 `X-Sync-Operation-Id` 和 `X-Sync-Operation-Url`。页面会直接在结果区展开本次操作日志，章节进度以 `before/total -> after/total` 形式展示；同时保留 `/api/check/<operation-id>` 完整日志链接，便于刷新后复查。
 
 ## 本地开发
 
@@ -214,13 +214,13 @@ KV 环形缓冲区仍在内部保留最近 **50 条**错误/warn 事件，供 Wo
 
 **单次同步操作日志**
 
-前端同步完成后点击结果区的“操作日志”链接即可查看，地址格式为：
+前端同步完成后会直接在动画同步页面内显示本次操作日志；如需单独打开或稍后复查，可点击结果区的完整日志链接，地址格式为：
 
 ```text
 https://your-worker.workers.dev/api/check/<operation-id>
 ```
 
-`operation-id` 由时间戳和随机 hash 组成，来自同步响应头或前端结果里的“操作日志”链接。该端点只按不可猜的 id 查询单次操作，不提供全局列表；日志不包含 access token，默认保留 24 小时。浏览器默认返回可读 HTML 页面；自动化检查如需 JSON，可请求同一路径并带 `Accept: application/json`。
+`operation-id` 由时间戳和随机 hash 组成，来自同步响应头或前端结果里的完整日志链接。该端点只按不可猜的 id 查询单次操作，不提供全局列表；日志不包含 access token，默认保留 24 小时。浏览器默认返回可读 HTML 页面；自动化检查如需 JSON，可请求同一路径并带 `Accept: application/json`。
 
 ### 日志事件速查
 
@@ -239,7 +239,7 @@ https://your-worker.workers.dev/api/check/<operation-id>
 | `sync_compare` | info | 账户动画收藏对比结果，含双方条目数 / 共同数 / 差异数 |
 | `sync_compare_fetch_failed` | error | 账户对比拉取收藏失败，含安全化后的 `reason` |
 | `sync_apply` | info | 前端动画同步写入，含 `mode` / `total` / `ok` / `errors` |
-| `sync_operation` | info | 单次前端同步操作日志，含 `requested_count` / `returned_count` / `ok` / `errors` / `items`，每个 item 可含 `episodeChanged` |
+| `sync_operation` | info | 单次前端同步操作日志，含 `requested_count` / `returned_count` / `ok` / `errors` / `items`，每个 item 可含 `episodeChanged` 和 `episodeProgress` |
 | `sync_request_failed` | error | 前端同步 API 上游/内部错误，含 `route` / `kind` / `upstream_status` |
 | `sync_phase` | info | 定时同步阶段（token_refresh → token_ready → fetched_collections → images_downloaded → fetch_calendar → snapshot_written），每阶段含计数 |
 | `sync_failed` | error | 定时同步失败，含 `phase` / `kind` / `upstream_status` |

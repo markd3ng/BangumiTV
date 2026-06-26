@@ -24,6 +24,11 @@ export interface PatchEntryOptions {
 
 export interface PatchEntryResult {
   episodeChanged: number
+  episodeProgress?: {
+    before: number
+    after: number
+    total: number
+  }
 }
 
 export interface AccountInfo {

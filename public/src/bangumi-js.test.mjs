@@ -26,6 +26,12 @@ test('public sync displays operation log lookup urls', () => {
   assert.ok(source.includes('\\u64cd\\u4f5c\\u65e5\\u5fd7'), 'renders operation log label')
 })
 
+test('public sync renders operation log inline with progress before and after', () => {
+  assert.ok(source.includes('renderInlineSyncLog(results, operationLinks)'), 'renders operation log inside sync page')
+  assert.ok(source.includes('formatEpisodeProgress'), 'formats episode progress')
+  assert.ok(source.includes("progress.before + '/' + progress.total + ' -> ' + progress.after + '/' + progress.total"), 'shows before and after progress')
+})
+
 test('public sync uses sync API routes and no legacy manage routes', () => {
   assert.ok(source.includes("API + '/api/sync/compare'"), 'calls sync compare endpoint')
   assert.ok(source.includes("API + '/api/sync/apply'"), 'calls sync apply endpoint')

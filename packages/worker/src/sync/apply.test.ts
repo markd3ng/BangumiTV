@@ -26,10 +26,10 @@ class FakeClient implements PlatformClient {
     return this.items
   }
 
-  async patchEntry(_token: string, externalId: string, _item: ComparisonItem, options?: { sourceToken?: string }): Promise<{ episodeChanged: number }> {
+  async patchEntry(_token: string, externalId: string, _item: ComparisonItem, options?: { sourceToken?: string }): Promise<{ episodeChanged: number; episodeProgress: { before: number; after: number; total: number } }> {
     this.patchedIds.push(externalId)
     if (options?.sourceToken) this.episodeProgressIds.push(externalId)
-    return { episodeChanged: Number(externalId) }
+    return { episodeChanged: Number(externalId), episodeProgress: { before: 1, after: Number(externalId), total: 12 } }
   }
 }
 
@@ -98,4 +98,5 @@ test('executeSync copies episode progress and reports changed episode count', as
   assert.deepEqual(targetClient.patchedIds, ['8'])
   assert.deepEqual(targetClient.episodeProgressIds, ['8'])
   assert.equal(results[0].episodeChanged, 8)
+  assert.deepEqual(results[0].episodeProgress, { before: 1, after: 8, total: 12 })
 })
