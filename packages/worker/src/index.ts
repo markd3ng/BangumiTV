@@ -19,11 +19,81 @@ import {
   createHealthFailureLog,
   createSyncRequestErrorLog,
   publicError,
+  syncHeaders,
 } from './sync/errors'
 
 // ── KV 错误环形缓冲区 ──
 const ERROR_RING_KEY = 'debug:errors'
 const ERROR_RING_MAX = 50
+const SYNC_OPERATION_PREFIX = 'sync:operation:'
+const SYNC_OPERATION_TTL_SECONDS = 60 * 60 * 24
+
+interface SyncOperationLog {
+  id: string
+  event: 'sync_operation'
+  mode: string
+  requested_count: number
+  returned_count: number
+  ok: number
+  errors: number
+  duration_ms: number
+  at: string
+  items: Array<{
+    externalId: string
+    title: string
+    status: 'ok' | 'error'
+    error?: string
+  }>
+}
+
+function operationLogKey(id: string): string {
+  return `${SYNC_OPERATION_PREFIX}${id}`
+}
+
+function createOperationId(): string {
+  return crypto.randomUUID()
+}
+
+function syncOperationHeaders(id: string): Headers {
+  const headers = new Headers(syncHeaders())
+  headers.set('X-Sync-Operation-Id', id)
+  headers.set('X-Sync-Operation-Url', `/api/sync/operations/${id}`)
+  return headers
+}
+
+function createSyncOperationLog(
+  id: string,
+  mode: string,
+  requestedCount: number,
+  results: Array<{ externalId: string; title: string; status: 'ok' | 'error'; error?: string }>,
+  durationMs: number,
+): SyncOperationLog {
+  const ok = results.filter((r) => r.status === 'ok').length
+  const errors = results.filter((r) => r.status === 'error').length
+  return {
+    id,
+    event: 'sync_operation',
+    mode,
+    requested_count: requestedCount,
+    returned_count: results.length,
+    ok,
+    errors,
+    duration_ms: durationMs,
+    at: new Date().toISOString(),
+    items: results.map((result) => ({
+      externalId: result.externalId,
+      title: result.title,
+      status: result.status,
+      ...(result.error ? { error: result.error } : {}),
+    })),
+  }
+}
+
+async function persistSyncOperationLog(kv: KVNamespace, log: SyncOperationLog): Promise<void> {
+  await kv.put(operationLogKey(log.id), JSON.stringify(log), {
+    expirationTtl: SYNC_OPERATION_TTL_SECONDS,
+  })
+}
 
 async function appendErrorLog(storage: KVStorage, entry: unknown): Promise<void> {
   try {
@@ -219,8 +289,10 @@ app.post('/api/sync/compare', async (c) => {
 
 app.post('/api/sync/apply', async (c) => {
   const storage = new KVStorage(c.env.BANGUMI_KV)
+  const startedAt = Date.now()
   try {
     const body = await c.req.json()
+    const operationId = createOperationId()
     const clientA = getPlatformClient(body.platformA || 'bgm')
     const clientB = getPlatformClient(body.platformB || 'bgm')
     const results = await executeSync(clientA, body.tokenA, clientB, body.tokenB, {
@@ -231,11 +303,31 @@ app.post('/api/sync/apply', async (c) => {
     }, c.env as { SYNCLOCK: DurableObjectNamespace })
     const syncOk = results.filter((r: any) => r.status === 'ok').length
     const syncErr = results.filter((r: any) => r.status === 'error').length
-    console.log(JSON.stringify({ event: 'sync_apply', mode: body.mode, total: results.length, ok: syncOk, errors: syncErr, at: new Date().toISOString() }))
-    return Response.json(results)
+    const requestedCount = Array.isArray(body.subject_ids) ? body.subject_ids.length : results.length
+    const operationLog = createSyncOperationLog(operationId, body.mode, requestedCount, results, Date.now() - startedAt)
+    await persistSyncOperationLog(c.env.BANGUMI_KV, operationLog)
+    console.log(JSON.stringify({ event: 'sync_apply', operation_id: operationId, mode: body.mode, total: results.length, ok: syncOk, errors: syncErr, at: new Date().toISOString() }))
+    return Response.json(results, {
+      headers: syncOperationHeaders(operationId),
+    })
   } catch (err) {
     return errorToResponse('/api/sync/apply', err, storage)
   }
+})
+
+app.get('/api/sync/operations/:id', async (c) => {
+  const id = c.req.param('id')
+  if (!/^[0-9a-fA-F-]{36}$/.test(id)) {
+    return Response.json({ ok: false, error: { code: 'INVALID_OPERATION_ID', message: 'Invalid operation id' } }, { status: 400, headers: syncHeaders() })
+  }
+
+  const storage = new KVStorage(c.env.BANGUMI_KV)
+  const operation = await storage.get<SyncOperationLog>(operationLogKey(id))
+  if (!operation) {
+    return Response.json({ ok: false, error: { code: 'NOT_FOUND', message: 'Operation log not found or expired' } }, { status: 404, headers: syncHeaders() })
+  }
+
+  return Response.json({ ok: true, operation }, { headers: syncHeaders() })
 })
 
 

@@ -603,6 +603,7 @@
       var platformA = (resultArea.querySelector('.sync-platform[data-side="A"]') || {}).value || 'bgm'
       var platformB = (resultArea.querySelector('.sync-platform[data-side="B"]') || {}).value || 'bgm'
       var allResults = []
+      var operationLinks = []
 
       if (!ids.length) return alert('\u6ca1\u6709\u53ef\u540c\u6b65\u7684\u6761\u76ee')
 
@@ -618,6 +619,8 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ tokenA: fromToken, platformA: platformA, from: fromUser, tokenB: toToken, platformB: platformB, to: toUser, mode: 'partial', subject_ids: chunk }),
           })
+          var operationId = res.headers.get('X-Sync-Operation-Id')
+          if (operationId) operationLinks.push('/api/sync/operations/' + operationId)
           var batchResults = await res.json().catch(function() { return null })
           if (!res.ok) {
             var errMsg = (batchResults && batchResults.error && batchResults.error.message) || ('HTTP ' + res.status + ' ' + res.statusText)
@@ -637,6 +640,11 @@
         document.getElementById('sync-progress-fill').style.width = '100%'
         var msg = '\u540c\u6b65\u5b8c\u6210\uff1a' + ok + ' \u6210\u529f\uff0c' + err + ' \u5931\u8d25'
         msg += '<br><small>\u8bf7\u6c42\u6a21\u5f0f: ' + mode + '\uff1b\u9884\u8ba1: ' + expected + '\uff1b\u540e\u7aef\u8fd4\u56de: ' + results.length + '</small>'
+        if (operationLinks.length) {
+          msg += '<br><small>\u64cd\u4f5c\u65e5\u5fd7: ' + operationLinks.map(function(url, index) {
+            return '<a href="' + url + '" target="_blank" rel="noreferrer">#' + (index + 1) + '</a>'
+          }).join(' ') + '</small>'
+        }
         if (err > 0) {
           var failed = results.filter(function(r) { return r.status === 'error' }).slice(0, 3).map(function(r) { return (r.title || r.externalId) + ': ' + (r.error || 'unknown') }).join('; ')
           msg += '<br><small style="color:#e94560;">\u5931\u8d25\u6761\u76ee: ' + failed + (err > 3 ? ' \u7b49' + err + '\u9879' : '') + '</small>'

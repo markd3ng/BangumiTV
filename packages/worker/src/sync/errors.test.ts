@@ -152,8 +152,19 @@ test('worker exposes frontend sync APIs but no legacy manage routes', async () =
   assert.equal(source.includes('exchangeCode'), false)
   assert.ok(source.includes("app.post('/api/sync/compare'"), 'compare API route remains available')
   assert.ok(source.includes("app.post('/api/sync/apply'"), 'sync API route remains available')
+  assert.ok(source.includes("app.get('/api/sync/operations/:id'"), 'sync operation log lookup route remains available')
   assert.ok(source.includes("event: 'sync_compare'"), 'compare log event uses sync naming')
   assert.ok(source.includes("event: 'sync_apply'"), 'apply log event uses sync naming')
+})
+
+test('sync operation logs are scoped by opaque id and exclude tokens', async () => {
+  const source = await readFile(new URL('../index.ts', import.meta.url), 'utf8')
+
+  assert.match(source, /const operationId = createOperationId\(\)/)
+  assert.match(source, /headers\.set\('X-Sync-Operation-Id', id\)/)
+  assert.match(source, /operationLogKey\(log\.id\)/)
+  assert.match(source, /expirationTtl: SYNC_OPERATION_TTL_SECONDS/)
+  assert.doesNotMatch(source, /const operationLog = \{[\s\S]*(tokenA|tokenB|fromToken|toToken)/)
 })
 
 test('worker source keeps health endpoint free of usernames in free text', async () => {

@@ -18,6 +18,13 @@ test('public sync result shows backend result count for diagnosis', () => {
   assert.ok(source.includes('results.length'), 'uses actual response array length')
 })
 
+test('public sync displays operation log lookup urls', () => {
+  assert.ok(source.includes("res.headers.get('X-Sync-Operation-Id')"), 'reads operation id header')
+  assert.ok(source.includes("'/api/sync/operations/' + operationId"), 'builds operation log endpoint')
+  assert.ok(source.includes('operationLinks.push'), 'collects operation links per batch')
+  assert.ok(source.includes('\\u64cd\\u4f5c\\u65e5\\u5fd7'), 'renders operation log label')
+})
+
 test('public sync uses sync API routes and no legacy manage routes', () => {
   assert.ok(source.includes("API + '/api/sync/compare'"), 'calls sync compare endpoint')
   assert.ok(source.includes("API + '/api/sync/apply'"), 'calls sync apply endpoint')
