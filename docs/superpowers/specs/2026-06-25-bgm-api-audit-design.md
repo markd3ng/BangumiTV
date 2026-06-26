@@ -14,8 +14,8 @@
 
 - `packages/shared/src/bgm-client.ts`
 - cron 同步与 token 刷新
-- 管理页 compare/sync
-- OAuth exchange 与 token status
+- 首页动画同步视图调用的 compare/sync API
+- cron token refresh 与 token status
 - 图片下载与日历同步
 
 每个调用点检查：

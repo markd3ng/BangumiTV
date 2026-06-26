@@ -11,7 +11,6 @@
 - `packages/shared/src/platform/bgm.ts`
 - `packages/shared/src/utils.ts`
 - `packages/worker/src/cron.ts`
-- `packages/worker/src/manage/oauth.ts`
 - `packages/worker/src/manage/compare.ts`
 - `packages/worker/src/manage/sync-write.ts`
 - `README.md`
@@ -66,17 +65,17 @@
 - **证据：** 本地 OpenAPI `SubjectType` 说明 `2` 是动画；其他合法类型还有书籍、音乐、游戏、三次元。
 - **影响：** 如果产品预期是全账户同步，书籍/音乐/游戏/三次元会被静默排除。
 - **决策：** 批次 B 已明确产品口径：账户同步继续只同步动画收藏。
-- **建议修法：** 不扩展全类型；把 README、管理页、嵌入页和报告文案全部写成“动画同步”。
-- **验证方式：** 管理页测试断言页面明确出现“仅同步动画收藏”。
+- **建议修法：** 不扩展全类型；把 README、首页同步视图、嵌入页和报告文案全部写成“动画同步”。
+- **验证方式：** public 前端测试断言首页同步视图按动画同步口径发送请求。
 - **状态：** 批次 B 已按动画同步口径推进。
 
-#### BGM-API-004：OAuth endpoint 不在本地 OpenAPI 文件中
+#### BGM-API-004：OAuth token endpoint 不在本地 OpenAPI 文件中
 
-- **位置：** `packages/shared/src/bgm-client.ts:135`, `packages/shared/src/bgm-client.ts:151`, `packages/shared/src/bgm-client.ts:171`, `packages/worker/src/manage/oauth.ts:3`
-- **当前写法：** OAuth authorize、token exchange、refresh、token status 使用 `https://bgm.tv/oauth/...`。
+- **位置：** `packages/shared/src/bgm-client.ts:135`, `packages/shared/src/bgm-client.ts:151`, `packages/shared/src/bgm-client.ts:171`
+- **当前写法：** token refresh 和 token status 使用 `https://bgm.tv/oauth/...`；旧 `/manage` OAuth 授权与 exchange 路由已移除。
 - **证据：** `jq '.paths | keys[]' docs/example/api/bgm-api.json | rg 'oauth|token_status|access_token'` 无匹配。`/calendar` 已由本地 OpenAPI 覆盖，OAuth 才是缺口。
 - **影响：** 项目规则要求修改 API 调用前必须验证；后续改 OAuth 逻辑时需要额外权威证据。
-- **建议修法：** 修改 OAuth 行为前，补充或引用 `authorize`、`access_token`、`token_status` 的本地证据来源。
+- **建议修法：** 修改 refresh 或 token status 行为前，补充或引用 `access_token`、`token_status` 的本地证据来源。
 - **验证方式：** 保留本地 OpenAPI 缺口查询命令，未来计划中单独处理。
 
 #### BGM-API-005：`ep_status` 和 `vol_status` 不能作为非书籍写入字段
@@ -101,7 +100,7 @@
 
 #### BGM-API-007：完整同步曾信任前端传入的源用户名
 
-- **位置：** `packages/worker/src/manage/index.html:358`, `packages/worker/src/manage/sync-write.ts:60`
+- **位置：** `packages/worker/src/manage/sync-write.ts:60`；已删除的旧 `packages/worker/src/manage/index.html` 曾有同类问题
 - **原写法：** 前端完整同步请求把 `from` 组装为 `Account A` / `Account B` 等展示文本，后端 full 模式再用该字段调用 `fetchCollections()` 拉源账号收藏。
 - **证据：** `BgmPlatformClient.fetchCollections()` 需要真实 bgm.tv username；`getMe(token)` 已能从 token 解析真实 username。
 - **影响：** 完整同步可能没有按真实源账号的全部动画收藏执行，表现为只同步少量条目，而不是对比页显示的几百条源账号独有收藏。
@@ -118,6 +117,16 @@
 - **建议修法：** 公开同步页从 `syncState.data.userA.name/userB.name` 读取真实用户名发给 `/api/manage/sync`；同步结果同时显示预计项数和后端返回项数，便于区分前端发错、后端执行少、或部署缓存问题。
 - **验证方式：** public 前端静态测试断言同步请求使用 compare 返回的用户名，并显示 `results.length` 诊断信息。
 - **状态：** 已修复；`public/src/bangumi.js` 不再发送 `A` / `B` 作为同步用户名。
+
+#### BGM-API-009：旧 `/manage` 页面和管理 OAuth 流会误导当前同步入口
+
+- **位置：** `packages/worker/src/index.ts`；旧 `packages/worker/src/manage/index.html`、`packages/worker/src/manage/oauth.ts`、`/api/manage/oauth-url`、`/api/manage/exchange`
+- **原写法：** Worker 暴露 `/manage` 和 `/manage/callback` 页面路由，同时保留管理 OAuth URL/exchange API。
+- **证据：** 当前产品入口已经是 Worker 首页的「动画同步」视图，用户直接粘贴两个 bgm.tv developer access token；截图和当前前端代码均来自 `public/src/bangumi.js`。
+- **影响：** 旧页面和旧 OAuth 入口会让排查方向偏到已废弃 UI，且继续产生 `/manage/callback` 这类无效 URI。
+- **建议修法：** 删除 `/manage`、`/manage/callback`、管理 OAuth API、未挂载旧 HTML 和孤立 OAuth helper；保留首页同步视图实际调用的 `/api/manage/compare`、`/api/manage/sync`。
+- **验证方式：** worker security 测试断言旧页面/OAuth 路由和 helper 不存在，同时同步 API 仍存在。
+- **状态：** 已修复。
 
 ### P2 问题
 
@@ -146,7 +155,7 @@
 - **证据：** BGM-API-003；本地 OpenAPI `SubjectType` 说明 `2` 是动画。
 - **影响：** 用户或后续实现者可能误以为书籍/音乐/游戏/三次元也会同步。
 - **决策：** 批次 B 已定为“继续只同步动画收藏”。
-- **处理结果：** README、管理页、嵌入页和当前仍可能作为指导的设计文档已统一使用“动画同步”措辞。
+- **处理结果：** README、首页同步视图、嵌入页和当前仍可能作为指导的设计文档已统一使用“动画同步”措辞。
 - **验证方式：** `rg -n "全部收藏|subject_type=2|多账户同步" README.md docs/superpowers/specs docs/superpowers/plans`。
 
 #### BGM-API-104：OAuth 路径需要额外非 OpenAPI 证据
@@ -175,9 +184,9 @@
 状态：已完成。
 
 - 账户同步继续只使用 `subject_type=2`。
-- README、管理页、嵌入页和报告文案统一写成“动画同步”。
+- README、首页同步视图、嵌入页和报告文案统一写成“动画同步”。
 - 不扩展书籍/音乐/游戏/三次元同步。
-- OAuth 行为保持不变，直到补充权威 OAuth 证据来源。
+- 旧 `/manage` OAuth 授权入口已移除；cron token 继续通过部署环境变量配置。
 
 ### 批次 C：P2 文档同步
 
@@ -185,5 +194,6 @@
 
 - 已更新活跃审计设计/计划，移除 `/calendar` 是本地 OpenAPI 缺口的错误说法。
 - 已更新当前仍可能作为指导的 Cloudflare 迁移设计，将账户同步说明改为动画同步、POST upsert，且只写 `type` 和 `rate`。
+- 已移除运行代码中的旧 `/manage` 页面、`/manage/callback` 和管理 OAuth exchange 流，并同步 README/审计报告。
 - 旧实施计划保持历史记录，除非它被当作当前指导文档使用。
 - 已为 `docs/example/api/bgm-api.json` 未覆盖的 OAuth endpoint 保留说明。

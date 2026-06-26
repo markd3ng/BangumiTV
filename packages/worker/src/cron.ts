@@ -48,7 +48,7 @@ async function ensureFreshToken(
         : null
 
   if (!current) {
-    throw new Error('No valid bgm.tv token: configure BANGUMI_TOKEN/BANGUMI_REFRESH_TOKEN or run /manage to authorize')
+    throw new Error('No valid bgm.tv token: configure BANGUMI_TOKEN in deployment secrets')
   }
 
   const probe = new BgmClient()

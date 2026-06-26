@@ -9,27 +9,16 @@ import { compareAccounts } from './manage/compare'
 import { executeSync } from './manage/sync-write'
 import { BgmPlatformClient, type PlatformId } from '@bangumi-tv/shared'
 import type { PlatformClient } from '@bangumi-tv/shared'
-import { getOAuthRedirectUrl, exchangeCode } from './manage/oauth'
 import { handleImage } from './image/proxy'
 import { getSnapshot } from './storage/snapshot'
-import manageHtml from './manage/index.html'
 import indexHtml from './html'
 import bangumiJs from './js'
 import bangumiCss from './css'
 import { BgmHttpError, BgmTimeoutError, BgmNetworkError } from '@bangumi-tv/shared'
-import type { OAuthPurpose } from './manage/security'
 import {
-  callbackPageCsp,
-  createOAuthState,
   createHealthFailureLog,
   createManageErrorLog,
-  manageHeaders,
-  managePageCsp,
-  oauthCallbackHtml,
-  parseOAuthExchangeBody,
-  parseOAuthPurposeBody,
   publicError,
-  verifyOAuthState,
 } from './manage/security'
 
 // ── KV 错误环形缓冲区 ──
@@ -207,95 +196,6 @@ app.get('/api/health', async (c) => {
 // 图片代理
 app.get('/image/*', (c) => {
   return handleImage({ BANGUMI_R2: c.env.BANGUMI_R2 }, c.req.raw)
-})
-
-// 管理页面
-app.get('/manage', () => {
-  return new Response(manageHtml, {
-    headers: {
-      ...manageHeaders(managePageCsp()),
-      'Content-Type': 'text/html; charset=utf-8',
-    },
-  })
-})
-
-app.get('/manage/callback', () => {
-  return new Response(oauthCallbackHtml(), {
-    headers: {
-      ...manageHeaders(callbackPageCsp()),
-      'Content-Type': 'text/html; charset=utf-8',
-    },
-  })
-})
-
-// ── 管理 API ──
-app.post('/api/manage/oauth-url', async (c) => {
-  const purpose: OAuthPurpose | null = parseOAuthPurposeBody(await c.req.json().catch(() => null))
-  if (!purpose) {
-    const log = { event: 'manage_input_error', route: '/api/manage/oauth-url', reason: 'invalid_purpose', at: new Date().toISOString() }
-    console.warn(JSON.stringify(log))
-    appendErrorLog(new KVStorage(c.env.BANGUMI_KV), log)
-    return publicError(400, 'INVALID_REQUEST')
-  }
-  if (!c.env.BANGUMI_CLIENT_ID) {
-    const log = { event: 'manage_input_error', route: '/api/manage/oauth-url', reason: 'oauth_not_configured', at: new Date().toISOString() }
-    console.warn(JSON.stringify(log))
-    appendErrorLog(new KVStorage(c.env.BANGUMI_KV), log)
-    return publicError(503, 'OAUTH_NOT_CONFIGURED')
-  }
-  const created = await createOAuthState((c.env as any).MANAGE_SECRET || 'unused', purpose)
-  const redirectUri = `${new URL(c.req.url).origin}/manage/callback`
-  console.log(JSON.stringify({ event: 'manage_oauth_url', purpose, at: new Date().toISOString() }))
-  return Response.json({
-    url: getOAuthRedirectUrl(c.env.BANGUMI_CLIENT_ID, redirectUri, created.state),
-    state: created.state,
-    nonce: created.nonce,
-  })
-})
-
-app.post('/api/manage/exchange', async (c) => {
-  const body = parseOAuthExchangeBody(await c.req.json().catch(() => null))
-  if (!body) {
-    const log = { event: 'manage_input_error', route: '/api/manage/exchange', reason: 'invalid_body', at: new Date().toISOString() }
-    console.warn(JSON.stringify(log))
-    appendErrorLog(new KVStorage(c.env.BANGUMI_KV), log)
-    return publicError(400, 'INVALID_REQUEST')
-  }
-  const state = await verifyOAuthState((c.env as any).MANAGE_SECRET || 'unused', body.state)
-  if (!state) {
-    const log = { event: 'manage_input_error', route: '/api/manage/exchange', reason: 'invalid_oauth_state', at: new Date().toISOString() }
-    console.warn(JSON.stringify(log))
-    appendErrorLog(new KVStorage(c.env.BANGUMI_KV), log)
-    return publicError(400, 'INVALID_OAUTH_STATE')
-  }
-  if (!c.env.BANGUMI_CLIENT_ID || !c.env.BANGUMI_CLIENT_SECRET) {
-    const log = { event: 'manage_input_error', route: '/api/manage/exchange', reason: 'oauth_not_configured', at: new Date().toISOString() }
-    console.warn(JSON.stringify(log))
-    appendErrorLog(new KVStorage(c.env.BANGUMI_KV), log)
-    return publicError(503, 'OAUTH_NOT_CONFIGURED')
-  }
-
-  try {
-    const result = await exchangeCode(
-      c.env.BANGUMI_CLIENT_ID,
-      c.env.BANGUMI_CLIENT_SECRET,
-      body.code,
-      `${new URL(c.req.url).origin}/manage/callback`,
-    )
-    if (state.purpose === 'cron') {
-      const storage = new KVStorage(c.env.BANGUMI_KV)
-      await storage.put('bgm:tokens', {
-        access_token: result.access_token,
-        refresh_token: result.refresh_token,
-      })
-      console.log(JSON.stringify({ event: 'manage_oauth_exchange', purpose: 'cron', at: new Date().toISOString() }))
-      return Response.json({ ok: true })
-    }
-    console.log(JSON.stringify({ event: 'manage_oauth_exchange', purpose: state.purpose, has_user_id: true, at: new Date().toISOString() }))
-    return Response.json({ access_token: result.access_token, user_id: result.user_id })
-  } catch (err) {
-    return errorToResponse('/api/manage/exchange', err, new KVStorage(c.env.BANGUMI_KV))
-  }
 })
 
 function getPlatformClient(platform: string): PlatformClient {

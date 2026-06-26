@@ -130,7 +130,7 @@
         if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + res.statusText)
         var data = await res.json()
         if (data.total === 0) {
-          grid.innerHTML = '<p class="bgm-empty">暂无数据 — 同步可能尚未执行，请在 /manage 授权并触发同步</p>'
+          grid.innerHTML = '<p class="bgm-empty">暂无数据 — 同步可能尚未执行，请在动画同步视图配置 token 并触发同步</p>'
           pagination.innerHTML = ''
           return
         }
@@ -183,7 +183,7 @@
             var c = health.data.collections
             statusBar.innerHTML = '<p>已连接 | 条目 ' + (c.types && c.types._total) + ' | 更新于 ' + (c.updated_at || '?').slice(0, 10) + '</p>'
           } else if (health.ok) {
-            var hint = '请在 /manage 授权并触发同步'
+            var hint = '请在动画同步视图配置 token 并触发同步'
             if (health.data && health.data.last_error) hint += '<br>上次同步错误: ' + health.data.last_error
             statusBar.innerHTML = '<p class="bgm-status-warn">已连接，但 KV 无数据。' + hint + '</p>'
           } else {
@@ -215,7 +215,7 @@
 
     function renderCalendar(days) {
       if (!days || !days.length) {
-        cal.innerHTML = '<p class="bgm-empty">暂无日历数据 — 同步可能尚未执行，请在 /manage 授权并触发同步</p>'
+        cal.innerHTML = '<p class="bgm-empty">暂无日历数据 — 同步可能尚未执行，请在动画同步视图配置 token 并触发同步</p>'
         return
       }
       var html = ''

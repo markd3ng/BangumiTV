@@ -4,7 +4,7 @@
 
 基于 Cloudflare Workers，数据直接来源于 bgm.tv API。条目封面在同步时自动下载，计算哈希后存入 R2 bucket，通过 `/image/:hash` 路由提供。
 
-**架构：双 Worker 拆分** — 主 Worker (`bangumi-tv`) 处理公开 API、管理 API、图片代理；同步 Worker (`bangumi-tv-sync`) 独立处理定时同步和图片下载，各自独享 50 子请求配额，避免同步导致 API 响应超时或子请求超限。
+**架构：双 Worker 拆分** — 主 Worker (`bangumi-tv`) 处理公开 API、前端动画同步 API、图片代理；同步 Worker (`bangumi-tv-sync`) 独立处理定时同步和图片下载，各自独享 50 子请求配额，避免同步导致 API 响应超时或子请求超限。
 
 ## Demo
 
@@ -51,7 +51,6 @@
    | `CF_API_TOKEN` | Cloudflare API Token（见上方「Cloudflare API Token 权限配置」） |
    | `CF_ACCOUNT_ID` | Cloudflare 账户 ID（Dashboard 右侧栏可见） |
    | `CRON_SECRET` | 自定义随机字符串（手动触发 sync worker `POST /__cron/sync` 认证用） |
-   | `MANAGE_SECRET` | 必填。管理 API 的共享密码；未配置时管理 API 返回 503 |
 
    **Variables:**
    | 名称 | 说明 |
@@ -117,15 +116,14 @@ Sync Worker 在定时同步时自动下载条目封面（来源：bgm.tv），�
 - 前端在 hash 为 null 时使用纯色占位 SVG，避免构造损坏 URL
 - 图片缓存头：`Cache-Control: public, max-age=31536000, immutable`
 
-## 管理页面
+## 前端动画同步
 
-访问 `https://bangumi-tv.<你的子域名>.workers.dev/manage`：
+访问 Worker 首页并切换到「动画同步」视图：
 
-- **多账户动画同步**：粘贴两个 bgm.tv access token（用户名可选）→ 点击对比 → 选择完整同步动画或部分同步动画 → 执行。当前仅同步 bgm.tv 动画收藏（`subject_type=2`）。Token 在 [bgm.tv 开发者设置](https://bgm.tv/dev) 生成，永久有效。
-- 管理密码只保存在浏览器内存中，刷新后重新输入。
-- **Cron token** 通过 Cloudflare Dashboard 环境变量 `BANGUMI_TOKEN` 配置，不在管理页操作。
+- **多账户动画同步**：粘贴两个 bgm.tv access token → 点击对比 → 选择完整同步动画或选中同步动画 → 执行。当前仅同步 bgm.tv 动画收藏（`subject_type=2`）。Token 在 [bgm.tv 开发者设置](https://bgm.tv/dev) 生成，永久有效。
+- **Cron token** 通过 Cloudflare Dashboard 环境变量 `BANGUMI_TOKEN` 配置，不在前端页面操作。
 
-> **管理页密码保护：** `MANAGE_SECRET` 是管理 API 的必填共享密码。管理页的写操作都会要求输入该密码；未配置时管理 API 返回 503。
+> 说明：旧 `/manage` 页面入口已移除；`/api/manage/compare`、`/api/manage/sync` 只是历史命名的后端同步 API，仍供前端动画同步视图调用。
 
 ## 本地开发
 
@@ -148,7 +146,6 @@ BANGUMI_PRIMARY_USER=user1
 BANGUMI_CLIENT_ID=你的_client_id
 BANGUMI_CLIENT_SECRET=你的_client_secret
 CRON_SECRET=任意字符串
-MANAGE_SECRET=本地管理密码
 # BANGUMI_TOKEN 用于 cron 同步，通过 Cloudflare Dashboard 或 GitHub Secrets 配置
 SYNC_MODE=merge
 NSFW_SHOW=true
@@ -169,14 +166,13 @@ NSFW_SHOW=true
 | `BANGUMI_CLIENT_ID` | secret | bgm.tv API 应用的 App ID（sync worker 内部 API 调用用） |
 | `BANGUMI_CLIENT_SECRET` | secret | bgm.tv API 应用的 App Secret（sync worker 内部 API 调用用） |
 | `CRON_SECRET` | secret | 手动触发 sync worker `POST /__cron/sync` 的认证密钥（定时 cron 由 sync worker 自动执行） |
-| `MANAGE_SECRET` | secret | 必填。管理页写操作密码；未配置时管理 API 返回 503 |
 
 > GitHub 中：标 **var** 的配在 Settings → Secrets and variables → Actions → **Variables**；标 **secret** 的配在 **Secrets**。
 
 ### 迁移与回滚
 
-- 迁移顺序：先在部署环境配置 `MANAGE_SECRET`，再部署代码，最后验证 `/manage` 的 cron OAuth 授权与首次同步。
-- 回滚代码时：保留 `MANAGE_SECRET`，并继续保留 `bgm:tokens` 里的 token；不要在回滚里删除 secret 或清空 KV token，否则后续 cron 需要重新授权。
+- 迁移顺序：先在部署环境配置 `BANGUMI_TOKEN`，再部署代码，最后在 Worker 首页的「动画同步」视图验证多账户动画同步。
+- 回滚代码时：保留 `BANGUMI_TOKEN` / `BANGUMI_REFRESH_TOKEN`，并继续保留 KV 中已有的 `bgm:tokens`；不要在回滚里清空 token，否则后续 cron 需要重新配置。
 
 ## 调试与日志
 
@@ -212,15 +208,14 @@ curl https://your-worker.workers.dev/api/health
 
 `last_error` 为最近一次同步失败的错误消息（仅存最近一条）。
 
-**持久化错误日志（需管理密钥）**
+**持久化错误日志（公开诊断接口）**
 
 ```bash
-curl -H 'X-Manage-Secret: <MANAGE_SECRET>' \
-  https://your-worker.workers.dev/api/manage/errors?n=20
+curl https://your-worker.workers.dev/api/manage/errors?n=20
 # → {"count":50,"errors":[{...}, ...]}
 ```
 
-KV 环形缓冲区保留最近 **50 条**错误/warn 事件（`api_error`、`manage_auth_denied`、`manage_input_error`、`sync_failed`、`manage_request_failed` 等），查询参数 `n` 控制返回条数（默认 20，上限 100），按时间倒序。
+KV 环形缓冲区保留最近 **50 条**错误/warn 事件（`api_error`、`manage_input_error`、`sync_failed`、`manage_request_failed` 等），查询参数 `n` 控制返回条数（默认 20，上限 100），按时间倒序。
 
 ### 日志事件速查
 
@@ -236,12 +231,9 @@ KV 环形缓冲区保留最近 **50 条**错误/warn 事件（`api_error`、`man
 | `image_proxy_hit` | info | 图片缓存命中，含 `hash` / `content_type` |
 | `image_proxy_miss` | info | 图片缓存未命中，含 `hash` |
 | `image_download_failed` | warn | 单图下载失败，含 `subject_id` / `url` / `reason` |
-| `manage_auth_denied` | warn | 管理 API 认证被拒，含 `status` / `has_secret` / `origin` |
 | `manage_input_error` | warn | 管理 API 输入校验失败，含 `route` / `reason` |
-| `manage_oauth_url` | info | OAuth 授权 URL 生成，含 `purpose` |
-| `manage_oauth_exchange` | info | OAuth code 换 token 成功，含 `purpose` |
 | `manage_compare` | info | 账户对比结果，含双方条目数 / 共同数 / 差异数 |
-| `manage_sync` | info | 管理端同步写入，含 `mode` / `total` / `ok` / `errors` |
+| `manage_sync` | info | 前端动画同步写入，含 `mode` / `total` / `ok` / `errors` |
 | `manage_cron_token_deleted` | info | cron token 已清除 |
 | `manage_request_failed` | error | 管理 API 上游/内部错误，含 `route` / `kind` / `upstream_status` |
 | `sync_phase` | info | 定时同步阶段（token_refresh → token_ready → fetched_collections → images_downloaded → fetch_calendar → snapshot_written），每阶段含计数 |
