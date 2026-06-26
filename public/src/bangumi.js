@@ -322,17 +322,25 @@
     })
 
     // ── Card renderer ──
-    function renderCards(filter, page, pageSize, search) {
-      var data = syncState.data; if (!data) return
-      var nameA = (data.userA && data.userA.name) || 'A'
-      var nameB = (data.userB && data.userB.name) || 'B'
+    function getTitle(entry) {
+      return entry.title || entry.name_cn || entry.name || '#' + (entry.externalId || entry.subject_id)
+    }
 
+    function canSyncSection(dir, section) {
+      if (section === 'diff') return true
+      if (section === 'onlyA') return dir === 'A->B'
+      if (section === 'onlyB') return dir === 'B->A'
+      return false
+    }
+
+    function getFilteredEntries(filter, search) {
+      var data = syncState.data; if (!data) return
       var all = []
       function push(d, section) {
-        if (search && d.title.toLowerCase().indexOf(search.toLowerCase()) === -1) return
-        d._section = section
-        d._checkbox = section !== 'same'
-        all.push(d)
+        if (search && getTitle(d).toLowerCase().indexOf(search.toLowerCase()) === -1) return
+        var entry = Object.assign({}, d)
+        entry._section = section
+        all.push(entry)
       }
 
       if (filter === 'all' || filter === 'diff') {
@@ -347,6 +355,15 @@
       if (filter === 'same') {
         ;(data.same || []).forEach(function(d) { push(d, 'same') })
       }
+      return all
+    }
+
+    function renderCards(filter, page, pageSize, search) {
+      var data = syncState.data; if (!data) return
+      var nameA = (data.userA && data.userA.name) || 'A'
+      var nameB = (data.userB && data.userB.name) || 'B'
+      var dir = (document.getElementById('sync-direction') || {}).value || 'A->B'
+      var all = getFilteredEntries(filter, search) || []
 
       var tp = Math.ceil(all.length / pageSize) || 1
       var start = (page - 1) * pageSize
@@ -362,6 +379,7 @@
           var isOnlyA = d._section === 'onlyA'
           var isOnlyB = d._section === 'onlyB'
           var isSame = d._section === 'same'; if (isSame) { d.statusA = d.statusB = d.status; d.progressA = d.progressB = d.progress; d.scoreA = d.scoreB = d.score; }
+          var canSync = canSyncSection(dir, d._section)
 
           var borderColor = ''
           if (isDiff && d.statusA !== d.statusB) borderColor = '#e94560'
@@ -380,7 +398,7 @@
             if (highScore > 0) titleExtras += (highEp > 0 ? ' / ' : '') + '\u2605 ' + highScore
             titleExtras += '</span>'
           }
-          var titleName = d.title || d.name_cn || d.name || '#' + (d.externalId || d.subject_id)
+          var titleName = getTitle(d)
           h += '<div class="sync-card-title">' + titleName + titleExtras + '</div>'
 
           // Side-by-side columns
@@ -423,9 +441,11 @@
           h += '</div>' // sync-card-cols
 
           // Checkbox row
-          if (!isSame) {
+          if (canSync) {
             var cid = d.externalId || d.subject_id
             h += '<div class="sync-card-check"><label><input type="checkbox" checked data-id="' + cid + '"> \u540c\u6b65\u6b64\u9879</label></div>'
+          } else if (!isSame) {
+            h += '<div class="sync-card-check"><span style="font-size:12px;color:#999;font-weight:800;">\u5f53\u524d\u65b9\u5411\u4e0d\u53ef\u540c\u6b65</span></div>'
           }
 
           h += '</div>' // sync-card
@@ -497,7 +517,7 @@
       h += '<select id="sync-direction" style="padding:4px 6px;font-size:11px;">'
       h += '<option value="A->B">' + nameA + ' \u2192 ' + nameB + '</option>'
       h += '<option value="B->A">' + nameB + ' \u2192 ' + nameA + '</option></select>'
-      h += '<button id="sync-full-btn" class="sync-tool-btn" style="background:#e94560;color:#fff;">\u5b8c\u6574\u540c\u6b65</button>'
+      h += '<button id="sync-full-btn" class="sync-tool-btn" style="background:#e94560;color:#fff;">\u540c\u6b65\u7b5b\u9009\u5168\u90e8</button>'
       h += '<button id="sync-sel-btn" class="sync-tool-btn">\u9009\u4e2d\u540c\u6b65</button>'
       h += '</div>'
 
@@ -534,6 +554,9 @@
       document.getElementById('sync-sel-rev').addEventListener('click', function() {
         resultArea.querySelectorAll('input[type=checkbox]').forEach(function(c) { c.checked = !c.checked })
       })
+      document.getElementById('sync-direction').addEventListener('change', function() {
+        renderCards(syncState.filter, 1, parseInt(document.getElementById('sync-pagesize').value), syncState.search)
+      })
 
       document.getElementById('sync-full-btn').addEventListener('click', function() { doSyncOp('full', []) })
       document.getElementById('sync-sel-btn').addEventListener('click', function() {
@@ -561,13 +584,10 @@
       return ids
     }
 
-    function getFullSyncIds(dir) {
-      if (!syncState.data) return []
-      var sourceOnly = dir === 'A->B' ? syncState.data.onlyA : syncState.data.onlyB
-      return uniqueIds([]
-        .concat(syncState.data.differences || [])
-        .concat(sourceOnly || [])
-        .concat(syncState.data.same || []))
+    function getSyncableFilteredIds(dir, filter, search) {
+      return uniqueIds((getFilteredEntries(filter, search) || []).filter(function(entry) {
+        return canSyncSection(dir, entry._section)
+      }))
     }
 
     async function doSyncOp(mode, subjectIds) {
@@ -578,7 +598,7 @@
       var nameB = (syncState.data && syncState.data.userB && syncState.data.userB.name) || 'Account B'
       var fromUser = dir === 'A->B' ? nameA : nameB
       var toUser = dir === 'A->B' ? nameB : nameA
-      var ids = mode === 'full' ? getFullSyncIds(dir) : subjectIds
+      var ids = mode === 'full' ? getSyncableFilteredIds(dir, syncState.filter, syncState.search) : subjectIds
       var expected = ids.length
       var platformA = (resultArea.querySelector('.sync-platform[data-side="A"]') || {}).value || 'bgm'
       var platformB = (resultArea.querySelector('.sync-platform[data-side="B"]') || {}).value || 'bgm'

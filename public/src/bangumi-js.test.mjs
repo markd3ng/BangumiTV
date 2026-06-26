@@ -27,11 +27,17 @@ test('public sync uses sync API routes and no legacy manage routes', () => {
 
 test('public full sync batches source ids to avoid one huge worker request', () => {
   assert.ok(source.includes('var SYNC_BATCH_SIZE = 35'), 'uses a worker-safe batch size')
-  assert.ok(source.includes('getFullSyncIds(dir)'), 'full sync derives source ids from compare data')
-  assert.ok(source.includes("syncState.data.differences || []"), 'includes changed entries')
-  assert.ok(source.includes("dir === 'A->B' ? syncState.data.onlyA : syncState.data.onlyB"), 'includes source-only entries')
-  assert.ok(source.includes('syncState.data.same || []'), 'includes unchanged source entries for full sync')
   assert.ok(source.includes("mode: 'partial'"), 'sends backend chunk requests as partial batches')
   assert.ok(source.includes('for (var start = 0; start < ids.length; start += SYNC_BATCH_SIZE)'), 'iterates batches')
   assert.ok(source.includes("Math.round(done / expected * 100) + '%'"), 'updates progress per completed batch')
+})
+
+test('public full sync applies current filter search and direction', () => {
+  assert.ok(source.includes('getSyncableFilteredIds(dir, syncState.filter, syncState.search)'), 'full sync uses current filter/search')
+  assert.ok(source.includes("canSyncSection(dir, section)"), 'direction decides whether a section can sync')
+  assert.ok(source.includes("if (section === 'diff') return true"), 'changed entries sync in either direction')
+  assert.ok(source.includes("if (section === 'onlyA') return dir === 'A->B'"), 'A-only entries sync only A to B')
+  assert.ok(source.includes("if (section === 'onlyB') return dir === 'B->A'"), 'B-only entries sync only B to A')
+  assert.ok(source.includes("syncState.filter, 1, parseInt(document.getElementById('sync-pagesize').value), syncState.search"), 'direction changes re-render checkbox availability')
+  assert.ok(source.includes('\\u540c\\u6b65\\u7b5b\\u9009\\u5168\\u90e8'), 'button text describes filtered sync')
 })
