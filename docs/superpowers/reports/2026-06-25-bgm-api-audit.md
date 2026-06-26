@@ -109,6 +109,16 @@
 - **验证方式：** worker 同步测试模拟 `from: "Account A"`，断言 full 模式仍使用 `real-source-user` 拉取源收藏，并同步所有源条目。
 - **状态：** 已修复；`executeSync()` full/partial 目标集合均来自 token owner username。
 
+#### BGM-API-008：公开同步页曾向同步 API 发送 `A` / `B` 占位用户名
+
+- **位置：** `public/src/bangumi.js:547`
+- **原写法：** 黄色公开同步页调用 `/api/manage/sync` 时，把 `from/to` 写成 `A` / `B`，而不是 compare 阶段返回的真实 bgm.tv username。
+- **证据：** 截图中的 UI 来自 `public/src/bangumi.js` / `public/src/bangumi.css`，不是 `packages/worker/src/manage/index.html`；后端旧版本会使用 `from` 拉源收藏。
+- **影响：** 当前端或后端任一侧仍在旧版本时，完整同步可能只执行少量条目，和对比页显示的几百条源账号收藏不一致。
+- **建议修法：** 公开同步页从 `syncState.data.userA.name/userB.name` 读取真实用户名发给 `/api/manage/sync`；同步结果同时显示预计项数和后端返回项数，便于区分前端发错、后端执行少、或部署缓存问题。
+- **验证方式：** public 前端静态测试断言同步请求使用 compare 返回的用户名，并显示 `results.length` 诊断信息。
+- **状态：** 已修复；`public/src/bangumi.js` 不再发送 `A` / `B` 作为同步用户名。
+
 ### P2 问题
 
 #### BGM-API-101：审计设计/计划曾误把 `/calendar` 列成本地 OpenAPI 缺口

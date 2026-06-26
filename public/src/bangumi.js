@@ -548,13 +548,19 @@
       var dir = document.getElementById('sync-direction').value
       var fromToken = dir === 'A->B' ? syncState.tokenA : syncState.tokenB
       var toToken = dir === 'A->B' ? syncState.tokenB : syncState.tokenA
-      var fromUser = dir === 'A->B' ? 'A' : 'B'; var toUser = dir === 'A->B' ? 'B' : 'A'
+      var nameA = (syncState.data && syncState.data.userA && syncState.data.userA.name) || 'Account A'
+      var nameB = (syncState.data && syncState.data.userB && syncState.data.userB.name) || 'Account B'
+      var totalA = (syncState.data && syncState.data.userA && syncState.data.userA.total) || 0
+      var totalB = (syncState.data && syncState.data.userB && syncState.data.userB.total) || 0
+      var fromUser = dir === 'A->B' ? nameA : nameB
+      var toUser = dir === 'A->B' ? nameB : nameA
+      var expected = mode === 'full' ? (dir === 'A->B' ? totalA : totalB) : subjectIds.length
       var platformA = (resultArea.querySelector('.sync-platform[data-side="A"]') || {}).value || 'bgm'
       var platformB = (resultArea.querySelector('.sync-platform[data-side="B"]') || {}).value || 'bgm'
 
       document.getElementById('sync-progress').style.display = ''
       document.getElementById('sync-progress-fill').style.width = '0%'
-      document.getElementById('sync-progress-text').textContent = '\u6b63\u5728\u540c\u6b65...'
+      document.getElementById('sync-progress-text').textContent = '\u6b63\u5728\u540c\u6b65... \u6a21\u5f0f ' + mode + '\uff0c\u9884\u8ba1 ' + expected + ' \u9879'
 
       try {
         var res = await fetch(API + '/api/manage/sync', {
@@ -574,6 +580,7 @@
         var err = results.filter(function(r) { return r.status === 'error' }).length
         document.getElementById('sync-progress-fill').style.width = '100%'
         var msg = '\u540c\u6b65\u5b8c\u6210\uff1a' + ok + ' \u6210\u529f\uff0c' + err + ' \u5931\u8d25'
+        msg += '<br><small>\u8bf7\u6c42\u6a21\u5f0f: ' + mode + '\uff1b\u9884\u8ba1: ' + expected + '\uff1b\u540e\u7aef\u8fd4\u56de: ' + results.length + '</small>'
         if (err > 0) {
           var failed = results.filter(function(r) { return r.status === 'error' }).slice(0, 3).map(function(r) { return (r.title || r.externalId) + ': ' + (r.error || 'unknown') }).join('; ')
           msg += '<br><small style="color:#e94560;">\u5931\u8d25\u6761\u76ee: ' + failed + (err > 3 ? ' \u7b49' + err + '\u9879' : '') + '</small>'
