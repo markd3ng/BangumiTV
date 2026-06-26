@@ -40,12 +40,12 @@
 #### BGM-API-001：`fetchJson()` 曾把 `204 No Content` 当成 JSON 解析
 
 - **位置：** `packages/shared/src/bgm-client.ts:73`, `packages/shared/src/bgm-client.ts:98`, `packages/shared/src/bgm-client.ts:198`
-- **原写法：** 写入类 endpoint 成功后进入 `fetchJson()`，最后无条件 `res.json()`。
-- **证据：** 本地 OpenAPI 中 `POST/PATCH /v0/users/-/collections/{subject_id}` 的成功响应是 `204`。
+- **原写法：** 写入类 endpoint 成功后进入 `fetchJson()`，最后无条件解析 JSON；第一轮修复只对 `204` 短路。
+- **证据：** 本地 OpenAPI 中 `POST/PATCH /v0/users/-/collections/{subject_id}` 的成功响应是 `204`；实际兼容层仍需接受其他 2xx 空响应体，否则会抛 `Unexpected end of JSON input`。
 - **影响：** 写入已经成功时仍可能被报告为 `Unexpected end of JSON input`。
-- **建议修法：** 在 `res.json()` 之前对 `204` 直接返回 `undefined` 或 `null`。
-- **验证方式：** 增加 shared 测试，模拟 `patchCollection()` 收到 `204` 时不抛错。
-- **状态：** 已在 批次 A 修复；shared 测试覆盖 `204`。
+- **建议修法：** 成功响应先读取文本；空 body 直接返回 `undefined`，非空 body 再解析 JSON。
+- **验证方式：** 增加 shared 测试，模拟 `patchCollection()` 收到 `204` 和 `upsertCollection()` 收到 `200` 空 body 时都不抛错。
+- **状态：** 已修复；shared 测试覆盖 `204` 和 2xx 空响应体。
 
 #### BGM-API-002：账户同步曾用 PATCH 执行 upsert 语义
 
@@ -144,11 +144,11 @@
 
 状态：已实现。
 
-- 在 shared bgm client 中，`204 No Content` 直接视为成功，不再解析 JSON。
+- 在 shared bgm client 中，2xx 空响应体直接视为成功，不再解析 JSON。
 - 账户同步写回新增 `POST /v0/users/-/collections/{subject_id}` 的 upsert 方法。
 - 非书籍同步写入 body 不包含 `ep_status` 和 `vol_status`。
 - 动画同步写入 body 不包含会覆盖目标账号标签/评价的 `tags` 和 `comment`。
-- 已增加针对 `204`、写入方法、写入 body 的聚焦测试。
+- 已增加针对 `204`、2xx 空响应体、写入方法、写入 body 的聚焦测试。
 
 ### 批次 B：P1 产品语义
 

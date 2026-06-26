@@ -96,7 +96,9 @@ export class BgmClient {
       throw new BgmHttpError(res.status, `bgm.tv 返回错误 (${res.status}): ${body.slice(0, 300)}`)
     }
     if (res.status === 204) return undefined
-    return res.json()
+    const body = await res.text()
+    if (!body.trim()) return undefined
+    return JSON.parse(body)
   }
 
   async getCollections(username: string, offset = 0, limit = 30): Promise<{ data: BgmCollection[]; total: number }> {

@@ -126,6 +126,18 @@ test('patchCollection accepts 204 No Content without parsing JSON', async () => 
   }
 })
 
+test('upsertCollection accepts 2xx empty responses without parsing JSON', async () => {
+  const client = new BgmClient()
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = captureFetch(200).fetch
+  try {
+    const result = await client.upsertCollection('token', 265, { type: 3 })
+    assert.equal(result, undefined)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test('BgmPlatformClient upserts collection with POST and only syncs anime-safe fields', async () => {
   const client = new BgmPlatformClient()
   const originalFetch = globalThis.fetch
