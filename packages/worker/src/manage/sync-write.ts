@@ -57,7 +57,8 @@ async function doSync(
   clientB: PlatformClient, toToken: string,
   request: SyncRequest,
 ): Promise<SyncResult[]> {
-  const fromCol = await clientA.fetchCollections(fromToken, request.from)
+  const sourceAccount = await clientA.getMe(fromToken)
+  const fromCol = await clientA.fetchCollections(fromToken, sourceAccount.username)
 
   let targets: ComparisonItem[]
   if (request.mode === 'full') {

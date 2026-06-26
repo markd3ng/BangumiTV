@@ -99,6 +99,16 @@
 - **验证方式：** 测试确认 bgm 平台写入 body 只包含动画同步需要的安全字段。
 - **状态：** 已修复；`BgmPlatformClient.patchEntry()` 不再发送 `tags` 和 `comment`。
 
+#### BGM-API-007：完整同步曾信任前端传入的源用户名
+
+- **位置：** `packages/worker/src/manage/index.html:358`, `packages/worker/src/manage/sync-write.ts:60`
+- **原写法：** 前端完整同步请求把 `from` 组装为 `Account A` / `Account B` 等展示文本，后端 full 模式再用该字段调用 `fetchCollections()` 拉源账号收藏。
+- **证据：** `BgmPlatformClient.fetchCollections()` 需要真实 bgm.tv username；`getMe(token)` 已能从 token 解析真实 username。
+- **影响：** 完整同步可能没有按真实源账号的全部动画收藏执行，表现为只同步少量条目，而不是对比页显示的几百条源账号独有收藏。
+- **建议修法：** 后端同步时用源 token 调用 `getMe()`，以 token owner username 拉源收藏；前端传入的 `from/to` 只作为兼容字段，不作为数据源身份。
+- **验证方式：** worker 同步测试模拟 `from: "Account A"`，断言 full 模式仍使用 `real-source-user` 拉取源收藏，并同步所有源条目。
+- **状态：** 已修复；`executeSync()` full/partial 目标集合均来自 token owner username。
+
 ### P2 问题
 
 #### BGM-API-101：审计设计/计划曾误把 `/calendar` 列成本地 OpenAPI 缺口
