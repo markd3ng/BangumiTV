@@ -8,3 +8,10 @@ test('compare source keeps only-side entries out of differences', async () => {
   assert.doesNotMatch(source, /onlyA\.push\(d\);\s*differences\.push\(d\)/)
   assert.doesNotMatch(source, /onlyB\.push\(d\);\s*differences\.push\(d\)/)
 })
+
+test('compare source treats only syncable fields as differences', async () => {
+  const source = await readFile(new URL('./compare.ts', import.meta.url), 'utf8')
+
+  assert.match(source, /a\.status === b\.status && a\.score === b\.score/)
+  assert.doesNotMatch(source, /a\.status === b\.status && a\.progress === b\.progress && a\.score === b\.score/)
+})
