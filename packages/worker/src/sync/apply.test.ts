@@ -8,6 +8,7 @@ class FakeClient implements PlatformClient {
   readonly platform: PlatformId = 'bgm'
   fetchedUsernames: string[] = []
   patchedIds: string[] = []
+  episodeProgressIds: string[] = []
   private readonly username: string
   private readonly items: ComparisonItem[]
 
@@ -25,8 +26,10 @@ class FakeClient implements PlatformClient {
     return this.items
   }
 
-  async patchEntry(_token: string, externalId: string, _item: ComparisonItem): Promise<void> {
+  async patchEntry(_token: string, externalId: string, _item: ComparisonItem, options?: { sourceToken?: string }): Promise<{ episodeChanged: number }> {
     this.patchedIds.push(externalId)
+    if (options?.sourceToken) this.episodeProgressIds.push(externalId)
+    return { episodeChanged: Number(externalId) }
   }
 }
 
@@ -79,4 +82,20 @@ test('executeSync full mode fetches source collections with token owner username
   assert.deepEqual(sourceClient.fetchedUsernames, ['real-source-user'])
   assert.deepEqual(targetClient.patchedIds, ['1', '2', '3'])
   assert.equal(results.length, 3)
+})
+
+test('executeSync copies episode progress and reports changed episode count', async () => {
+  const sourceClient = new FakeClient('real-source-user', [item('8')])
+  const targetClient = new FakeClient('real-target-user', [])
+
+  const results = await executeSync(sourceClient, 'from-token', targetClient, 'to-token', {
+    mode: 'partial',
+    from: 'Account A',
+    to: 'Account B',
+    subject_ids: ['8'],
+  })
+
+  assert.deepEqual(targetClient.patchedIds, ['8'])
+  assert.deepEqual(targetClient.episodeProgressIds, ['8'])
+  assert.equal(results[0].episodeChanged, 8)
 })

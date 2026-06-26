@@ -1,6 +1,6 @@
 import { BgmClient } from '../bgm-client'
 import { fetchAllCollections } from '../utils'
-import { type PlatformClient, type ComparisonItem, type AccountInfo, WatchStatus, type PlatformId } from './client'
+import { type PlatformClient, type ComparisonItem, type AccountInfo, WatchStatus, type PlatformId, type PatchEntryOptions, type PatchEntryResult } from './client'
 
 const BGM_STATUS_MAP: Record<number, WatchStatus> = {
   1: WatchStatus.PLAN_TO_WATCH,
@@ -16,6 +16,12 @@ const WATCH_STATUS_TO_BGM: Record<string, number> = {
   [WatchStatus.WATCHING]: 3,
   [WatchStatus.ON_HOLD]: 4,
   [WatchStatus.DROPPED]: 5,
+}
+
+type EpisodeCollectionType = 0 | 1 | 2 | 3
+
+function episodeTypeMap(entries: Array<{ episode: { id: number }; type: EpisodeCollectionType }>): Map<number, EpisodeCollectionType> {
+  return new Map(entries.map((entry) => [entry.episode.id, entry.type]))
 }
 
 export class BgmPlatformClient implements PlatformClient {
@@ -40,13 +46,48 @@ export class BgmPlatformClient implements PlatformClient {
     }))
   }
 
-  async patchEntry(token: string, externalId: string, item: ComparisonItem): Promise<void> {
+  async patchEntry(token: string, externalId: string, item: ComparisonItem, options?: PatchEntryOptions): Promise<PatchEntryResult> {
     const client = new BgmClient()
     const bgmType = WATCH_STATUS_TO_BGM[item.status] || 3
-    // 账户同步当前只覆盖动画收藏；不要发送会清空目标账号标签/评论的字段。
+    // 不要发送会清空目标账号标签/评论的字段；动画进度走 episode collection API。
     await client.upsertCollection(token, Number(externalId), {
       type: bgmType,
       rate: item.score,
     })
+
+    const episodeChanged = options?.sourceToken
+      ? await this.syncEpisodeProgress(client, options.sourceToken, token, Number(externalId))
+      : 0
+
+    return { episodeChanged }
+  }
+
+  private async syncEpisodeProgress(client: BgmClient, sourceToken: string, targetToken: string, subjectId: number): Promise<number> {
+    const [source, target] = await Promise.all([
+      client.getSubjectEpisodeCollections(sourceToken, subjectId),
+      client.getSubjectEpisodeCollections(targetToken, subjectId),
+    ])
+    const sourceMap = episodeTypeMap(source.data)
+    const targetMap = episodeTypeMap(target.data)
+    const changedByType = new Map<EpisodeCollectionType, number[]>()
+    const ids = new Set([...sourceMap.keys(), ...targetMap.keys()])
+
+    for (const episodeId of ids) {
+      const sourceType = sourceMap.get(episodeId) ?? 0
+      const targetType = targetMap.get(episodeId) ?? 0
+      if (sourceType === targetType) continue
+      const bucket = changedByType.get(sourceType) || []
+      bucket.push(episodeId)
+      changedByType.set(sourceType, bucket)
+    }
+
+    let changed = 0
+    for (const [type, episodeIds] of changedByType) {
+      if (!episodeIds.length) continue
+      await client.patchSubjectEpisodeCollections(targetToken, subjectId, episodeIds, type)
+      changed += episodeIds.length
+    }
+
+    return changed
   }
 }

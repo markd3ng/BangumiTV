@@ -269,7 +269,7 @@
     var tok = document.createElement('div')
     tok.className = 'sync-token-area'
     tok.innerHTML = '<h3>多账户动画同步</h3>' +
-      '<p class="muted" style="font-size:12px;margin-bottom:8px;">粘贴 <a href="https://bgm.tv/dev" target="_blank">bgm.tv Access Token</a>，两个账号各一个；仅同步动画收藏</p>'
+      '<p class="muted" style="font-size:12px;margin-bottom:8px;">粘贴 <a href="https://bgm.tv/dev" target="_blank">bgm.tv Access Token</a>，两个账号各一个；同步动画条目、状态、评分和章节进度</p>'
     view.appendChild(tok)
 
     function buildTokenRow(side, idSuffix) {
@@ -308,7 +308,7 @@
 
     var loaded = false
     var syncState = { tokenA: '', tokenB: '', data: null, page: 1, filter: 'all', search: '' }
-    var SYNC_BATCH_SIZE = 35
+    var SYNC_BATCH_SIZE = 5
 
     // ── Token clear handler ──
     tok.addEventListener('click', function(e) {

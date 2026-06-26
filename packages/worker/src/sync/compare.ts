@@ -82,7 +82,7 @@ export async function compareAccounts(
     const b = mapB.get(id)
 
     if (a && b) {
-      if (a.status === b.status && a.score === b.score) {
+      if (a.status === b.status && a.progress === b.progress && a.score === b.score) {
         same.push({ externalId: id, title: a.title, status: statusLabel(a.status), progress: a.progress, totalEpisodes: a.totalEpisodes, score: a.score })
       } else {
         differences.push({ externalId: id, title: a.title || b.title, statusA: statusLabel(a.status), statusB: statusLabel(b.status), progressA: a.progress, progressB: b.progress, scoreA: a.score, scoreB: b.score })

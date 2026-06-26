@@ -120,12 +120,12 @@ Sync Worker 在定时同步时自动下载条目封面（来源：bgm.tv），�
 
 访问 Worker 首页并切换到「动画同步」视图：
 
-- **多账户动画同步**：粘贴两个 bgm.tv access token → 点击对比 → 选择完整同步动画或选中同步动画 → 执行。当前仅同步 bgm.tv 动画收藏（`subject_type=2`）。Token 在 [bgm.tv 开发者设置](https://bgm.tv/dev) 生成，永久有效。
+- **多账户动画同步**：粘贴两个 bgm.tv access token → 点击对比 → 选择完整同步动画或选中同步动画 → 执行。当前仅支持 bgm.tv 动画收藏（`subject_type=2`），同步内容包含条目状态、评分和章节进度。Token 在 [bgm.tv 开发者设置](https://bgm.tv/dev) 生成，永久有效。
 - **Cron token** 通过 Cloudflare Dashboard 环境变量 `BANGUMI_TOKEN` 配置，不在前端页面操作。
 
 > 说明：旧 `/manage` 页面入口和 `/api/manage/*` 同步接口已移除；首页动画同步视图调用 `POST /api/sync/compare` 和 `POST /api/sync/apply`。
 
-同步写入完成后，`POST /api/sync/apply` 会在响应头返回 `X-Sync-Operation-Id` 和 `X-Sync-Operation-Url`。页面会把每个批次的“操作日志”链接显示在结果区，链接格式为 `/api/check/<operation-id>`；点开就是可读结果页，用于确认这一批真实写入了多少条、成功/失败数量和失败原因。
+同步写入完成后，`POST /api/sync/apply` 会在响应头返回 `X-Sync-Operation-Id` 和 `X-Sync-Operation-Url`。页面会把每个批次的“操作日志”链接显示在结果区，链接格式为 `/api/check/<operation-id>`；点开就是可读结果页，用于确认这一批真实写入了多少条、章节进度变更数量、成功/失败数量和失败原因。
 
 ## 本地开发
 
@@ -239,7 +239,7 @@ https://your-worker.workers.dev/api/check/<operation-id>
 | `sync_compare` | info | 账户动画收藏对比结果，含双方条目数 / 共同数 / 差异数 |
 | `sync_compare_fetch_failed` | error | 账户对比拉取收藏失败，含安全化后的 `reason` |
 | `sync_apply` | info | 前端动画同步写入，含 `mode` / `total` / `ok` / `errors` |
-| `sync_operation` | info | 单次前端同步操作日志，含 `requested_count` / `returned_count` / `ok` / `errors` / `items` |
+| `sync_operation` | info | 单次前端同步操作日志，含 `requested_count` / `returned_count` / `ok` / `errors` / `items`，每个 item 可含 `episodeChanged` |
 | `sync_request_failed` | error | 前端同步 API 上游/内部错误，含 `route` / `kind` / `upstream_status` |
 | `sync_phase` | info | 定时同步阶段（token_refresh → token_ready → fetched_collections → images_downloaded → fetch_calendar → snapshot_written），每阶段含计数 |
 | `sync_failed` | error | 定时同步失败，含 `phase` / `kind` / `upstream_status` |

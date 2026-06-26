@@ -166,3 +166,99 @@ test('BgmPlatformClient upserts collection with POST and only syncs anime-safe f
     globalThis.fetch = originalFetch
   }
 })
+
+test('BgmClient reads subject episode collections', async () => {
+  const client = new BgmClient()
+  const originalFetch = globalThis.fetch
+  const captured = captureFetch(200)
+  globalThis.fetch = async (url: string | URL | Request, init?: RequestInit) => {
+    captured.calls.push({ url: String(url), init })
+    return new Response(JSON.stringify({
+      data: [
+        { episode: { id: 101 }, type: 2, updated_at: 1 },
+        { episode: { id: 102 }, type: 0, updated_at: 1 },
+      ],
+      total: 2,
+    }), { status: 200 }) as unknown as Response
+  }
+  try {
+    const result = await client.getSubjectEpisodeCollections('token', 265)
+
+    assert.equal(captured.calls[0].url, 'https://api.bgm.tv/v0/users/-/collections/265/episodes?limit=1000&offset=0')
+    assert.equal(captured.calls[0].init?.headers && (captured.calls[0].init.headers as Record<string, string>).Authorization, 'Bearer token')
+    assert.deepEqual(result.data.map((entry) => ({ id: entry.episode.id, type: entry.type })), [
+      { id: 101, type: 2 },
+      { id: 102, type: 0 },
+    ])
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('BgmClient patches episode collections by subject', async () => {
+  const client = new BgmClient()
+  const originalFetch = globalThis.fetch
+  const captured = captureFetch()
+  globalThis.fetch = captured.fetch
+  try {
+    await client.patchSubjectEpisodeCollections('token', 265, [101, 102], 2)
+
+    assert.equal(captured.calls.length, 1)
+    assert.equal(captured.calls[0].url, 'https://api.bgm.tv/v0/users/-/collections/265/episodes')
+    assert.equal(captured.calls[0].init?.method, 'PATCH')
+    assert.deepEqual(JSON.parse(String(captured.calls[0].init?.body)), {
+      episode_id: [101, 102],
+      type: 2,
+    })
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('BgmPlatformClient syncs episode progress after collection fields', async () => {
+  const client = new BgmPlatformClient()
+  const originalFetch = globalThis.fetch
+  const calls: { url: string; init?: RequestInit }[] = []
+  globalThis.fetch = async (url: string | URL | Request, init?: RequestInit) => {
+    calls.push({ url: String(url), init })
+    const urlText = String(url)
+    if (urlText.includes('/collections/265/episodes') && init?.method !== 'PATCH') {
+      const token = (init?.headers as Record<string, string>).Authorization
+      const data = token === 'Bearer from-token'
+        ? [
+            { episode: { id: 101 }, type: 2, updated_at: 1 },
+            { episode: { id: 102 }, type: 2, updated_at: 1 },
+            { episode: { id: 103 }, type: 0, updated_at: 1 },
+          ]
+        : [
+            { episode: { id: 101 }, type: 2, updated_at: 1 },
+            { episode: { id: 102 }, type: 0, updated_at: 1 },
+            { episode: { id: 103 }, type: 2, updated_at: 1 },
+          ]
+      return new Response(JSON.stringify({ data, total: data.length }), { status: 200 }) as unknown as Response
+    }
+    return new Response(null, { status: 204 }) as unknown as Response
+  }
+
+  try {
+    const result = await client.patchEntry('to-token', '265', {
+      externalId: '265',
+      title: 'Neon Genesis Evangelion',
+      status: WatchStatus.WATCHING,
+      progress: 2,
+      totalEpisodes: 3,
+      score: 9,
+      platform: 'bgm',
+    }, { sourceToken: 'from-token' })
+
+    const patchCalls = calls.filter((call) => call.init?.method === 'PATCH')
+    assert.equal(calls[0].init?.method, 'POST')
+    assert.equal(result.episodeChanged, 2)
+    assert.deepEqual(patchCalls.map((call) => JSON.parse(String(call.init?.body))), [
+      { episode_id: [102], type: 2 },
+      { episode_id: [103], type: 0 },
+    ])
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})

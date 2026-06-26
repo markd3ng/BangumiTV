@@ -18,6 +18,14 @@ export interface ComparisonItem {
   platform: PlatformId
 }
 
+export interface PatchEntryOptions {
+  sourceToken?: string
+}
+
+export interface PatchEntryResult {
+  episodeChanged: number
+}
+
 export interface AccountInfo {
   username: string
   externalId: string
@@ -28,5 +36,5 @@ export interface PlatformClient {
   readonly platform: PlatformId
   getMe(token: string): Promise<AccountInfo>
   fetchCollections(token: string, username: string): Promise<ComparisonItem[]>
-  patchEntry(token: string, externalId: string, item: ComparisonItem): Promise<void>
+  patchEntry(token: string, externalId: string, item: ComparisonItem, options?: PatchEntryOptions): Promise<PatchEntryResult>
 }

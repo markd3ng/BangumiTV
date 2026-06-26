@@ -60,6 +60,12 @@ export interface BgmCalendarItem {
   items: BgmSlimSubject[]
 }
 
+export interface BgmEpisodeCollection {
+  episode: { id: number }
+  type: 0 | 1 | 2 | 3
+  updated_at: number
+}
+
 export class BgmClient {
   constructor(private token?: string) {}
 
@@ -214,6 +220,24 @@ export class BgmClient {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'User-Agent': UA },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(30000),
+    })
+  }
+
+  async getSubjectEpisodeCollections(token: string, subjectId: number): Promise<{ data: BgmEpisodeCollection[]; total: number }> {
+    const url = `${BGM_BASE}/v0/users/-/collections/${subjectId}/episodes?limit=1000&offset=0`
+    return this.fetchJson(url, {
+      headers: { Authorization: `Bearer ${token}`, 'User-Agent': UA },
+      signal: AbortSignal.timeout(30000),
+    })
+  }
+
+  async patchSubjectEpisodeCollections(token: string, subjectId: number, episodeIds: number[], type: 0 | 1 | 2 | 3) {
+    const url = `${BGM_BASE}/v0/users/-/collections/${subjectId}/episodes`
+    return this.fetchJson(url, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'User-Agent': UA },
+      body: JSON.stringify({ episode_id: episodeIds, type }),
       signal: AbortSignal.timeout(30000),
     })
   }

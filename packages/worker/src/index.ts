@@ -42,6 +42,7 @@ interface SyncOperationLog {
     externalId: string
     title: string
     status: 'ok' | 'error'
+    episodeChanged?: number
     error?: string
   }>
 }
@@ -84,7 +85,7 @@ function createSyncOperationLog(
   id: string,
   mode: string,
   requestedCount: number,
-  results: Array<{ externalId: string; title: string; status: 'ok' | 'error'; error?: string }>,
+  results: Array<{ externalId: string; title: string; status: 'ok' | 'error'; episodeChanged?: number; error?: string }>,
   durationMs: number,
 ): SyncOperationLog {
   const ok = results.filter((r) => r.status === 'ok').length
@@ -103,6 +104,7 @@ function createSyncOperationLog(
       externalId: result.externalId,
       title: result.title,
       status: result.status,
+      ...(typeof result.episodeChanged === 'number' ? { episodeChanged: result.episodeChanged } : {}),
       ...(result.error ? { error: result.error } : {}),
     })),
   }
@@ -121,6 +123,7 @@ function renderSyncOperationHtml(operation: SyncOperationLog): string {
       <td>${escapeHtml(item.externalId)}</td>
       <td>${escapeHtml(item.title)}</td>
       <td class="${statusClass}">${escapeHtml(item.status)}</td>
+      <td>${typeof item.episodeChanged === 'number' ? item.episodeChanged : ''}</td>
       <td>${escapeHtml(item.error || '')}</td>
     </tr>`
   }).join('')
@@ -157,8 +160,8 @@ function renderSyncOperationHtml(operation: SyncOperationLog): string {
     <span>时间 ${escapeHtml(operation.at)}</span>
   </div>
   <table>
-    <thead><tr><th>Subject ID</th><th>标题</th><th>状态</th><th>错误</th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="4">没有返回条目</td></tr>'}</tbody>
+    <thead><tr><th>Subject ID</th><th>标题</th><th>状态</th><th>章节变更</th><th>错误</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="5">没有返回条目</td></tr>'}</tbody>
   </table>
 </body>
 </html>`

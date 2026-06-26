@@ -34,7 +34,7 @@ test('public sync uses sync API routes and no legacy manage routes', () => {
 })
 
 test('public full sync batches source ids to avoid one huge worker request', () => {
-  assert.ok(source.includes('var SYNC_BATCH_SIZE = 35'), 'uses a worker-safe batch size')
+  assert.ok(source.includes('var SYNC_BATCH_SIZE = 5'), 'uses a worker-safe batch size with episode progress writes')
   assert.ok(source.includes("mode: 'partial'"), 'sends backend chunk requests as partial batches')
   assert.ok(source.includes('for (var start = 0; start < ids.length; start += SYNC_BATCH_SIZE)'), 'iterates batches')
   assert.ok(source.includes("Math.round(done / expected * 100) + '%'"), 'updates progress per completed batch')
