@@ -5,8 +5,8 @@ import { KVStorage } from './storage/kv'
 import { handleCollections } from './api/collections'
 import { handleCalendar } from './api/calendar'
 import { handleConfig } from './api/config'
-import { compareAccounts } from './manage/compare'
-import { executeSync } from './manage/sync-write'
+import { compareAccounts } from './sync/compare'
+import { executeSync } from './sync/apply'
 import { BgmPlatformClient, type PlatformId } from '@bangumi-tv/shared'
 import type { PlatformClient } from '@bangumi-tv/shared'
 import { handleImage } from './image/proxy'
@@ -17,9 +17,9 @@ import bangumiCss from './css'
 import { BgmHttpError, BgmTimeoutError, BgmNetworkError } from '@bangumi-tv/shared'
 import {
   createHealthFailureLog,
-  createManageErrorLog,
+  createSyncRequestErrorLog,
   publicError,
-} from './manage/security'
+} from './sync/errors'
 
 // ── KV 错误环形缓冲区 ──
 const ERROR_RING_KEY = 'debug:errors'
@@ -43,7 +43,7 @@ function errMsg(err: unknown): string {
 }
 
 function errorToResponse(route: string, err: unknown, storage?: KVStorage): Response {
-  const log = createManageErrorLog(route, err)
+  const log = createSyncRequestErrorLog(route, err)
   console.error(JSON.stringify(log))
   if (storage) appendErrorLog(storage, log)
 
@@ -203,21 +203,21 @@ function getPlatformClient(platform: string): PlatformClient {
   throw new Error(`Unsupported platform: ${platform}`)
 }
 
-app.post('/api/manage/compare', async (c) => {
+app.post('/api/sync/compare', async (c) => {
   const storage = new KVStorage(c.env.BANGUMI_KV)
   try {
     const body = await c.req.json()
     const clientA = getPlatformClient(body.platformA || 'bgm')
     const clientB = getPlatformClient(body.platformB || 'bgm')
     const result = await compareAccounts(clientA, body.tokenA || '', clientB, body.tokenB || '')
-    console.log(JSON.stringify({ event: 'manage_compare', platform_a: body.platformA || 'bgm', platform_b: body.platformB || 'bgm', total_a: result.userA.total, total_b: result.userB.total, common: result.common, diffs: result.differences.length, at: new Date().toISOString() }))
+    console.log(JSON.stringify({ event: 'sync_compare', platform_a: body.platformA || 'bgm', platform_b: body.platformB || 'bgm', total_a: result.userA.total, total_b: result.userB.total, common: result.common, diffs: result.differences.length, at: new Date().toISOString() }))
     return Response.json(result)
   } catch (err) {
-    return errorToResponse('/api/manage/compare', err, storage)
+    return errorToResponse('/api/sync/compare', err, storage)
   }
 })
 
-app.post('/api/manage/sync', async (c) => {
+app.post('/api/sync/apply', async (c) => {
   const storage = new KVStorage(c.env.BANGUMI_KV)
   try {
     const body = await c.req.json()
@@ -231,32 +231,11 @@ app.post('/api/manage/sync', async (c) => {
     }, c.env as { SYNCLOCK: DurableObjectNamespace })
     const syncOk = results.filter((r: any) => r.status === 'ok').length
     const syncErr = results.filter((r: any) => r.status === 'error').length
-    console.log(JSON.stringify({ event: 'manage_sync', mode: body.mode, total: results.length, ok: syncOk, errors: syncErr, at: new Date().toISOString() }))
+    console.log(JSON.stringify({ event: 'sync_apply', mode: body.mode, total: results.length, ok: syncOk, errors: syncErr, at: new Date().toISOString() }))
     return Response.json(results)
   } catch (err) {
-    return errorToResponse('/api/manage/sync', err, storage)
+    return errorToResponse('/api/sync/apply', err, storage)
   }
-})
-
-// 清除 KV 中持久化的 cron token（仅用于清理旧 KV 残留）
-app.delete('/api/manage/cron-token', async (c) => {
-  const storage = new KVStorage(c.env.BANGUMI_KV)
-  try {
-    await storage.delete('bgm:tokens')
-    console.log(JSON.stringify({ event: 'manage_cron_token_deleted', at: new Date().toISOString() }))
-    return Response.json({ ok: true })
-  } catch (err) {
-    return errorToResponse('/api/manage/cron-token', err, storage)
-  }
-})
-
-// ── 调试：查询持久化错误日志 ──
-app.get('/api/manage/errors', async (c) => {
-  const storage = new KVStorage(c.env.BANGUMI_KV)
-  const n = Math.min(parseInt(c.req.query('n') || '20') || 20, 100)
-  const errors = (await storage.get<any[]>(ERROR_RING_KEY)) || []
-  const recent = errors.slice(-n).reverse()
-  return Response.json({ count: errors.length, errors: recent })
 })
 
 

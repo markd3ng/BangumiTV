@@ -563,7 +563,7 @@
       document.getElementById('sync-progress-text').textContent = '\u6b63\u5728\u540c\u6b65... \u6a21\u5f0f ' + mode + '\uff0c\u9884\u8ba1 ' + expected + ' \u9879'
 
       try {
-        var res = await fetch(API + '/api/manage/sync', {
+        var res = await fetch(API + '/api/sync/apply', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tokenA: fromToken, platformA: platformA, from: fromUser, tokenB: toToken, platformB: platformB, to: toUser, mode: mode, subject_ids: subjectIds }),
@@ -614,7 +614,7 @@
           try {
             var platformA = selA ? selA.value : 'bgm'
             var platformB = selB ? selB.value : 'bgm'
-            var res = await fetch(API + '/api/manage/compare', {
+            var res = await fetch(API + '/api/sync/compare', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ tokenA: ta, platformA: platformA, tokenB: tb, platformB: platformB }),

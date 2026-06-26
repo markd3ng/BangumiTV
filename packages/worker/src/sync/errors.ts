@@ -1,5 +1,5 @@
-export interface ManageErrorLog {
-  event: 'manage_request_failed'
+export interface SyncRequestErrorLog {
+  event: 'sync_request_failed'
   route: string
   kind: string
   upstream_status: number | undefined
@@ -58,11 +58,11 @@ const publicMessages: Record<string, string> = {
 export function publicError(status: number, code: string, _error?: unknown): Response {
   return Response.json(
     { error: { code, message: publicMessages[code] || 'Request failed' } },
-    { status, headers: manageHeaders() },
+    { status, headers: syncHeaders() },
   )
 }
 
-export function manageHeaders(csp?: string): HeadersInit {
+export function syncHeaders(csp?: string): HeadersInit {
   const headers: Record<string, string> = {
     'Cache-Control': 'no-store',
     'Referrer-Policy': 'no-referrer',
@@ -77,13 +77,13 @@ export function manageHeaders(csp?: string): HeadersInit {
   return headers
 }
 
-export function createManageErrorLog(
+export function createSyncRequestErrorLog(
   route: string,
   err: unknown,
   at = new Date().toISOString(),
-): ManageErrorLog {
+): SyncRequestErrorLog {
   return {
-    event: 'manage_request_failed',
+    event: 'sync_request_failed',
     route,
     kind: safeErrorKind(err),
     upstream_status: upstreamStatus(err),

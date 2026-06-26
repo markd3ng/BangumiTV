@@ -11,8 +11,8 @@
 - `packages/shared/src/platform/bgm.ts`
 - `packages/shared/src/utils.ts`
 - `packages/worker/src/cron.ts`
-- `packages/worker/src/manage/compare.ts`
-- `packages/worker/src/manage/sync-write.ts`
+- `packages/worker/src/sync/compare.ts`
+- `packages/worker/src/sync/apply.ts`
 - `README.md`
 - `docs/superpowers/specs/**`
 - `docs/superpowers/plans/**`
@@ -48,7 +48,7 @@
 
 #### BGM-API-002：账户同步曾用 PATCH 执行 upsert 语义
 
-- **位置：** `packages/shared/src/bgm-client.ts:198`, `packages/shared/src/platform/bgm.ts:43`, `packages/worker/src/manage/sync-write.ts:72`
+- **位置：** `packages/shared/src/bgm-client.ts:198`, `packages/shared/src/platform/bgm.ts:43`, `packages/worker/src/sync/apply.ts:72`
 - **原写法：** 同步写入调用 `patchCollection()`，请求为 `PATCH /v0/users/-/collections/{subject_id}`。
 - **证据：** 本地 OpenAPI 描述 `POST /v0/users/-/collections/{subject_id}` 是“新增或修改”；同一条目的 `PATCH` 是修改已有收藏，404 语义包含“条目未收藏”。
 - **影响：** 目标账号尚未收藏某条目时，同步可能 404。
@@ -100,7 +100,7 @@
 
 #### BGM-API-007：完整同步曾信任前端传入的源用户名
 
-- **位置：** `packages/worker/src/manage/sync-write.ts:60`；已删除的旧 `packages/worker/src/manage/index.html` 曾有同类问题
+- **位置：** `packages/worker/src/sync/apply.ts:60`；已删除的旧 `packages/worker/src/manage/index.html` 曾有同类问题
 - **原写法：** 前端完整同步请求把 `from` 组装为 `Account A` / `Account B` 等展示文本，后端 full 模式再用该字段调用 `fetchCollections()` 拉源账号收藏。
 - **证据：** `BgmPlatformClient.fetchCollections()` 需要真实 bgm.tv username；`getMe(token)` 已能从 token 解析真实 username。
 - **影响：** 完整同步可能没有按真实源账号的全部动画收藏执行，表现为只同步少量条目，而不是对比页显示的几百条源账号独有收藏。
@@ -111,10 +111,10 @@
 #### BGM-API-008：公开同步页曾向同步 API 发送 `A` / `B` 占位用户名
 
 - **位置：** `public/src/bangumi.js:547`
-- **原写法：** 黄色公开同步页调用 `/api/manage/sync` 时，把 `from/to` 写成 `A` / `B`，而不是 compare 阶段返回的真实 bgm.tv username。
+- **原写法：** 黄色公开同步页调用同步 API 时，把 `from/to` 写成 `A` / `B`，而不是 compare 阶段返回的真实 bgm.tv username。
 - **证据：** 截图中的 UI 来自 `public/src/bangumi.js` / `public/src/bangumi.css`，不是 `packages/worker/src/manage/index.html`；后端旧版本会使用 `from` 拉源收藏。
 - **影响：** 当前端或后端任一侧仍在旧版本时，完整同步可能只执行少量条目，和对比页显示的几百条源账号收藏不一致。
-- **建议修法：** 公开同步页从 `syncState.data.userA.name/userB.name` 读取真实用户名发给 `/api/manage/sync`；同步结果同时显示预计项数和后端返回项数，便于区分前端发错、后端执行少、或部署缓存问题。
+- **建议修法：** 公开同步页从 `syncState.data.userA.name/userB.name` 读取真实用户名发给 `/api/sync/apply`；同步结果同时显示预计项数和后端返回项数，便于区分前端发错、后端执行少、或部署缓存问题。
 - **验证方式：** public 前端静态测试断言同步请求使用 compare 返回的用户名，并显示 `results.length` 诊断信息。
 - **状态：** 已修复；`public/src/bangumi.js` 不再发送 `A` / `B` 作为同步用户名。
 
@@ -124,7 +124,7 @@
 - **原写法：** Worker 暴露 `/manage` 和 `/manage/callback` 页面路由，同时保留管理 OAuth URL/exchange API。
 - **证据：** 当前产品入口已经是 Worker 首页的「动画同步」视图，用户直接粘贴两个 bgm.tv developer access token；截图和当前前端代码均来自 `public/src/bangumi.js`。
 - **影响：** 旧页面和旧 OAuth 入口会让排查方向偏到已废弃 UI，且继续产生 `/manage/callback` 这类无效 URI。
-- **建议修法：** 删除 `/manage`、`/manage/callback`、管理 OAuth API、未挂载旧 HTML 和孤立 OAuth helper；保留首页同步视图实际调用的 `/api/manage/compare`、`/api/manage/sync`。
+- **建议修法：** 删除 `/manage`、`/manage/callback`、管理 OAuth API、未挂载旧 HTML 和孤立 OAuth helper；首页同步视图改用同步语义 API：`POST /api/sync/compare`、`POST /api/sync/apply`。
 - **验证方式：** worker security 测试断言旧页面/OAuth 路由和 helper 不存在，同时同步 API 仍存在。
 - **状态：** 已修复。
 
@@ -187,6 +187,7 @@
 - README、首页同步视图、嵌入页和报告文案统一写成“动画同步”。
 - 不扩展书籍/音乐/游戏/三次元同步。
 - 旧 `/manage` OAuth 授权入口已移除；cron token 继续通过部署环境变量配置。
+- 旧 `/api/manage/*` 同步 API 已由 `/api/sync/*` 替代；当前产品入口以首页动画同步视图为准，不保留旧管理 API 兼容别名。
 
 ### 批次 C：P2 文档同步
 
@@ -194,6 +195,6 @@
 
 - 已更新活跃审计设计/计划，移除 `/calendar` 是本地 OpenAPI 缺口的错误说法。
 - 已更新当前仍可能作为指导的 Cloudflare 迁移设计，将账户同步说明改为动画同步、POST upsert，且只写 `type` 和 `rate`。
-- 已移除运行代码中的旧 `/manage` 页面、`/manage/callback` 和管理 OAuth exchange 流，并同步 README/审计报告。
+- 已移除运行代码中的旧 `/manage` 页面、`/manage/callback`、管理 OAuth exchange 流和旧 `/api/manage/*` 同步/诊断 API，并同步 README/审计报告。
 - 旧实施计划保持历史记录，除非它被当作当前指导文档使用。
 - 已为 `docs/example/api/bgm-api.json` 未覆盖的 OAuth endpoint 保留说明。

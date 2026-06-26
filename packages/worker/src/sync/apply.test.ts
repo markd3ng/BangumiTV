@@ -2,18 +2,20 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { executeSync } from './sync-write.ts'
+import { executeSync } from './apply.ts'
 import { WatchStatus, type AccountInfo, type ComparisonItem, type PlatformClient, type PlatformId } from '@bangumi-tv/shared'
 
 class FakeClient implements PlatformClient {
   readonly platform: PlatformId = 'bgm'
   fetchedUsernames: string[] = []
   patchedIds: string[] = []
+  private readonly username: string
+  private readonly items: ComparisonItem[]
 
-  constructor(
-    private readonly username: string,
-    private readonly items: ComparisonItem[],
-  ) {}
+  constructor(username: string, items: ComparisonItem[]) {
+    this.username = username
+    this.items = items
+  }
 
   async getMe(_token: string): Promise<AccountInfo> {
     return { username: this.username, externalId: this.username, platform: 'bgm' }
@@ -41,27 +43,27 @@ function item(externalId: string): ComparisonItem {
   }
 }
 
-function readSyncWriteSource(): string {
-  return readFileSync(join(process.cwd(), 'packages/worker/src/manage/sync-write.ts'), 'utf8')
+function readSyncApplySource(): string {
+  return readFileSync(join(process.cwd(), 'packages/worker/src/sync/apply.ts'), 'utf8')
 }
 
 test('executeSync validates mode is either full or partial', async () => {
-  const source = readSyncWriteSource()
+  const source = readSyncApplySource()
   assert.match(source, /mode.*===.*('full'|"full").*mode.*===.*('partial'|"partial")/)
 })
 
 test('executeSync validates from and to are non-empty strings', async () => {
-  const source = readSyncWriteSource()
+  const source = readSyncApplySource()
   assert.match(source, /typeof fromToken !== 'string'|fromUser\.trim\(\)|from\.trim\(\)/)
 })
 
 test('executeSync validates partial mode requires subject_ids array', async () => {
-  const source = readSyncWriteSource()
+  const source = readSyncApplySource()
   assert.match(source, /subject_ids/)
 })
 
 test('executeSync rejects empty subject_ids in partial mode', async () => {
-  const source = readSyncWriteSource()
+  const source = readSyncApplySource()
   assert.match(source, /subject_ids\.length === 0|subject_ids\?\.length/)
 })
 

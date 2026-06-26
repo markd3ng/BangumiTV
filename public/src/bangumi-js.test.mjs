@@ -17,3 +17,10 @@ test('public sync result shows backend result count for diagnosis', () => {
   assert.ok(source.includes("msg += '<br><small>"), 'renders diagnostic summary')
   assert.ok(source.includes('results.length'), 'uses actual response array length')
 })
+
+test('public sync uses sync API routes and no legacy manage routes', () => {
+  assert.ok(source.includes("API + '/api/sync/compare'"), 'calls sync compare endpoint')
+  assert.ok(source.includes("API + '/api/sync/apply'"), 'calls sync apply endpoint')
+  assert.equal(source.includes('/api/manage/compare'), false)
+  assert.equal(source.includes('/api/manage/sync'), false)
+})

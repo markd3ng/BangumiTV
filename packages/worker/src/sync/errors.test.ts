@@ -3,18 +3,18 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import {
   createHealthFailureLog,
-  createManageErrorLog,
+  createSyncRequestErrorLog,
   createSyncFailureLog,
-  manageHeaders,
+  syncHeaders,
   publicError,
-} from './security.ts'
+} from './errors.ts'
 
 function namedError(name: string, message: string, extra?: Record<string, unknown>): Error {
   return Object.assign(new Error(message), { name }, extra)
 }
 
-test('management headers disable storage and framing', () => {
-  const headers = new Headers(manageHeaders())
+test('sync headers disable storage and framing', () => {
+  const headers = new Headers(syncHeaders())
   assert.equal(headers.get('Cache-Control'), 'no-store')
   assert.equal(headers.get('X-Frame-Options'), 'DENY')
   assert.equal(headers.get('X-Content-Type-Options'), 'nosniff')
@@ -34,41 +34,41 @@ test('public errors never echo upstream text', async () => {
 test('compare source logs real error to ring buffer, returns safe reason', async () => {
   const source = await readFile(new URL('./compare.ts', import.meta.url), 'utf8')
 
-  assert.match(source, /console\.error\(JSON\.stringify\(\{ event: 'manage_compare_fetch_failed'/)
+  assert.match(source, /console\.error\(JSON\.stringify\(\{ event: 'sync_compare_fetch_failed'/)
   assert.match(source, /error: reason/)
   assert.equal(source.includes('err.message'), false, 'no raw err.message in response')
   assert.equal(source.includes('settled.reason.message'), true, 'reason extracted safely')
 })
 
-test('sync-write source logs real error reason and returns it safely', async () => {
-  const source = await readFile(new URL('./sync-write.ts', import.meta.url), 'utf8')
+test('sync apply source logs real error reason and returns it safely', async () => {
+  const source = await readFile(new URL('./apply.ts', import.meta.url), 'utf8')
 
   assert.match(source, /const reason = err instanceof Error \? err\.message : String\(err\)/)
   assert.match(source, /error: reason/)
 })
 
-test('manage error logs keep only safe structured fields', () => {
-  const authLog = createManageErrorLog(
-    '/api/manage/sync',
+test('sync request error logs keep only safe structured fields', () => {
+  const authLog = createSyncRequestErrorLog(
+    '/api/sync/apply',
     namedError('BgmHttpError', 'access_token=secret upstream body', { status: 403 }),
     '2026-06-19T00:00:00.000Z',
   )
   assert.deepEqual(authLog, {
-    event: 'manage_request_failed',
-    route: '/api/manage/sync',
+    event: 'sync_request_failed',
+    route: '/api/sync/apply',
     kind: 'BgmHttpError',
     upstream_status: 403,
     at: '2026-06-19T00:00:00.000Z',
   })
 
-  const networkLog = createManageErrorLog(
-    '/api/manage/compare',
+  const networkLog = createSyncRequestErrorLog(
+    '/api/sync/compare',
     namedError('BgmNetworkError', 'state=stolen'),
     '2026-06-19T00:00:00.000Z',
   )
   assert.deepEqual(networkLog, {
-    event: 'manage_request_failed',
-    route: '/api/manage/compare',
+    event: 'sync_request_failed',
+    route: '/api/sync/compare',
     kind: 'BgmNetworkError',
     upstream_status: undefined,
     at: '2026-06-19T00:00:00.000Z',
@@ -130,7 +130,7 @@ test('worker sync logging calls never receive errors usernames or free text', as
   )
 })
 
-test('worker exposes public sync APIs but not legacy manage page or OAuth routes', async () => {
+test('worker exposes frontend sync APIs but no legacy manage routes', async () => {
   const source = await readFile(new URL('../index.ts', import.meta.url), 'utf8')
 
   assert.ok(source.includes("const publicCors = cors({ origin: '*', allowMethods: ['GET', 'OPTIONS'] })"))
@@ -140,14 +140,20 @@ test('worker exposes public sync APIs but not legacy manage page or OAuth routes
 
   assert.equal(source.includes("app.get('/manage'"), false)
   assert.equal(source.includes("app.get('/manage/callback'"), false)
+  assert.equal(source.includes("app.post('/api/manage/compare'"), false)
+  assert.equal(source.includes("app.post('/api/manage/sync'"), false)
   assert.equal(source.includes("app.post('/api/manage/oauth-url'"), false)
   assert.equal(source.includes("app.post('/api/manage/exchange'"), false)
+  assert.equal(source.includes("app.delete('/api/manage/cron-token'"), false)
+  assert.equal(source.includes("app.get('/api/manage/errors'"), false)
   assert.equal(source.includes('/manage/callback'), false)
   assert.equal(source.includes('createOAuthState'), false)
   assert.equal(source.includes('verifyOAuthState'), false)
   assert.equal(source.includes('exchangeCode'), false)
-  assert.ok(source.includes("app.post('/api/manage/compare'"), 'compare API route remains available')
-  assert.ok(source.includes("app.post('/api/manage/sync'"), 'sync API route remains available')
+  assert.ok(source.includes("app.post('/api/sync/compare'"), 'compare API route remains available')
+  assert.ok(source.includes("app.post('/api/sync/apply'"), 'sync API route remains available')
+  assert.ok(source.includes("event: 'sync_compare'"), 'compare log event uses sync naming')
+  assert.ok(source.includes("event: 'sync_apply'"), 'apply log event uses sync naming')
 })
 
 test('worker source keeps health endpoint free of usernames in free text', async () => {
@@ -164,13 +170,10 @@ test('worker source keeps health endpoint free of usernames in free text', async
   assert.match(healthBlock, /return Response\.json\(\{ ok: false \}/)
 })
 
-test('worker source catches cron token delete failures and maps them safely', async () => {
+test('worker source no longer exposes frontend-unused maintenance APIs', async () => {
   const source = await readFile(new URL('../index.ts', import.meta.url), 'utf8')
-  const deleteBlockMatch = source.match(/app\.delete\('\/api\/manage\/cron-token', async \(c\) => \{[\s\S]*?\n\}\)\n/)
-  assert.ok(deleteBlockMatch, 'expected cron token delete handler source block')
-  const deleteBlock = deleteBlockMatch[0]
 
-  assert.match(deleteBlock, /try \{/)
-  assert.match(deleteBlock, /await storage\.delete\('bgm:tokens'\)/)
-  assert.match(deleteBlock, /catch \(err\) \{\s*return errorToResponse\('\/api\/manage\/cron-token', err, storage\)/)
+  assert.equal(source.includes('/api/manage/cron-token'), false)
+  assert.equal(source.includes('/api/manage/errors'), false)
+  assert.equal(source.includes('manage_cron_token_deleted'), false)
 })

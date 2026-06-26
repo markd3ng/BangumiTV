@@ -57,7 +57,7 @@ export async function compareAccounts(
       return { name, items: settled.value, total: settled.value.length }
     }
     const reason = settled.reason instanceof Error ? settled.reason.message : String(settled.reason)
-    console.error(JSON.stringify({ event: 'manage_compare_fetch_failed', user: name, reason, at: new Date().toISOString() }))
+    console.error(JSON.stringify({ event: 'sync_compare_fetch_failed', user: name, reason, at: new Date().toISOString() }))
     return { name, items: [] as ComparisonItem[], total: 0, error: reason }
   }
 

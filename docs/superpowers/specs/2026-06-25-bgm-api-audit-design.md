@@ -112,6 +112,6 @@
 后续实现阶段的最小验证应覆盖：
 
 - `packages/shared/src/bgm-client.test.ts`：响应解析、204、method/body/auth。
-- shared 平台层或 manage sync 测试：账户同步写回语义。
+- shared 平台层或 sync apply 测试：账户同步写回语义。
 - `pnpm -r test`。
 - 必要时 `pnpm -r typecheck`。

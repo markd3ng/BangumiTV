@@ -123,7 +123,7 @@ Sync Worker 在定时同步时自动下载条目封面（来源：bgm.tv），�
 - **多账户动画同步**：粘贴两个 bgm.tv access token → 点击对比 → 选择完整同步动画或选中同步动画 → 执行。当前仅同步 bgm.tv 动画收藏（`subject_type=2`）。Token 在 [bgm.tv 开发者设置](https://bgm.tv/dev) 生成，永久有效。
 - **Cron token** 通过 Cloudflare Dashboard 环境变量 `BANGUMI_TOKEN` 配置，不在前端页面操作。
 
-> 说明：旧 `/manage` 页面入口已移除；`/api/manage/compare`、`/api/manage/sync` 只是历史命名的后端同步 API，仍供前端动画同步视图调用。
+> 说明：旧 `/manage` 页面入口和 `/api/manage/*` 同步接口已移除；首页动画同步视图调用 `POST /api/sync/compare` 和 `POST /api/sync/apply`。
 
 ## 本地开发
 
@@ -208,14 +208,7 @@ curl https://your-worker.workers.dev/api/health
 
 `last_error` 为最近一次同步失败的错误消息（仅存最近一条）。
 
-**持久化错误日志（公开诊断接口）**
-
-```bash
-curl https://your-worker.workers.dev/api/manage/errors?n=20
-# → {"count":50,"errors":[{...}, ...]}
-```
-
-KV 环形缓冲区保留最近 **50 条**错误/warn 事件（`api_error`、`manage_input_error`、`sync_failed`、`manage_request_failed` 等），查询参数 `n` 控制返回条数（默认 20，上限 100），按时间倒序。
+KV 环形缓冲区仍在内部保留最近 **50 条**错误/warn 事件，供 Worker 运行时排障使用；当前不再暴露公开错误日志查询 API。
 
 ### 日志事件速查
 
@@ -231,11 +224,10 @@ KV 环形缓冲区保留最近 **50 条**错误/warn 事件（`api_error`、`man
 | `image_proxy_hit` | info | 图片缓存命中，含 `hash` / `content_type` |
 | `image_proxy_miss` | info | 图片缓存未命中，含 `hash` |
 | `image_download_failed` | warn | 单图下载失败，含 `subject_id` / `url` / `reason` |
-| `manage_input_error` | warn | 管理 API 输入校验失败，含 `route` / `reason` |
-| `manage_compare` | info | 账户对比结果，含双方条目数 / 共同数 / 差异数 |
-| `manage_sync` | info | 前端动画同步写入，含 `mode` / `total` / `ok` / `errors` |
-| `manage_cron_token_deleted` | info | cron token 已清除 |
-| `manage_request_failed` | error | 管理 API 上游/内部错误，含 `route` / `kind` / `upstream_status` |
+| `sync_compare` | info | 账户动画收藏对比结果，含双方条目数 / 共同数 / 差异数 |
+| `sync_compare_fetch_failed` | error | 账户对比拉取收藏失败，含安全化后的 `reason` |
+| `sync_apply` | info | 前端动画同步写入，含 `mode` / `total` / `ok` / `errors` |
+| `sync_request_failed` | error | 前端同步 API 上游/内部错误，含 `route` / `kind` / `upstream_status` |
 | `sync_phase` | info | 定时同步阶段（token_refresh → token_ready → fetched_collections → images_downloaded → fetch_calendar → snapshot_written），每阶段含计数 |
 | `sync_failed` | error | 定时同步失败，含 `phase` / `kind` / `upstream_status` |
 | `sync_item_failed` | warn | 单条目 PATCH 失败，含 `subject_id` / `reason` |

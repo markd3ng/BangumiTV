@@ -4,7 +4,7 @@ import { R2ImageStore } from './image/store'
 import { runSync } from './cron'
 import { getSyncLockStub } from './sync-lock'
 import type { AcquireResponse } from './sync-lock'
-import { createSyncFailureLog } from './manage/security'
+import { createSyncFailureLog } from './sync/errors'
 
 // ── KV 错误环形缓冲区 ──
 const ERROR_RING_KEY = 'debug:errors'
