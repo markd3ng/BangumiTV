@@ -30,6 +30,9 @@ test('public sync renders operation log inline with progress before and after', 
   assert.ok(source.includes('renderInlineSyncLog(results, operationLinks)'), 'renders operation log inside sync page')
   assert.ok(source.includes('formatEpisodeProgress'), 'formats episode progress')
   assert.ok(source.includes("progress.before + '/' + progress.total + ' -> ' + progress.after + '/' + progress.total"), 'shows before and after progress')
+  assert.ok(source.includes('formatFieldChange(r.collectionStatus)'), 'renders status before and after')
+  assert.ok(source.includes('formatFieldChange(r.scoreChange)'), 'renders score before and after')
+  assert.ok(source.includes('buildSyncBaseline(dir, chunk)'), 'sends before-state baseline with sync request')
 })
 
 test('public sync uses sync API routes and no legacy manage routes', () => {

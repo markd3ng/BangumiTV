@@ -607,6 +607,30 @@
       return progress.before + ' -> ' + progress.after + ' (' + suffix + ')'
     }
 
+    function formatFieldChange(change) {
+      if (!change) return ''
+      var before = change.before == null ? '\u2014' : change.before
+      var after = change.after == null ? '\u2014' : change.after
+      return before + ' -> ' + after
+    }
+
+    function buildSyncBaseline(dir, ids) {
+      var wanted = {}
+      ids.forEach(function(id) { wanted[String(id)] = true })
+      return (getFilteredEntries(syncState.filter, syncState.search) || []).filter(function(entry) {
+        return wanted[String(getEntryId(entry) || '')]
+      }).map(function(entry) {
+        var targetIsB = dir === 'A->B'
+        return {
+          externalId: String(getEntryId(entry) || ''),
+          status: targetIsB ? entry.statusB : entry.statusA,
+          score: targetIsB ? entry.scoreB : entry.scoreA,
+          progress: targetIsB ? entry.progressB : entry.progressA,
+          totalEpisodes: entry.totalEpisodes || Math.max(entry.progressA || 0, entry.progressB || 0),
+        }
+      })
+    }
+
     function renderInlineSyncLog(results, operationLinks) {
       var rows = results.map(function(r) {
         var cls = r.status === 'ok' ? 'ok' : 'error'
@@ -614,6 +638,8 @@
           '<td>' + escapeSyncHtml(r.externalId) + '</td>' +
           '<td>' + escapeSyncHtml(r.title || '') + '</td>' +
           '<td class="' + cls + '">' + escapeSyncHtml(r.status) + '</td>' +
+          '<td>' + escapeSyncHtml(formatFieldChange(r.collectionStatus)) + '</td>' +
+          '<td>' + escapeSyncHtml(formatFieldChange(r.scoreChange)) + '</td>' +
           '<td>' + escapeSyncHtml(formatEpisodeProgress(r.episodeProgress)) + '</td>' +
           '<td>' + escapeSyncHtml(r.error || '') + '</td>' +
           '</tr>'
@@ -622,8 +648,8 @@
         return '<a href="' + url + '" target="_blank" rel="noreferrer">#' + (index + 1) + '</a>'
       }).join(' ') + '</div>' : ''
       return '<div class="sync-inline-log"><h4>\u672c\u6b21\u64cd\u4f5c\u65e5\u5fd7</h4>' + links +
-        '<table><thead><tr><th>Subject ID</th><th>\u6807\u9898</th><th>\u72b6\u6001</th><th>\u7ae0\u8282\u8fdb\u5ea6</th><th>\u9519\u8bef</th></tr></thead><tbody>' +
-        (rows || '<tr><td colspan="5">\u6ca1\u6709\u8fd4\u56de\u6761\u76ee</td></tr>') +
+        '<table><thead><tr><th>Subject ID</th><th>\u6807\u9898</th><th>\u7ed3\u679c</th><th>\u6536\u85cf\u72b6\u6001</th><th>\u8bc4\u5206</th><th>\u7ae0\u8282\u8fdb\u5ea6</th><th>\u9519\u8bef</th></tr></thead><tbody>' +
+        (rows || '<tr><td colspan="7">\u6ca1\u6709\u8fd4\u56de\u6761\u76ee</td></tr>') +
         '</tbody></table></div>'
     }
 
@@ -651,10 +677,11 @@
       try {
         for (var start = 0; start < ids.length; start += SYNC_BATCH_SIZE) {
           var chunk = ids.slice(start, start + SYNC_BATCH_SIZE)
+          var baseline = buildSyncBaseline(dir, chunk)
           var res = await fetch(API + '/api/sync/apply', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tokenA: fromToken, platformA: platformA, from: fromUser, tokenB: toToken, platformB: platformB, to: toUser, mode: 'partial', subject_ids: chunk }),
+            body: JSON.stringify({ tokenA: fromToken, platformA: platformA, from: fromUser, tokenB: toToken, platformB: platformB, to: toUser, mode: 'partial', subject_ids: chunk, baseline: baseline }),
           })
           var operationId = res.headers.get('X-Sync-Operation-Id')
           if (operationId) operationLinks.push('/api/check/' + operationId)

@@ -33,7 +33,7 @@ class FakeClient implements PlatformClient {
   }
 }
 
-function item(externalId: string): ComparisonItem {
+function item(externalId: string, overrides: Partial<ComparisonItem> = {}): ComparisonItem {
   return {
     externalId,
     title: `Anime ${externalId}`,
@@ -42,6 +42,7 @@ function item(externalId: string): ComparisonItem {
     totalEpisodes: 12,
     score: 0,
     platform: 'bgm',
+    ...overrides,
   }
 }
 
@@ -99,4 +100,22 @@ test('executeSync copies episode progress and reports changed episode count', as
   assert.deepEqual(targetClient.episodeProgressIds, ['8'])
   assert.equal(results[0].episodeChanged, 8)
   assert.deepEqual(results[0].episodeProgress, { before: 1, after: 8, total: 12 })
+})
+
+test('executeSync reports status and score before and after from baseline', async () => {
+  const sourceClient = new FakeClient('real-source-user', [item('9', { status: WatchStatus.WATCHING, score: 7 })])
+  const targetClient = new FakeClient('real-target-user', [])
+
+  const results = await executeSync(sourceClient, 'from-token', targetClient, 'to-token', {
+    mode: 'partial',
+    from: 'Account A',
+    to: 'Account B',
+    subject_ids: ['9'],
+    baseline: [
+      { externalId: '9', status: WatchStatus.PLAN_TO_WATCH, score: 6, progress: 1, totalEpisodes: 12 },
+    ],
+  })
+
+  assert.deepEqual(results[0].collectionStatus, { before: '想看', after: '在看' })
+  assert.deepEqual(results[0].scoreChange, { before: 6, after: 7 })
 })

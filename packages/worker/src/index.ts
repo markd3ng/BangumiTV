@@ -42,6 +42,14 @@ interface SyncOperationLog {
     externalId: string
     title: string
     status: 'ok' | 'error'
+    collectionStatus?: {
+      before: string
+      after: string
+    }
+    scoreChange?: {
+      before: number | null
+      after: number | null
+    }
     episodeChanged?: number
     episodeProgress?: {
       before: number
@@ -96,11 +104,18 @@ function formatEpisodeProgress(progress?: { before: number; after: number; total
   return `${progress.before} -> ${progress.after} (${suffix})`
 }
 
+function formatFieldChange(change?: { before: unknown; after: unknown }): string {
+  if (!change) return ''
+  const before = change.before ?? '—'
+  const after = change.after ?? '—'
+  return `${before} -> ${after}`
+}
+
 function createSyncOperationLog(
   id: string,
   mode: string,
   requestedCount: number,
-  results: Array<{ externalId: string; title: string; status: 'ok' | 'error'; episodeChanged?: number; episodeProgress?: { before: number; after: number; total: number }; error?: string }>,
+  results: Array<{ externalId: string; title: string; status: 'ok' | 'error'; collectionStatus?: { before: string; after: string }; scoreChange?: { before: number | null; after: number | null }; episodeChanged?: number; episodeProgress?: { before: number; after: number; total: number }; error?: string }>,
   durationMs: number,
 ): SyncOperationLog {
   const ok = results.filter((r) => r.status === 'ok').length
@@ -119,6 +134,8 @@ function createSyncOperationLog(
       externalId: result.externalId,
       title: result.title,
       status: result.status,
+      ...(result.collectionStatus ? { collectionStatus: result.collectionStatus } : {}),
+      ...(result.scoreChange ? { scoreChange: result.scoreChange } : {}),
       ...(typeof result.episodeChanged === 'number' ? { episodeChanged: result.episodeChanged } : {}),
       ...(result.episodeProgress ? { episodeProgress: result.episodeProgress } : {}),
       ...(result.error ? { error: result.error } : {}),
@@ -139,6 +156,8 @@ function renderSyncOperationHtml(operation: SyncOperationLog): string {
       <td>${escapeHtml(item.externalId)}</td>
       <td>${escapeHtml(item.title)}</td>
       <td class="${statusClass}">${escapeHtml(item.status)}</td>
+      <td>${escapeHtml(formatFieldChange(item.collectionStatus))}</td>
+      <td>${escapeHtml(formatFieldChange(item.scoreChange))}</td>
       <td>${escapeHtml(formatEpisodeProgress(item.episodeProgress))}</td>
       <td>${escapeHtml(item.error || '')}</td>
     </tr>`
@@ -176,8 +195,8 @@ function renderSyncOperationHtml(operation: SyncOperationLog): string {
     <span>时间 ${escapeHtml(operation.at)}</span>
   </div>
   <table>
-    <thead><tr><th>Subject ID</th><th>标题</th><th>状态</th><th>章节变更</th><th>错误</th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="5">没有返回条目</td></tr>'}</tbody>
+    <thead><tr><th>Subject ID</th><th>标题</th><th>结果</th><th>收藏状态</th><th>评分</th><th>章节进度</th><th>错误</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="7">没有返回条目</td></tr>'}</tbody>
   </table>
 </body>
 </html>`
@@ -388,6 +407,7 @@ app.post('/api/sync/apply', async (c) => {
       from: body.from,
       to: body.to,
       subject_ids: body.subject_ids,
+      baseline: body.baseline,
     }, c.env as { SYNCLOCK: DurableObjectNamespace })
     const syncOk = results.filter((r: any) => r.status === 'ok').length
     const syncErr = results.filter((r: any) => r.status === 'error').length

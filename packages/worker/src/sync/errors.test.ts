@@ -170,6 +170,12 @@ test('sync operation logs are scoped by opaque id and exclude tokens', async () 
   assert.doesNotMatch(source, /const operationLog = \{[\s\S]*(tokenA|tokenB|fromToken|toToken)/)
 })
 
+test('sync apply forwards before-state baseline into executeSync', async () => {
+  const source = await readFile(new URL('../index.ts', import.meta.url), 'utf8')
+
+  assert.match(source, /baseline: body\.baseline/)
+})
+
 test('worker source keeps health endpoint free of usernames in free text', async () => {
   const source = await readFile(new URL('../index.ts', import.meta.url), 'utf8')
   const healthBlockMatch = source.match(/app\.get\('\/api\/health', async \(c\) => \{[\s\S]*?\n\}\)\n/)

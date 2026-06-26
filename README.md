@@ -125,7 +125,7 @@ Sync Worker 在定时同步时自动下载条目封面（来源：bgm.tv），�
 
 > 说明：旧 `/manage` 页面入口和 `/api/manage/*` 同步接口已移除；首页动画同步视图调用 `POST /api/sync/compare` 和 `POST /api/sync/apply`。
 
-同步写入完成后，`POST /api/sync/apply` 会在响应头返回 `X-Sync-Operation-Id` 和 `X-Sync-Operation-Url`。页面会直接在结果区展开本次操作日志，章节进度以 `before/total -> after/total` 形式展示；同时保留 `/api/check/<operation-id>` 完整日志链接，便于刷新后复查。
+同步写入完成后，`POST /api/sync/apply` 会在响应头返回 `X-Sync-Operation-Id` 和 `X-Sync-Operation-Url`。页面会直接在结果区展开本次操作日志，收藏状态、评分、章节进度都以 `before -> after` 形式展示，其中章节进度使用 `before/total -> after/total`；同时保留 `/api/check/<operation-id>` 完整日志链接，便于刷新后复查。
 
 ## 本地开发
 
@@ -239,7 +239,7 @@ https://your-worker.workers.dev/api/check/<operation-id>
 | `sync_compare` | info | 账户动画收藏对比结果，含双方条目数 / 共同数 / 差异数 |
 | `sync_compare_fetch_failed` | error | 账户对比拉取收藏失败，含安全化后的 `reason` |
 | `sync_apply` | info | 前端动画同步写入，含 `mode` / `total` / `ok` / `errors` |
-| `sync_operation` | info | 单次前端同步操作日志，含 `requested_count` / `returned_count` / `ok` / `errors` / `items`，每个 item 可含 `episodeChanged` 和 `episodeProgress` |
+| `sync_operation` | info | 单次前端同步操作日志，含 `requested_count` / `returned_count` / `ok` / `errors` / `items`，每个 item 可含 `collectionStatus` / `scoreChange` / `episodeChanged` / `episodeProgress` |
 | `sync_request_failed` | error | 前端同步 API 上游/内部错误，含 `route` / `kind` / `upstream_status` |
 | `sync_phase` | info | 定时同步阶段（token_refresh → token_ready → fetched_collections → images_downloaded → fetch_calendar → snapshot_written），每阶段含计数 |
 | `sync_failed` | error | 定时同步失败，含 `phase` / `kind` / `upstream_status` |

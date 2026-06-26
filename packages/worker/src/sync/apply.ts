@@ -6,12 +6,28 @@ export interface SyncRequest {
   from: string
   to: string
   subject_ids?: string[]
+  baseline?: SyncBaseline[]
+}
+
+export interface SyncBaseline {
+  externalId: string
+  status?: string | null
+  score?: number | null
+  progress?: number | null
+  totalEpisodes?: number | null
+}
+
+export interface FieldChange<T> {
+  before: T
+  after: T
 }
 
 export interface SyncResult {
   externalId: string
   title: string
   status: 'ok' | 'error'
+  collectionStatus?: FieldChange<string>
+  scoreChange?: FieldChange<number | null>
   episodeChanged?: number
   episodeProgress?: {
     before: number
@@ -19,6 +35,11 @@ export interface SyncResult {
     total: number
   }
   error?: string
+}
+
+function statusLabel(s: string | null | undefined): string {
+  if (!s || s === '—') return '未收藏'
+  return ({ watching: '在看', completed: '看过', plan_to_watch: '想看', on_hold: '搁置', dropped: '抛弃' })[s] || s
 }
 
 function validateSyncRequest(request: SyncRequest): void {
@@ -75,11 +96,21 @@ async function doSync(
   }
 
   const results: SyncResult[] = []
+  const baselineMap = new Map((request.baseline || []).map((entry) => [entry.externalId, entry]))
 
   for (const entry of targets) {
     try {
       const result = await clientB.patchEntry(toToken, entry.externalId, entry, { sourceToken: fromToken })
-      results.push({ externalId: entry.externalId, title: entry.title, status: 'ok', episodeChanged: result.episodeChanged, episodeProgress: result.episodeProgress })
+      const baseline = baselineMap.get(entry.externalId)
+      results.push({
+        externalId: entry.externalId,
+        title: entry.title,
+        status: 'ok',
+        collectionStatus: { before: statusLabel(baseline?.status), after: statusLabel(entry.status) },
+        scoreChange: { before: typeof baseline?.score === 'number' ? baseline.score : null, after: entry.score || null },
+        episodeChanged: result.episodeChanged,
+        episodeProgress: result.episodeProgress,
+      })
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err)
       console.warn(JSON.stringify({ event: 'sync_item_failed', external_id: entry.externalId, reason, at: new Date().toISOString() }))
