@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { executeSync } from './apply.ts'
 import { WatchStatus, type AccountInfo, type ComparisonItem, type PlatformClient, type PlatformId } from '@bangumi-tv/shared'
 
@@ -44,7 +43,7 @@ function item(externalId: string): ComparisonItem {
 }
 
 function readSyncApplySource(): string {
-  return readFileSync(join(process.cwd(), 'packages/worker/src/sync/apply.ts'), 'utf8')
+  return readFileSync(new URL('./apply.ts', import.meta.url), 'utf8')
 }
 
 test('executeSync validates mode is either full or partial', async () => {

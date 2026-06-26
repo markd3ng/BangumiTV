@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.branch || 'dev' }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.ref_name }}
 
       - uses: pnpm/action-setup@v4
         with:
@@ -55,6 +55,7 @@ jobs:
 
       # 幂等创建资源：已存在时忽略。
       - name: Provision Cloudflare resources
+        if: ${{ !inputs.skip_provision }}
         working-directory: packages/worker
         run: |
           npx wrangler kv namespace create "bangumi-tv-kv" || echo "KV namespace already exists"
