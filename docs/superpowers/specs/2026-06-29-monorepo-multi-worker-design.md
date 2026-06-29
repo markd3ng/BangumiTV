@@ -93,11 +93,12 @@ It should not perform bgm.tv upstream requests, token refresh, cron sync, or med
 
 ### `apps/sync-worker`
 
-Cron and manual sync Worker.
+Native cron sync Worker.
 
 Responsibilities:
 
-- Own the single cron trigger.
+- Own the single cron trigger through the Worker `scheduled()` handler.
+- Declare the cron schedule in Worker config with `triggers.crons`.
 - Refresh or validate bgm.tv tokens.
 - Fetch user collections.
 - Fetch calendar data.
@@ -105,6 +106,8 @@ Responsibilities:
 - Generate new snapshots using `packages/domain`.
 - Enqueue media jobs for missing or stale image cache and missing or stale subject meta.
 - Write sync generation metadata.
+
+There is no public `POST /__cron/sync` route in the new architecture. Production sync is triggered by Cloudflare scheduled events, not by `curl`ing a Worker URI. If a manual production run is needed, it should use Cloudflare's scheduled-event tooling or an explicitly internal/admin mechanism added later, not a public cron URL and `CRON_SECRET`.
 
 This Worker should keep heavy media and subject-detail enrichment out of the main cron invocation.
 
@@ -610,8 +613,15 @@ BANGUMI_CLIENT_SECRET
 BANGUMI_USERS
 BANGUMI_PRIMARY_USER
 SYNC_MODE
-CRON_SECRET
 ```
+
+Cron config:
+
+```text
+triggers.crons = ["0 */4 * * *"]
+```
+
+The exact syntax must be written in the target Worker config only after validating against the local Wrangler schema and `wrangler --help` / config docs for the chosen config format.
 
 ### `media-worker`
 
@@ -630,6 +640,86 @@ BANGUMI_TOKEN
 ```
 
 If media-worker needs refreshed OAuth tokens, token refresh remains owned by `sync-worker`; media-worker should read a current token from KV or receive a short-lived internal instruction without exposing it publicly.
+
+## CI/CD and Cron Deployment
+
+The current workflow performs too many deployment-time infrastructure mutations: creating KV/R2 resources, listing KV namespaces, rewriting Wrangler config files, uploading secrets on every run, calling Cloudflare REST APIs with `curl` to inspect or create cron schedules, and deploying multiple Workers through ad hoc commands. The monorepo architecture replaces this with a smaller and more predictable pipeline.
+
+### CI/CD Goals
+
+- CI validates source and config.
+- CD deploys Workers from checked-in config.
+- CI/CD does not provision long-lived Cloudflare resources on every deploy.
+- CI/CD does not rewrite committed Worker config files during deploy.
+- CI/CD does not upload secrets on every deploy.
+- CI/CD does not call Cloudflare REST APIs with `curl` to create cron schedules.
+- The deploy token should need only the permissions required to deploy Workers and read referenced resources, not broad resource-management permissions for every run.
+
+### Resource Provisioning Model
+
+Cloudflare resources are provisioned once outside normal deploy runs:
+
+```text
+KV namespace
+R2 bucket
+Queue
+Durable Object migration
+Service bindings
+Worker secrets
+Cron schedule in sync-worker config
+```
+
+After initial provisioning, GitHub Actions deploys against stable resource identifiers checked into environment-specific Wrangler configs or injected through safe environment-specific config templates that are not rewritten by shell scripts during deployment.
+
+### Target Workflow
+
+The default deploy workflow should be short:
+
+```text
+checkout
+setup pnpm/node
+pnpm install --frozen-lockfile
+pnpm typecheck
+pnpm test
+pnpm build
+wrangler check/types for each Worker config
+wrangler deploy for frontend-worker
+wrangler deploy for read-worker
+wrangler deploy for sync-worker
+wrangler deploy for media-worker
+```
+
+Optional dry-run deploy checks may run before deploy, but they should use each app's own config directly.
+
+### Removed Workflow Steps
+
+The new workflow must remove these old patterns:
+
+- `wrangler kv namespace create` during normal deploy.
+- `wrangler r2 bucket create` during normal deploy.
+- `wrangler kv namespace list` to discover IDs during normal deploy.
+- Python or shell edits that replace IDs inside Wrangler config.
+- `wrangler secret put` loops during every deploy.
+- `curl https://api.cloudflare.com/client/v4/.../schedules` schedule diagnostics.
+- `curl -X PUT .../schedules` schedule creation.
+- Public `curl https://<worker>/__cron/sync` as a sync trigger.
+
+### Native Cron Requirement
+
+`sync-worker` must implement `scheduled(event, env, ctx)` and its Worker config must declare the cron schedule. The deployed Worker should run from Cloudflare scheduled events without a public HTTP cron endpoint.
+
+The README must describe cron as native Worker scheduled events. It must not tell users to manually call a `/__cron/sync` URI or rely on a public cron secret.
+
+### GitHub Permissions
+
+The workflow should explicitly set minimum GitHub token permissions. For a simple deploy pipeline, that usually means read-only repository contents plus whatever is needed by the selected deploy action. Before writing the workflow, verify the exact permissions required by the chosen GitHub Actions and Wrangler deploy path.
+
+Cloudflare API token permissions must be documented as two tiers:
+
+- Initial provisioning token: can create/manage KV, R2, Queues, Workers, and required bindings.
+- Routine deploy token: can deploy Workers and read/use existing resources.
+
+Routine deploys should not require broad resource creation permissions.
 
 ## Error Handling
 
@@ -680,6 +770,7 @@ If media-worker needs refreshed OAuth tokens, token refresh remains owned by `sy
 
 - `frontend-worker` calls `read-worker` through service binding.
 - `sync-worker` enqueues media jobs without downloading images inline.
+- `sync-worker` has a `scheduled()` handler and no public cron trigger route.
 - `media-worker` consumes queue jobs and updates KV/R2.
 - `read-worker` returns cache stats without secrets.
 
@@ -691,6 +782,8 @@ README must be rewritten for the new architecture. It must document:
 - Four Worker deployment units.
 - `packages/widget` as the single home for frontend assets, templates, shared footer, and theme CSS.
 - Cloudflare KV, R2, Queue, Durable Object, and service binding setup.
+- Initial provisioning versus routine deploy permissions.
+- Native Worker cron schedule through `scheduled()` and `triggers.crons`.
 - Queue-based media processing.
 - Image cache public URI, R2 key, and hash calculation.
 - `images.common` and `images.large` snapshot shape.
@@ -703,6 +796,8 @@ README must be rewritten for the new architecture. It must document:
 README must not describe removed legacy fields, old single Worker deployment, old image field names, or unimplemented endpoints.
 
 README must not instruct users to edit `bangumi-theme`, because that directory is removed in the monorepo architecture.
+
+README must not instruct users to `curl` a cron URI for normal sync. Manual sync by public HTTP endpoint is removed from the target architecture.
 
 ## Implementation Order
 
@@ -721,12 +816,13 @@ README must not instruct users to edit `bangumi-theme`, because that directory i
 13. Implement public `/cache` page.
 14. Implement footer build metadata through the shared footer.
 15. Implement build-time analytics and webmaster injection after verifying official snippets.
-16. Rewrite README and deployment docs.
-17. Run full tests, typecheck, Wrangler config validation, and dry-run deploy checks.
+16. Rewrite GitHub Actions deploy workflow to remove deployment-time provisioning, secret upload loops, config rewriting, schedule `curl`s, and public cron URI assumptions.
+17. Rewrite README and deployment docs.
+18. Run full tests, typecheck, Wrangler config validation, and dry-run deploy checks.
 
 ## Open Decisions
 
-None. The cache statistics page is public. Queue is the selected media processing mechanism. Legacy compatibility is out of scope.
+None. The cache statistics page is public. Queue is the selected media processing mechanism. Legacy compatibility is out of scope. Cron is native Worker scheduled events, not a public HTTP endpoint.
 
 ## Self-Review
 
@@ -737,4 +833,5 @@ None. The cache statistics page is public. Queue is the selected media processin
 - New image shape removes legacy fields.
 - Public `/cache` is included and secret-safe.
 - Build-time analytics and webmaster injection are included.
+- CI/CD simplification and native cron requirements are included.
 - README obligations are explicit.
