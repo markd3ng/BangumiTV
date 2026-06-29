@@ -477,9 +477,10 @@ body {
 /* —— 工具栏 —— */
 .sync-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
 .sync-tool-btn {
-  padding: 8px 12px; border: var(--nb-border); border-radius: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 38px; box-sizing: border-box; padding: 0 12px; border: var(--nb-border); border-radius: 0;
   background: var(--nb-surface); color: var(--nb-ink); cursor: pointer;
-  font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px;
+  font-size: 12px; line-height: 1; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px;
   box-shadow: var(--nb-shadow-sm); transition: transform 0.08s ease, box-shadow 0.08s ease;
 }
 .sync-tool-btn:hover { transform: translate(-2px,-2px); box-shadow: 5px 5px 0 0 var(--nb-ink); }
@@ -487,9 +488,9 @@ body {
 .sync-tool-btn-primary { background: var(--nb-accent); color: var(--nb-surface); }
 .sync-toolbar select,
 .sync-search {
-  padding: 8px 10px; border: var(--nb-border); border-radius: 0;
+  height: 38px; box-sizing: border-box; padding: 0 10px; border: var(--nb-border); border-radius: 0;
   background: var(--nb-surface); color: var(--nb-ink);
-  font-size: 12px; font-weight: 700; box-shadow: var(--nb-shadow-sm);
+  font-size: 12px; line-height: 1; font-weight: 700; box-shadow: var(--nb-shadow-sm);
 }
 .sync-search { width: 150px; }
 .sync-search:focus { outline: none; box-shadow: 4px 4px 0 0 var(--nb-accent); }

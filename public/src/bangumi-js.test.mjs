@@ -58,3 +58,9 @@ test('public full sync applies current filter search and direction', () => {
   assert.ok(source.includes("syncState.filter, 1, parseInt(document.getElementById('sync-pagesize').value), syncState.search"), 'direction changes re-render checkbox availability')
   assert.ok(source.includes('\\u540c\\u6b65\\u7b5b\\u9009\\u5168\\u90e8'), 'button text describes filtered sync')
 })
+
+test('public sync toolbar controls use theme classes instead of inline sizing', () => {
+  assert.equal(source.includes('id="sync-pagesize" style='), false)
+  assert.equal(source.includes('id="sync-direction" style='), false)
+  assert.ok(source.includes('class="sync-select"'), 'select controls share themed sizing')
+})
