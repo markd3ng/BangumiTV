@@ -37,61 +37,56 @@
     window.location.href = 'https://www.google.com'
   }
 
-  // ---------------------------------------------------------------
-  // 收藏卡片（保持原逻辑不变）：用 images.hash 走 worker 图片代理 + 观看进度
-  // ---------------------------------------------------------------
-  function renderCard(entry) {
-    const imgUrl = entry.images && entry.images.hash
-      ? API + '/image/' + entry.images.hash + '?w=300&fmt=webp&size=common'
-      : 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" fill="#333"><rect width="300" height="400"/></svg>')
+  const COVER_PLACEHOLDER = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" fill="#333"><rect width="300" height="400"/></svg>')
 
-    const total = entry.eps || entry.total_episodes || 0
-    const progress = total > 0
-      ? Math.round((entry.ep_status / total) * 100)
-      : 0
-
-    var html = '<a href="https://bgm.tv/subject/' + entry.subject_id + '" target="_blank" class="bgm-card';
-    if (entry.nsfw) html += ' bgm-nsfw';
-    html += '">' +
-      '<div class="bgm-card-cover">' +
-        '<img src="' + imgUrl + '" alt="' + (entry.name_cn || entry.name) + '" loading="lazy">';
-    if (entry.nsfw) html += '<div class="bgm-nsfw-overlay" onclick="event.preventDefault();this.parentElement.parentElement.classList.toggle(\'bgm-nsfw-reveal\')">R18</div>';
-    html += '</div>' +
-      '<div class="bgm-card-info">' +
-        '<h3>' + (entry.name_cn || entry.name) + '</h3>';
-    if (progress > 0) html += '<div class="bgm-progress"><span style="width:' + progress + '%"></span></div>';
-    html += '<span class="bgm-ep">' + entry.ep_status + '/' + ((entry.eps || entry.total_episodes || '??')) + '</span>' +
-      '</div>' +
-    '</a>';
-    return html;
+  function subjectImageUrl(images) {
+    return images && images.hash
+      ? API + '/image/' + images.hash + '?w=300&fmt=webp&size=common'
+      : COVER_PLACEHOLDER
   }
 
-  // ---------------------------------------------------------------
-  // 放送日历卡片（新增）：items 是 BgmSlimSubject
-  // 字段与收藏不同：用 id、images.common（bgm.tv 原图）、rating.score
-  // ---------------------------------------------------------------
-  function renderCalendarCard(entry) {
-    const hasHash = entry.images && entry.images.hash
-    const imgUrl = hasHash
-      ? API + '/image/' + entry.images.hash + '?w=300&fmt=webp&size=common'
-      : 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" fill="#333"><rect width="300" height="400"/></svg>')
-    const name = entry.name_cn || entry.name || ''
-    const score = entry.rating && entry.rating.score
-
-    var html = '<a href="https://bgm.tv/subject/' + entry.id + '" target="_blank" class="bgm-card';
-    if (entry.nsfw) html += ' bgm-nsfw';
+  function renderSubjectCard(card) {
+    var html = '<a href="https://bgm.tv/subject/' + card.subjectId + '" target="_blank" class="bgm-card'
+    if (card.nsfw) html += ' bgm-nsfw'
     html += '">' +
       '<div class="bgm-card-cover">' +
-        '<img src="' + imgUrl + '" alt="' + name + '" width="300" height="400" loading="lazy">';
-    if (entry.nsfw) html += '<div class="bgm-nsfw-overlay" onclick="event.preventDefault();this.parentElement.parentElement.classList.toggle(\'bgm-nsfw-reveal\')">R18</div>';
+        '<img src="' + subjectImageUrl(card.images) + '" alt="' + card.name + '" width="300" height="400" loading="lazy">'
+    if (card.nsfw) html += '<div class="bgm-nsfw-overlay" onclick="event.preventDefault();this.parentElement.parentElement.classList.toggle(\'bgm-nsfw-reveal\')">R18</div>'
     html += '</div>' +
       '<div class="bgm-card-info">' +
-        '<h3>' + name + '</h3>';
-    if (score) html += '<span class="bgm-score">★ ' + Number(score).toFixed(1) + '</span>';
-    html += '<span class="bgm-ep">' + ((entry.eps || entry.total_episodes) || '??') + ' 话</span>' +
+        '<h3>' + card.name + '</h3>'
+    if (card.progress > 0) html += '<div class="bgm-progress"><span style="width:' + card.progress + '%"></span></div>'
+    if (card.score) html += '<span class="bgm-score">★ ' + Number(card.score).toFixed(1) + '</span>'
+    html += '<span class="bgm-ep">' + card.meta + '</span>' +
       '</div>' +
-    '</a>';
-    return html;
+    '</a>'
+    return html
+  }
+
+  function renderCard(entry) {
+    const total = entry.eps || entry.total_episodes || 0
+    const progress = total > 0 ? Math.round((entry.ep_status / total) * 100) : 0
+    return renderSubjectCard({
+      subjectId: entry.subject_id,
+      images: entry.images,
+      name: entry.name_cn || entry.name || '',
+      nsfw: entry.nsfw,
+      progress: progress,
+      score: null,
+      meta: entry.ep_status + '/' + ((entry.eps || entry.total_episodes || '??')),
+    })
+  }
+
+  function renderCalendarCard(entry) {
+    return renderSubjectCard({
+      subjectId: entry.id,
+      images: entry.images,
+      name: entry.name_cn || entry.name || '',
+      nsfw: entry.nsfw,
+      progress: 0,
+      score: entry.rating && entry.rating.score,
+      meta: ((entry.eps || entry.total_episodes) || '??') + ' 话',
+    })
   }
 
   // ---------------------------------------------------------------

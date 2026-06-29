@@ -64,3 +64,9 @@ test('public sync toolbar controls use theme classes instead of inline sizing', 
   assert.equal(source.includes('id="sync-direction" style='), false)
   assert.ok(source.includes('class="sync-select"'), 'select controls share themed sizing')
 })
+
+test('collection and calendar cards share the same renderer pipeline', () => {
+  assert.ok(source.includes('function renderSubjectCard('), 'has shared subject card renderer')
+  assert.equal(source.match(/return renderSubjectCard\(\{/g)?.length, 2, 'collection and calendar adapters use shared renderer')
+  assert.equal(source.includes('function renderCalendarCard(entry) {\n    const hasHash'), false, 'calendar does not duplicate image URL logic')
+})
