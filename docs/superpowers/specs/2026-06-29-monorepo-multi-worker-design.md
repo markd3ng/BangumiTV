@@ -193,9 +193,20 @@ Responsibilities:
 - Main widget JS and CSS.
 - Cache statistics page JS and CSS reuse.
 - HTML templates.
+- Shared HTML shell and layout primitives.
+- A single reusable footer component/template partial used by every public page.
 - Build-time rendering of analytics scripts.
 - Build-time rendering of webmaster verification meta tags.
 - Build-time rendering of footer links and commit information.
+
+Current top-level frontend/theme assets are consolidated into this package:
+
+- `public/index.html`
+- `public/src/bangumi.js`
+- `public/src/bangumi.css`
+- `bangumi-theme/**`
+
+After migration, there is no standalone `bangumi-theme` directory and no separate directory for one-off styles. Theme CSS, widget JS, page templates, and cache-page assets live under `packages/widget` with one source of truth.
 
 ### `packages/worker-common`
 
@@ -483,6 +494,8 @@ The footer links to this page from every public HTML page.
 
 ## Footer and Build Version
 
+Footer is a shared widget component/template partial, not copied per page. Every public HTML page uses the same footer renderer so links, build metadata, and future footer changes stay consistent.
+
 Every public page footer includes:
 
 ```text
@@ -505,6 +518,8 @@ GITHUB_REPOSITORY -> https://github.com/{GITHUB_REPOSITORY}
 ```
 
 If commit data is unavailable, footer shows `Build unknown` without a commit link.
+
+Footer tests must render every public page template and assert that they all use the shared footer output, rather than each page carrying a local footer variant.
 
 ## Build-Time Analytics and Webmaster Injection
 
@@ -674,6 +689,7 @@ README must be rewritten for the new architecture. It must document:
 
 - Monorepo package layout.
 - Four Worker deployment units.
+- `packages/widget` as the single home for frontend assets, templates, shared footer, and theme CSS.
 - Cloudflare KV, R2, Queue, Durable Object, and service binding setup.
 - Queue-based media processing.
 - Image cache public URI, R2 key, and hash calculation.
@@ -686,24 +702,27 @@ README must be rewritten for the new architecture. It must document:
 
 README must not describe removed legacy fields, old single Worker deployment, old image field names, or unimplemented endpoints.
 
+README must not instruct users to edit `bangumi-theme`, because that directory is removed in the monorepo architecture.
+
 ## Implementation Order
 
 1. Create monorepo app/package layout.
 2. Move pure domain logic into `packages/domain`.
 3. Move bgm.tv client into `packages/bgm-api`.
 4. Move storage adapters and key builders into `packages/storage`.
-5. Move widget assets and HTML rendering into `packages/widget`.
-6. Build `read-worker`.
-7. Build `frontend-worker`.
-8. Build `sync-worker` with queue producer.
-9. Build `media-worker` with queue consumer.
-10. Implement new image cache schema.
-11. Implement NSFW subject meta enrichment.
-12. Implement public `/cache` page.
-13. Implement footer build metadata.
-14. Implement build-time analytics and webmaster injection after verifying official snippets.
-15. Rewrite README and deployment docs.
-16. Run full tests, typecheck, Wrangler config validation, and dry-run deploy checks.
+5. Move `public/` and `bangumi-theme/**` frontend assets into `packages/widget`.
+6. Implement the shared footer component/template partial in `packages/widget`.
+7. Build `read-worker`.
+8. Build `frontend-worker`.
+9. Build `sync-worker` with queue producer.
+10. Build `media-worker` with queue consumer.
+11. Implement new image cache schema.
+12. Implement NSFW subject meta enrichment.
+13. Implement public `/cache` page.
+14. Implement footer build metadata through the shared footer.
+15. Implement build-time analytics and webmaster injection after verifying official snippets.
+16. Rewrite README and deployment docs.
+17. Run full tests, typecheck, Wrangler config validation, and dry-run deploy checks.
 
 ## Open Decisions
 
