@@ -5,8 +5,8 @@
   "packageManager": "pnpm@9.15.9",
   "description": "render your bangumi.tv progress on a static web page",
   "scripts": {
-    "dev": "pnpm -F @bangumi-tv/worker dev",
-    "deploy": "pnpm -F @bangumi-tv/worker deploy",
+    "dev": "pnpm -F @bangumi-tv/frontend-worker dev",
+    "deploy": "pnpm -r --filter './apps/*' --if-present deploy",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "build:check": "pnpm -r --if-present build:check"
