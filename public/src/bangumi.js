@@ -277,13 +277,13 @@
       row.className = 'sync-token-row'
       var saved = sessionStorage.getItem('sync-token' + idSuffix) || ''
       if (saved) {
-        row.innerHTML = '<span style="color:#4caf50;font-size:13px;">\u2713 ' + side + ' token 已就绪</span>' +
-          ' <button class="sync-token-clear" data-side="' + idSuffix + '" style="font-size:11px;background:none;border:none;color:#e94560;cursor:pointer;text-decoration:underline;">清除</button>'
+        row.innerHTML = '<span class="sync-token-ok">\u2713 ' + side + ' token 已就绪</span>' +
+          ' <button class="sync-token-clear" data-side="' + idSuffix + '">清除</button>'
       } else {
-        row.innerHTML = '<div style="display:flex;gap:8px;">' +
-          '<label style="flex:1;font-size:12px;color:#a0a0b0;">' + side + ' Token' +
-          '<input type="password" class="sync-token-input" data-side="' + idSuffix + '" placeholder="Access Token" style="width:100%;padding:8px;border:1px solid #2a2a4a;border-radius:4px;background:#0f3460;color:#fff;font-size:13px;margin-top:2px;"></label>' +
-          '<label style="font-size:12px;color:#a0a0b0;">平台<select class="sync-platform" data-side="' + idSuffix + '" style="margin-top:18px;padding:8px;border:1px solid #2a2a4a;border-radius:4px;background:#0f3460;color:#fff;font-size:13px;"><option value="bgm">bgm.tv</option></select></label>' +
+        row.innerHTML = '<div class="sync-token-fields">' +
+          '<label class="sync-token-label sync-token-label-grow">' + side + ' Token' +
+          '<input type="password" class="sync-token-input" data-side="' + idSuffix + '" placeholder="Access Token"></label>' +
+          '<label class="sync-token-label">平台<select class="sync-platform" data-side="' + idSuffix + '"><option value="bgm">bgm.tv</option></select></label>' +
           '</div>'
       }
       return row
@@ -393,7 +393,7 @@
           var highEp = Math.max(d.totalEpisodes || d.progressA || d.progressB || d.progress || 0)
           var titleExtras = ''
           if (highEp > 0 || highScore > 0) {
-            titleExtras = '<span style="float:right;font-size:11px;color:#a0a0b0;font-weight:normal;">'
+            titleExtras = '<span class="sync-card-meta">'
             if (highEp > 0) titleExtras += highEp + '话'
             if (highScore > 0) titleExtras += (highEp > 0 ? ' / ' : '') + '\u2605 ' + highScore
             titleExtras += '</span>'
@@ -445,7 +445,7 @@
             var cid = d.externalId || d.subject_id
             h += '<div class="sync-card-check"><label><input type="checkbox" checked data-id="' + cid + '"> \u540c\u6b65\u6b64\u9879</label></div>'
           } else if (!isSame) {
-            h += '<div class="sync-card-check"><span style="font-size:12px;color:#999;font-weight:800;">\u5f53\u524d\u65b9\u5411\u4e0d\u53ef\u540c\u6b65</span></div>'
+            h += '<div class="sync-card-check"><span class="sync-card-nosync">\u5f53\u524d\u65b9\u5411\u4e0d\u53ef\u540c\u6b65</span></div>'
           }
 
           h += '</div>' // sync-card
@@ -512,12 +512,12 @@
       h += '<button id="sync-sel-all" class="sync-tool-btn">\u5168\u9009</button>'
       h += '<button id="sync-sel-rev" class="sync-tool-btn">\u53cd\u9009</button>'
       h += '<select id="sync-pagesize" style="padding:4px 6px;font-size:11px;"><option value="20">20/\u9875</option><option value="50">50/\u9875</option><option value="100">100/\u9875</option></select>'
-      h += '<input type="text" id="sync-search" placeholder="\u641c\u7d22\u6761\u76ee..." style="padding:4px 8px;font-size:11px;border:1px solid #2a2a4a;border-radius:4px;background:#0f3460;color:#fff;width:140px;">'
+      h += '<input type="text" id="sync-search" class="sync-search" placeholder="\u641c\u7d22\u6761\u76ee...">'
       h += '<span style="flex:1;"></span>'
       h += '<select id="sync-direction" style="padding:4px 6px;font-size:11px;">'
       h += '<option value="A->B">' + nameA + ' \u2192 ' + nameB + '</option>'
       h += '<option value="B->A">' + nameB + ' \u2192 ' + nameA + '</option></select>'
-      h += '<button id="sync-full-btn" class="sync-tool-btn" style="background:#e94560;color:#fff;">\u540c\u6b65\u7b5b\u9009\u5168\u90e8</button>'
+      h += '<button id="sync-full-btn" class="sync-tool-btn sync-tool-btn-primary">\u540c\u6b65\u7b5b\u9009\u5168\u90e8</button>'
       h += '<button id="sync-sel-btn" class="sync-tool-btn">\u9009\u4e2d\u540c\u6b65</button>'
       h += '</div>'
 
