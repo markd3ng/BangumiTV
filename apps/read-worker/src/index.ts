@@ -1,1 +1,115 @@
 export const appBoundary = 'read-worker'
+
+import { imageOriginalKey, KVStorage, snapshotCalendarKey, snapshotCollectionsKey, snapshotSummaryKey } from '@bangumi-tv/storage'
+import { sanitizeErrorMessage } from '@bangumi-tv/worker-common'
+
+interface ReadEnv {
+  BANGUMI_KV: {
+    get(key: string, type: 'json'): Promise<unknown>
+    put(key: string, value: string): Promise<void>
+    delete(key: string): Promise<void>
+    list?(options?: { prefix?: string }): Promise<{ keys: Array<{ name: string }> }>
+  }
+  BANGUMI_R2: {
+    get(key: string): Promise<{
+      arrayBuffer(): Promise<ArrayBuffer>
+      httpMetadata?: { contentType?: string }
+      customMetadata?: Record<string, string>
+    } | null>
+  }
+  NSFW_SHOW?: 'true' | 'false'
+}
+
+const COLLECTION_TYPES = ['want', 'watched', 'watching', 'on_hold', 'dropped'] as const
+
+function json(data: unknown, init?: ResponseInit): Response {
+  return Response.json(data, {
+    ...init,
+    headers: {
+      'Cache-Control': 'public, max-age=60',
+      ...(init?.headers instanceof Headers ? Object.fromEntries(init.headers.entries()) : init?.headers as Record<string, string> | undefined),
+    },
+  })
+}
+
+function validCollectionType(value: string | null): (typeof COLLECTION_TYPES)[number] {
+  return COLLECTION_TYPES.includes(value as any) ? value as (typeof COLLECTION_TYPES)[number] : 'watching'
+}
+
+function sanitizeStatus(value: any): any {
+  if (Array.isArray(value)) return value.map(sanitizeStatus)
+  if (!value || typeof value !== 'object') return value
+  const sanitized: Record<string, unknown> = {}
+  for (const [key, item] of Object.entries(value)) {
+    sanitized[key] = key === 'last_error' && item ? sanitizeErrorMessage(item) : sanitizeStatus(item)
+  }
+  return sanitized
+}
+
+async function handleCollections(url: URL, env: ReadEnv): Promise<Response> {
+  const storage = new KVStorage(env.BANGUMI_KV)
+  const type = validCollectionType(url.searchParams.get('type'))
+  const data = await storage.get<unknown[]>(snapshotCollectionsKey(type)) ?? []
+  const types = await storage.get<Record<string, number>>(snapshotSummaryKey()) ?? {}
+  return json({ data, total: data.length, page: 1, limit: data.length, types })
+}
+
+async function handleCalendar(env: ReadEnv): Promise<Response> {
+  const storage = new KVStorage(env.BANGUMI_KV)
+  return json(await storage.get(snapshotCalendarKey()) ?? [])
+}
+
+async function handleCache(env: ReadEnv): Promise<Response> {
+  const list = await env.BANGUMI_KV.list?.({ prefix: 'image:status:' })
+  const entries = []
+  for (const key of list?.keys ?? []) {
+    const status = await env.BANGUMI_KV.get(key.name, 'json')
+    if (status) entries.push(sanitizeStatus(status))
+  }
+  const counts = {
+    cached: 0,
+    pending_next_cron: 0,
+    queued: 0,
+    failed: 0,
+    missing_source: 0,
+  }
+  const common = { ...counts }
+  const large = { ...counts }
+  for (const entry of entries as any[]) {
+    if (entry.common?.status && entry.common.status in common) common[entry.common.status as keyof typeof common]++
+    if (entry.large?.status && entry.large.status in large) large[entry.large.status as keyof typeof large]++
+  }
+  return json({
+    total_subjects: entries.length,
+    common,
+    large,
+    items: entries,
+  })
+}
+
+async function handleImage(pathname: string, env: ReadEnv): Promise<Response> {
+  const hash = pathname.split('/').pop() ?? ''
+  if (!/^[0-9a-f]{64}$/i.test(hash)) return new Response('Invalid hash', { status: 400 })
+  const object = await env.BANGUMI_R2.get(imageOriginalKey(hash))
+  if (!object) return new Response('Not found', { status: 404 })
+  const headers = new Headers({
+    'Cache-Control': 'public, max-age=31536000, immutable',
+    'Content-Type': object.httpMetadata?.contentType || 'image/jpeg',
+  })
+  const bytes = object.customMetadata?.bytes
+  if (bytes) headers.set('X-Image-Bytes', bytes)
+  return new Response(await object.arrayBuffer(), { headers })
+}
+
+async function fetch(request: Request, env: ReadEnv): Promise<Response> {
+  const url = new URL(request.url)
+  if (url.pathname === '/collections') return handleCollections(url, env)
+  if (url.pathname === '/calendar') return handleCalendar(env)
+  if (url.pathname === '/config') return json({ nsfw: env.NSFW_SHOW !== 'false' })
+  if (url.pathname === '/health') return json({ ok: true, worker: 'read-worker' })
+  if (url.pathname === '/cache') return handleCache(env)
+  if (url.pathname.startsWith('/image/')) return handleImage(url.pathname, env)
+  return new Response('Not found', { status: 404 })
+}
+
+export default { fetch }
