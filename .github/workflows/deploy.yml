@@ -6,14 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       branch:
-        description: 'Branch to deploy'
+        description: Branch to deploy
         required: false
-        default: 'dev'
-      skip_provision:
-        description: 'Skip resource provisioning (KV/R2)'
-        type: boolean
-        required: false
-        default: false
+        default: dev
 
 jobs:
   deploy:
@@ -30,14 +25,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'pnpm'
+          cache: pnpm
 
       - run: pnpm install --frozen-lockfile
-
-      - name: Configure Wrangler env
-        run: |
-          echo "CLOUDFLARE_API_TOKEN=${{ secrets.CF_API_TOKEN }}" >> "$GITHUB_ENV"
-          echo "CLOUDFLARE_ACCOUNT_ID=${{ secrets.CF_ACCOUNT_ID }}" >> "$GITHUB_ENV"
 
       - name: TypeCheck
         run: pnpm typecheck
@@ -45,138 +35,33 @@ jobs:
       - name: Test
         run: pnpm test
 
-      - name: Build Check (main worker)
-        working-directory: packages/worker
-        run: npx wrangler deploy --dry-run --outdir dist
+      - name: Build Check
+        run: pnpm build:check
 
-      - name: Build Check (sync worker)
-        working-directory: packages/worker
-        run: npx wrangler deploy --dry-run --outdir dist-sync --config wrangler.sync.toml
-
-      # 幂等创建资源：已存在时忽略。
-      - name: Provision Cloudflare resources
-        if: ${{ !inputs.skip_provision }}
-        working-directory: packages/worker
-        run: |
-          npx wrangler kv namespace create "bangumi-tv-kv" || echo "KV namespace already exists"
-          npx wrangler r2 bucket create "bangumi-tv-images" || echo "R2 bucket already exists"
-
-      # 在 shell 中解析 KV namespace id，trim 掉尾随换行；若未拿到则失败。
-      - name: Resolve KV namespace ID
-        id: kv-id
-        working-directory: packages/worker
-        run: |
-          set -euo pipefail
-          KV_ID=$(npx wrangler kv namespace list | jq -r '.[] | select(.title == "bangumi-tv-kv") | .id' | head -n1 | tr -d '[:space:]')
-          if [ -z "${KV_ID}" ]; then
-            echo "Failed to resolve KV namespace id" >&2
-            exit 1
-          fi
-          echo "id=${KV_ID}" >> "$GITHUB_OUTPUT"
-
-      - name: Inject KV id into wrangler configs
-        working-directory: packages/worker
-        env:
-          KV_ID: ${{ steps.kv-id.outputs.id }}
-        run: |
-          python3 - <<'PY'
-          import os, re, pathlib
-          kv_id = os.environ["KV_ID"]
-          for cfg in ["wrangler.toml", "wrangler.sync.toml"]:
-              p = pathlib.Path(cfg)
-              text = p.read_text()
-              text = re.sub(r'id = "bangumi-tv-kv"', f'id = "{kv_id}"', text)
-              p.write_text(text)
-          PY
-
-      # 逐个上传非空的 Worker secret（空值跳过，避免 wrangler rejected）。
-      - name: Upload secrets (main worker)
-        working-directory: packages/worker
-        env:
-          BANGUMI_TOKEN: ${{ secrets.BANGUMI_TOKEN }}
-          BANGUMI_REFRESH_TOKEN: ${{ secrets.BANGUMI_REFRESH_TOKEN }}
-          BANGUMI_USERS: ${{ vars.BANGUMI_USERS }}
-          BANGUMI_PRIMARY_USER: ${{ vars.BANGUMI_PRIMARY_USER }}
-          BANGUMI_CLIENT_ID: ${{ secrets.BANGUMI_CLIENT_ID }}
-          BANGUMI_CLIENT_SECRET: ${{ secrets.BANGUMI_CLIENT_SECRET }}
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-        run: |
-          for name in BANGUMI_TOKEN BANGUMI_REFRESH_TOKEN BANGUMI_USERS BANGUMI_PRIMARY_USER \
-                      BANGUMI_CLIENT_ID BANGUMI_CLIENT_SECRET CRON_SECRET; do
-            val="${!name}"
-            if [ -n "${val}" ]; then
-              echo "${val}" | npx wrangler secret put "$name"
-            else
-              echo "Skipping $name (empty — will use KV / not configured)"
-            fi
-          done
-
-      - name: Upload secrets (sync worker)
-        working-directory: packages/worker
-        env:
-          BANGUMI_TOKEN: ${{ secrets.BANGUMI_TOKEN }}
-          BANGUMI_REFRESH_TOKEN: ${{ secrets.BANGUMI_REFRESH_TOKEN }}
-          BANGUMI_USERS: ${{ vars.BANGUMI_USERS }}
-          BANGUMI_PRIMARY_USER: ${{ vars.BANGUMI_PRIMARY_USER }}
-          BANGUMI_CLIENT_ID: ${{ secrets.BANGUMI_CLIENT_ID }}
-          BANGUMI_CLIENT_SECRET: ${{ secrets.BANGUMI_CLIENT_SECRET }}
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-        run: |
-          for name in BANGUMI_TOKEN BANGUMI_REFRESH_TOKEN BANGUMI_USERS BANGUMI_PRIMARY_USER \
-                      BANGUMI_CLIENT_ID BANGUMI_CLIENT_SECRET CRON_SECRET; do
-            val="${!name}"
-            if [ -n "${val}" ]; then
-              echo "${val}" | npx wrangler secret put "$name" --config wrangler.sync.toml
-            else
-              echo "Skipping $name (empty)"
-            fi
-          done
-
-      - name: Validate assets before deploy
-        working-directory: packages/worker
-        run: |
-          if grep -r '<WORKER_DOMAIN>' ../../public/; then
-            echo "ERROR: Placeholder <WORKER_DOMAIN> found in public/ files" >&2
-            exit 1
-          fi
-          for f in ../../public/src/*.css; do
-            if [ -f "$f" ]; then
-              last_char=$(sed -n '$s/.*\(.\)$/\1/p' "$f")
-              if [ "$last_char" != "}" ]; then
-                echo "ERROR: $f may have incomplete CSS syntax (last non-newline char: $last_char)" >&2
-                exit 1
-              fi
-            fi
-          done
-
-      - name: Deploy Main Worker
+      - name: Deploy Read Worker
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: deploy
-          workingDirectory: packages/worker
+          command: deploy --config apps/read-worker/wrangler.toml
 
-      - name: Diagnose Sync Worker cron API
-        env:
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
-        working-directory: packages/worker
-        run: |
-          echo "=== Current schedules on bangumi-tv-sync ==="
-          curl -s "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/workers/scripts/bangumi-tv-sync/schedules" \
-            -H "Authorization: Bearer $CF_API_TOKEN" | python3 -m json.tool || true
-          echo ""
-          echo "=== Trying to create cron schedule ==="
-          curl -s -X PUT "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/workers/scripts/bangumi-tv-sync/schedules" \
-            -H "Authorization: Bearer $CF_API_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '[{"cron":"0 */4 * * *"}]' | python3 -m json.tool || true
+      - name: Deploy Media Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: deploy --config apps/media-worker/wrangler.toml
 
       - name: Deploy Sync Worker
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: deploy --config wrangler.sync.toml
-          workingDirectory: packages/worker
+          command: deploy --config apps/sync-worker/wrangler.toml
+
+      - name: Deploy Frontend Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: deploy --config apps/frontend-worker/wrangler.toml

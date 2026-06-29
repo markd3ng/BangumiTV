@@ -1,0 +1,47 @@
+import assert from 'node:assert/strict'
+import { existsSync, readFileSync } from 'node:fs'
+import { test } from 'node:test'
+import { fileURLToPath } from 'node:url'
+import { dirname, resolve } from 'node:path'
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
+
+const appConfigs = [
+  ['frontend-worker', ['[[services]]', 'READ_WORKER']],
+  ['read-worker', ['[[kv_namespaces]]', '[[r2_buckets]]']],
+  ['sync-worker', ['[[queues.producers]]', '[triggers]', '0 */4 * * *']],
+  ['media-worker', ['[[queues.consumers]]', '[[kv_namespaces]]', '[[r2_buckets]]']],
+] as const
+
+test('each target worker has a checked-in Wrangler config with required bindings', () => {
+  for (const [app, expectedFragments] of appConfigs) {
+    const path = resolve(root, 'apps', app, 'wrangler.toml')
+    assert.equal(existsSync(path), true, `${app} wrangler.toml should exist`)
+    const config = readFileSync(path, 'utf8')
+    for (const fragment of expectedFragments) {
+      assert.match(config, new RegExp(fragment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${app} config should include ${fragment}`)
+    }
+  }
+})
+
+test('deploy workflow uses checked-in app configs without provisioning or schedule mutation', () => {
+  const workflow = readFileSync(resolve(root, '.github/workflows/deploy.yml'), 'utf8')
+  for (const app of appConfigs.map(([app]) => app)) {
+    assert.match(workflow, new RegExp(`apps/${app}/wrangler\\.toml`), `workflow should deploy ${app} config`)
+  }
+
+  const forbidden = [
+    'wrangler kv namespace create',
+    'wrangler r2 bucket create',
+    'wrangler kv namespace list',
+    'wrangler secret put',
+    'CRON_SECRET',
+    'Inject KV id',
+    'python3 -',
+    '/schedules',
+    '/__cron/sync',
+  ]
+  for (const fragment of forbidden) {
+    assert.doesNotMatch(workflow, new RegExp(fragment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `workflow should not contain ${fragment}`)
+  }
+})
