@@ -9,7 +9,7 @@
     "deploy": "pnpm -F @bangumi-tv/worker deploy",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "build:check": "pnpm -r build:check"
+    "build:check": "pnpm -r --if-present build:check"
   },
   "repository": {
     "type": "git",

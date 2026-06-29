@@ -1,0 +1,19 @@
+{
+  "name": "@bangumi-tv/read-worker",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test"
+  },
+  "dependencies": {
+    "@bangumi-tv/domain": "workspace:*",
+    "@bangumi-tv/storage": "workspace:*",
+    "@bangumi-tv/worker-common": "workspace:*",
+    "hono": "^4.12.27"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0"
+  }
+}
