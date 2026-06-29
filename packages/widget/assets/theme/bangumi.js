@@ -37,12 +37,18 @@
   }
 
   // ---------------------------------------------------------------
-  // 收藏卡片（保持原逻辑不变）：用 images.hash 走 worker 图片代理 + 观看进度
+  const COVER_PLACEHOLDER = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" fill="#333"><rect width="300" height="400"/></svg>')
+
+  function subjectImageUrl(images) {
+    return images?.common?.uri
+      ? API + images.common.uri
+      : COVER_PLACEHOLDER
+  }
+
+  // 收藏卡片：用 images.common.uri 走 worker 图片代理 + 观看进度
   // ---------------------------------------------------------------
   function renderCard(entry) {
-    const imgUrl = entry.images && entry.images.hash
-      ? API + '/image/' + entry.images.hash + '?w=300&fmt=webp'
-      : 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" fill="#333"><rect width="300" height="400"/></svg>')
+    const imgUrl = subjectImageUrl(entry.images)
 
     const progress = entry.total_episodes > 0
       ? Math.round((entry.ep_status / entry.total_episodes) * 100)
@@ -69,9 +75,7 @@
   // 字段与收藏不同：用 id、images.common（bgm.tv 原图）、rating.score
   // ---------------------------------------------------------------
   function renderCalendarCard(entry) {
-    const img = entry.images || {}
-    const imgUrl = img.common || img.large || img.medium || img.grid
-      || 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" fill="#333"><rect width="300" height="400"/></svg>')
+    const imgUrl = subjectImageUrl(entry.images)
     const name = entry.name_cn || entry.name || ''
     const score = entry.rating && entry.rating.score
 

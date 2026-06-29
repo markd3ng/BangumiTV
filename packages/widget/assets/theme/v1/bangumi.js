@@ -38,12 +38,10 @@
   }
 
   // ---------------------------------------------------------------
-  // 收藏卡片（保持原逻辑不变）：用 images.hash 走 worker 图片代理 + 观看进度
+  // 收藏卡片：用 images.common.uri 走 worker 图片代理 + 观看进度
   // ---------------------------------------------------------------
   function renderCard(entry) {
-    const imgUrl = entry.images && entry.images.hash
-      ? API + '/image/' + entry.images.hash + '?w=300&fmt=webp&size=common'
-      : 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" fill="#333"><rect width="300" height="400"/></svg>')
+    const imgUrl = subjectImageUrl(entry.images)
 
     const total = entry.eps || entry.total_episodes || 0
     const progress = total > 0
@@ -71,10 +69,7 @@
   // 字段与收藏不同：用 id、images.common（bgm.tv 原图）、rating.score
   // ---------------------------------------------------------------
   function renderCalendarCard(entry) {
-    const hasHash = entry.images && entry.images.hash
-    const imgUrl = hasHash
-      ? API + '/image/' + entry.images.hash + '?w=300&fmt=webp&size=common'
-      : 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" fill="#333"><rect width="300" height="400"/></svg>')
+    const imgUrl = subjectImageUrl(entry.images)
     const name = entry.name_cn || entry.name || ''
     const score = entry.rating && entry.rating.score
 

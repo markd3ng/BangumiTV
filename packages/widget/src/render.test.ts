@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   renderCachePage,
   renderFooter,
@@ -7,6 +10,8 @@ import {
   renderWebmasterMeta,
   widgetJs,
 } from './index.ts'
+
+const widgetRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 test('renderFooter links cache page and commit when SHA and repository are present', () => {
   const footer = renderFooter({
@@ -49,4 +54,12 @@ test('renderWebmasterMeta emits only configured verification tags', () => {
 test('widgetJs consumes new images.common.uri shape', () => {
   assert.match(widgetJs, /images\?\.common\?\.uri/)
   assert.equal(widgetJs.includes('hash_large'), false)
+})
+
+test('packaged widget assets do not read legacy image hash fields', () => {
+  for (const asset of ['assets/public/src/bangumi.js', 'assets/theme/bangumi.js', 'assets/theme/v1/bangumi.js']) {
+    const source = readFileSync(resolve(widgetRoot, asset), 'utf8')
+    assert.equal(source.includes('images.hash'), false, `${asset} should not read images.hash`)
+    assert.equal(source.includes('hash_large'), false, `${asset} should not read hash_large`)
+  }
 })
