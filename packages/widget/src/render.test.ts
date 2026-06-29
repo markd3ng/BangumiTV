@@ -1,0 +1,52 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import {
+  renderCachePage,
+  renderFooter,
+  renderIndexPage,
+  renderWebmasterMeta,
+  widgetJs,
+} from './index.ts'
+
+test('renderFooter links cache page and commit when SHA and repository are present', () => {
+  const footer = renderFooter({
+    commitSha: '0123456789abcdef',
+    repositoryUrl: 'https://github.com/markd3ng/BangumiTV',
+  })
+
+  assert.match(footer, /href="\/cache"/)
+  assert.match(footer, /Build 0123456/)
+  assert.match(footer, /https:\/\/github.com\/markd3ng\/BangumiTV\/commit\/0123456789abcdef/)
+})
+
+test('renderFooter falls back to Build unknown without commit link', () => {
+  const footer = renderFooter({})
+
+  assert.match(footer, /Build unknown/)
+  assert.equal(footer.includes('/commit/'), false)
+})
+
+test('public pages reuse the exact shared footer output', () => {
+  const build = { commitSha: 'abcdef0123456789', repositoryUrl: 'https://github.com/markd3ng/BangumiTV' }
+  const footer = renderFooter(build)
+
+  assert.equal(renderIndexPage({ build }).includes(footer), true)
+  assert.equal(renderCachePage({ build }).includes(footer), true)
+})
+
+test('renderWebmasterMeta emits only configured verification tags', () => {
+  const html = renderWebmasterMeta({
+    googleSiteVerification: 'google-token',
+    bingSiteVerification: 'bing-token',
+  })
+
+  assert.match(html, /name="google-site-verification" content="google-token"/)
+  assert.match(html, /name="msvalidate\.01" content="bing-token"/)
+  assert.equal(html.includes('yandex-verification'), false)
+  assert.equal(html.includes('baidu-site-verification'), false)
+})
+
+test('widgetJs consumes new images.common.uri shape', () => {
+  assert.match(widgetJs, /images\?\.common\?\.uri/)
+  assert.equal(widgetJs.includes('hash_large'), false)
+})
