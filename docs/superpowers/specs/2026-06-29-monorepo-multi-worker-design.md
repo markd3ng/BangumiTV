@@ -202,14 +202,14 @@ Responsibilities:
 - Build-time rendering of webmaster verification meta tags.
 - Build-time rendering of footer links and commit information.
 
-Current top-level frontend/theme assets are consolidated into this package:
+Top-level frontend/theme assets have been consolidated into this package:
 
 - `public/index.html`
 - `public/src/bangumi.js`
 - `public/src/bangumi.css`
-- `bangumi-theme/**`
+- theme CSS, widget JS, and theme page templates previously stored outside `packages/widget`
 
-After migration, there is no standalone `bangumi-theme` directory and no separate directory for one-off styles. Theme CSS, widget JS, page templates, and cache-page assets live under `packages/widget` with one source of truth.
+After migration, there is no standalone theme asset directory and no separate directory for one-off styles. Theme CSS, widget JS, page templates, and cache-page assets live under `packages/widget` with one source of truth.
 
 ### `packages/worker-common`
 
@@ -795,7 +795,7 @@ README must be rewritten for the new architecture. It must document:
 
 README must not describe removed legacy fields, old single Worker deployment, old image field names, or unimplemented endpoints.
 
-README must not instruct users to edit `bangumi-theme`, because that directory is removed in the monorepo architecture.
+README must not instruct users to edit the removed standalone theme directory, because theme assets now live under `packages/widget`.
 
 README must not instruct users to `curl` a cron URI for normal sync. Manual sync by public HTTP endpoint is removed from the target architecture.
 
@@ -805,7 +805,7 @@ README must not instruct users to `curl` a cron URI for normal sync. Manual sync
 2. Move pure domain logic into `packages/domain`.
 3. Move bgm.tv client into `packages/bgm-api`.
 4. Move storage adapters and key builders into `packages/storage`.
-5. Move `public/` and `bangumi-theme/**` frontend assets into `packages/widget`.
+5. Move top-level public and theme frontend assets into `packages/widget`.
 6. Implement the shared footer component/template partial in `packages/widget`.
 7. Build `read-worker`.
 8. Build `frontend-worker`.
